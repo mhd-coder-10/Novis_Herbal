@@ -1,0 +1,335 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    -webkit-tap-highlight-color: transparent;
+    overflow-x: clip;
+    width: 100%;
+    max-width: 100%;
+  }
+
+  body {
+    @apply font-sans bg-[#FAF8F5] text-[#14231A];
+    overflow-x: clip;
+    width: 100%;
+    max-width: 100%;
+    position: relative;
+  }
+
+  #root {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: clip;
+  }
+
+  /* ==========================================================================
+     GLOBAL CURSOR & POINTER BEHAVIOR
+     ========================================================================== */
+  /* Ensure all clickable interactive elements display the hand pointer cursor */
+  button, 
+  [role="button"], 
+  a, 
+  select, 
+  option,
+  summary, 
+  label, 
+  .cursor-pointer,
+  input[type="checkbox"],
+  input[type="radio"],
+  input[type="file"],
+  input[type="submit"],
+  input[type="button"] {
+    cursor: pointer !important;
+  }
+
+  /* Ensure text inputs, textareas, and editable elements display the I-beam text cursor & clear caret */
+  input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="submit"]):not([type="button"]),
+  textarea,
+  [contenteditable="true"] {
+    cursor: text !important;
+    caret-color: auto !important;
+  }
+
+  /* Disabled states */
+  button:disabled,
+  input:disabled,
+  select:disabled,
+  textarea:disabled {
+    cursor: not-allowed !important;
+  }
+
+  /* Prevent Caret / Pipe cursor from appearing on non-editable elements (buttons, badges, tabs, text) */
+  *:not(input):not(textarea):not([contenteditable="true"]) {
+    caret-color: transparent !important;
+  }
+
+  button, [role="button"], a, select, summary, nav, .cursor-pointer {
+    -webkit-user-select: none;
+    user-select: none;
+  }
+}
+
+/* Fluid edge-to-edge container without rigid max-width or giant gutters */
+.page-container {
+  width: 100%;
+  max-width: 100%;
+  padding-left: 0.875rem;
+  padding-right: 0.875rem;
+}
+
+@media (min-width: 640px) {
+  .page-container {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .page-container {
+    padding-left: 2rem;
+    padding-right: 2rem;
+  }
+}
+
+@media (min-width: 1280px) {
+  .page-container {
+    padding-left: 2.5rem;
+    padding-right: 2.5rem;
+  }
+}
+
+@media (min-width: 1536px) {
+  .page-container {
+    padding-left: 3rem;
+    padding-right: 3rem;
+  }
+}
+
+/* ==========================================================================
+   GLOBAL SCROLLBAR CLEANUP (Remove ugly Windows native pipe/arrows)
+   ========================================================================== */
+/* Hide scrollbar line/pipe globally on all modal, dialog, drawer, and popup elements */
+.no-scrollbar,
+.modal-scroll,
+.dialog-content,
+[role="dialog"] [class*="overflow-y-auto"],
+[role="dialog"] [class*="overflow-auto"] {
+  -ms-overflow-style: none !important;
+  scrollbar-width: none !important;
+}
+
+.no-scrollbar::-webkit-scrollbar,
+.modal-scroll::-webkit-scrollbar,
+.dialog-content::-webkit-scrollbar,
+[role="dialog"] [class*="overflow-y-auto"]::-webkit-scrollbar,
+[role="dialog"] [class*="overflow-auto"]::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+/* For all scrollbars across the application: sleek invisible track, no arrow buttons */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent !important;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(14, 40, 30, 0.18);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(14, 40, 30, 0.35);
+}
+
+::-webkit-scrollbar-button {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+/* ==========================================================================
+   ADMIN PANEL TYPOGRAPHY (Inter font & enhanced, comfortable content sizing)
+   ========================================================================== */
+.admin-panel {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Headings and titles explicitly preserve luxury Playfair Display serif */
+.admin-panel .font-serif {
+  font-family: 'Playfair Display', Georgia, serif !important;
+}
+
+/* Upgrade baseline font scale inside admin panel so normal text is not microscopically small */
+.admin-panel {
+  font-size: 0.9375rem; /* 15px base */
+  line-height: 1.5;
+}
+
+.admin-panel .text-xs {
+  font-size: 0.8125rem; /* ~13px instead of 12px */
+  line-height: 1.25rem;
+}
+
+.admin-panel .text-\[10px\] {
+  font-size: 0.725rem; /* ~11.6px instead of 10px */
+}
+
+.admin-panel .text-\[11px\] {
+  font-size: 0.775rem; /* ~12.4px instead of 11px */
+}
+
+/* Inputs, selects, and textareas */
+.admin-panel input,
+.admin-panel select,
+.admin-panel textarea {
+  font-size: 0.875rem !important; /* 14px clear input text */
+}
+
+/* Table cells: spacious and legible */
+.admin-panel table td {
+  font-size: 0.85rem;
+}
+
+.admin-panel table th {
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+}
+
+/* Luxury card styling with minimal mobile padding */
+.luxury-card {
+  background: #FFFFFF;
+  border: 1px solid rgba(11, 59, 36, 0.08);
+  box-shadow: 0 4px 20px -4px rgba(11, 59, 36, 0.04);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@media (min-width: 768px) {
+  .luxury-card:hover {
+    border-color: rgba(11, 59, 36, 0.2);
+    transform: translateY(-4px);
+    box-shadow: 0 20px 40px -15px rgba(11, 59, 36, 0.12);
+  }
+}
+
+.gold-badge {
+  background: linear-gradient(135deg, #ECC94B 0%, #D4AF37 50%, #B7791F 100%);
+  color: #1A201C;
+}
+
+.forest-hero-bg {
+  background: radial-gradient(circle at 85% 15%, rgba(212, 175, 55, 0.12) 0%, transparent 45%),
+    radial-gradient(circle at 10% 85%, rgba(19, 82, 52, 0.35) 0%, transparent 50%),
+    linear-gradient(150deg, #051A10 0%, #0B3B24 55%, #072617 100%);
+}
+
+@keyframes float {
+
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+.animate-float {
+  animation: float 4s ease-in-out infinite;
+}
+
+@keyframes toastProgress {
+  from {
+    width: 100%;
+  }
+
+  to {
+    width: 0%;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.4s ease-out forwards;
+}
+
+@keyframes swapProgress {
+  0% {
+    width: 0%;
+  }
+
+  100% {
+    width: 100%;
+  }
+}
+
+.animate-swap-progress {
+  animation: swapProgress 5000ms linear forwards;
+}
+
+@keyframes heroSlideFade {
+  0% {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-hero-slide {
+  animation: heroSlideFade 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* ====================================================================
+   FINANCIAL AUDIT REPORT PRINT STYLING
+   Enables saving high-fidelity A4 PDF statements directly to PC
+   ==================================================================== */
+@media print {
+  body * {
+    visibility: hidden !important;
+  }
+  .printable-report,
+  .printable-report * {
+    visibility: visible !important;
+  }
+  .printable-report {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 24px !important;
+    background: #ffffff !important;
+    color: #0f172a !important;
+    font-size: 11px !important;
+  }
+  @page {
+    margin: 1.2cm;
+    size: A4 portrait;
+  }
+}

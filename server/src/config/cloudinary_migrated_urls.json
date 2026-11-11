@@ -1,0 +1,28 @@
+{
+  "hairOil": [
+    "https://res.cloudinary.com/ipb9jst1/image/upload/v1793361811/NOVISE_HERBAL/products/novise_hair_oil_1.jpg",
+    "https://res.cloudinary.com/ipb9jst1/image/upload/v1793361812/NOVISE_HERBAL/products/novise_hair_oil_2.jpg",
+    "https://res.cloudinary.com/ipb9jst1/image/upload/v1793361813/NOVISE_HERBAL/products/novise_hair_oil_3.jpg",
+    "https://res.cloudinary.com/ipb9jst1/image/upload/v1793361814/NOVISE_HERBAL/products/novise_hair_oil_4.jpg",
+    "https://res.cloudinary.com/ipb9jst1/image/upload/v1793361815/NOVISE_HERBAL/products/novise_hair_oil_5.jpg",
+    "https://res.cloudinary.com/ipb9jst1/image/upload/v1793361816/NOVISE_HERBAL/products/novise_hair_oil_6.jpg",
+    "https://res.cloudinary.com/ipb9jst1/image/upload/v1793361817/NOVISE_HERBAL/products/novise_hair_oil_7.jpg"
+  ],
+  "shampoo": [
+    "https://res.cloudinary.com/ipb9jst1/image/upload/v1793361817/NOVISE_HERBAL/products/novise_shampoo_1.jpg",
+    "https://res.cloudinary.com/ipb9jst1/image/upload/v1793361818/NOVISE_HERBAL/products/novise_shampoo_2.jpg",
+    "https://res.cloudinary.com/ipb9jst1/image/upload/v1793361819/NOVISE_HERBAL/products/novise_shampoo_3.jpg",
+    "https://res.cloudinary.com/ipb9jst1/image/upload/v1793361820/NOVISE_HERBAL/products/novise_shampoo_4.jpg",
+    "https://res.cloudinary.com/ipb9jst1/image/upload/v1793361820/NOVISE_HERBAL/products/novise_shampoo_5.jpg",
+    "https://res.cloudinary.com/ipb9jst1/image/upload/v1793361821/NOVISE_HERBAL/products/novise_shampoo_6.jpg",
+    "https://res.cloudinary.com/ipb9jst1/image/upload/v1793361822/NOVISE_HERBAL/products/novise_shampoo_7.jpg"
+  ],
+  "combo": [
+    "https://res.cloudinary.com/ipb9jst1/image/upload/v1793361823/NOVISE_HERBAL/products/novise_combo_1.jpg",
+    "https://res.cloudinary.com/ipb9jst1/image/upload/v1793361824/NOVISE_HERBAL/products/novise_combo_2.jpg",
+    "https://res.cloudinary.com/ipb9jst1/image/upload/v1793361825/NOVISE_HERBAL/products/novise_combo_3.jpg",
+    "https://res.cloudinary.com/ipb9jst1/image/upload/v1793361825/NOVISE_HERBAL/products/novise_combo_4.jpg",
+    "https://res.cloudinary.com/ipb9jst1/image/upload/v1793361826/NOVISE_HERBAL/products/novise_combo_5.jpg",
+    "https://res.cloudinary.com/ipb9jst1/image/upload/v1793361827/NOVISE_HERBAL/products/novise_combo_6.jpg"
+  ]
+}
