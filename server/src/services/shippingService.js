@@ -1,48 +1,75 @@
 import Order from '../models/Order.js';
 import AuditLog from '../models/AuditLog.js';
-import { createShiprocketShipment, mapCourierStatusToAppStatus } from './shiprocketService.js';
+import { sendOrderDispatchedEmail } from './emailService.js';
 
 export class ShippingService {
-  static async bookShipmentForOrder(orderId, adminUser) {
-    const order = await Order.findOne({ orderId });
+  /**
+   * Update manual courier consignment tracking details (India Post / Local Couriers)
+   * Dispatches tracking ID, tracking link, and marks order as DISPATCHED
+   */
+  static async updateTrackingDetails(orderId, { courierName, trackingNumber, trackingUrl, dispatchedAt, notes, updateStatusToDispatched = true }, adminUser) {
+    const order = await Order.findOne({ orderId: String(orderId).trim().toUpperCase() });
     if (!order) {
       const error = new Error('Order not found');
       error.statusCode = 404;
       throw error;
     }
 
-    if (['CANCELLED', 'DELIVERED', 'RETURNED'].includes(order.orderStatus)) {
-      const error = new Error(`Cannot create forward courier shipment for an order with status "${order.orderStatus}"`);
+    if (['CANCELLED'].includes(order.orderStatus)) {
+      const error = new Error(`Cannot dispatch or assign tracking to a CANCELLED order`);
       error.statusCode = 400;
       throw error;
     }
 
-    const shipmentResult = await createShiprocketShipment(order);
+    if (!trackingNumber || !trackingNumber.trim()) {
+      const error = new Error('Consignment Tracking Number is required');
+      error.statusCode = 400;
+      throw error;
+    }
 
-    order.shipment.provider = 'SHIPROCKET';
-    order.shipment.shiprocketOrderId = shipmentResult.shiprocketOrderId;
-    order.shipment.shipmentId = shipmentResult.shipmentId;
-    order.shipment.awbCode = shipmentResult.awbCode;
-    order.shipment.courierName = shipmentResult.courierName;
-    order.shipment.labelUrl = shipmentResult.labelUrl;
-    order.shipment.trackingUrl = shipmentResult.trackingUrl;
-    order.shipment.pickupScheduledAt = new Date();
+    const assignedCourier = (courierName || 'India Post').trim();
+    const cleanTrackingNo = trackingNumber.trim();
+    const finalTrackingUrl = (trackingUrl && trackingUrl.trim()) 
+      ? trackingUrl.trim() 
+      : (process.env.DEFAULT_TRACKING_PORTAL || 'https://www.indiapost.gov.in/');
+    const dispatchTime = dispatchedAt ? new Date(dispatchedAt) : new Date();
 
-    order.orderStatus = 'SHIPMENT_BOOKED';
+    if (!order.shipment) {
+      order.shipment = {};
+    }
+
+    order.shipment.provider = 'MANUAL_COURIER';
+    order.shipment.courierName = assignedCourier;
+    order.shipment.trackingNumber = cleanTrackingNo;
+    order.shipment.awbCode = cleanTrackingNo; // Kept as alias for UI compatibility
+    order.shipment.trackingUrl = finalTrackingUrl;
+    order.shipment.dispatchedAt = dispatchTime;
+    order.shipment.labelUrl = `/api/shipping/label/${order.orderId}`;
+    if (notes) {
+      order.shipment.notes = notes.trim();
+    }
+
+    // Automatically transition forward fulfillment to DISPATCHED if placed or packed
+    if (updateStatusToDispatched || ['PLACED', 'CONFIRMED', 'PROCESSING', 'PACKED'].includes(order.orderStatus)) {
+      order.orderStatus = 'DISPATCHED';
+    }
 
     order.trackingTimeline.push({
-      status: 'SHIPMENT_BOOKED',
-      title: 'Shipment Booked & AWB Assigned',
-      description: `Assigned Courier: ${shipmentResult.courierName} (AWB: ${shipmentResult.awbCode})`,
+      status: order.orderStatus,
+      title: `Dispatched via ${assignedCourier}`,
+      description: `Consignment / Tracking Number: ${cleanTrackingNo}. Track portal: ${finalTrackingUrl}`,
       location: 'Primary Fulfillment Hub, Mumbai',
-      timestamp: new Date(),
+      timestamp: dispatchTime,
       updatedBy: adminUser ? adminUser.email : 'ADMIN'
     });
 
     await order.save();
 
+    // Send Dispatched Email to Customer with Courier Partner & Tracking Details
+    sendOrderDispatchedEmail(order).catch(err => console.error('[Dispatch Email Error]:', err.message));
+
     await AuditLog.create({
-      action: 'SHIPMENT_BOOKED',
+      action: 'ORDER_DISPATCHED',
       entityType: 'ORDER',
       entityId: order.orderId,
       performedBy: {
@@ -50,63 +77,29 @@ export class ShippingService {
         email: adminUser?.email,
         role: adminUser?.role
       },
-      details: { awb: shipmentResult.awbCode, courier: shipmentResult.courierName, mode: shipmentResult.mode }
+      details: { 
+        trackingNumber: cleanTrackingNo, 
+        courier: assignedCourier, 
+        trackingUrl: finalTrackingUrl,
+        dispatchedAt: dispatchTime
+      }
     });
 
     return {
-      message: `Shipment booked successfully with ${shipmentResult.courierName}. AWB: ${shipmentResult.awbCode}`,
+      success: true,
+      message: `Tracking details saved. Parcel dispatched via ${assignedCourier} (Tracking No: ${cleanTrackingNo})`,
       shipment: order.shipment,
       order
     };
   }
 
-  static async handleShiprocketWebhookEvent(payload) {
-    const awb = payload.awb || payload.awb_code;
-    const currentStatus = payload.current_status || payload.status;
-    const location = payload.location || payload.current_hub_name || 'In Transit';
-
-    if (!awb) {
-      const error = new Error('AWB code missing in webhook payload');
-      error.statusCode = 400;
-      throw error;
-    }
-
-    const order = await Order.findOne({ 'shipment.awbCode': awb });
-    if (!order) {
-      const error = new Error('Order with this AWB not found');
-      error.statusCode = 404;
-      throw error;
-    }
-
-    const mappedStatus = mapCourierStatusToAppStatus(currentStatus);
-
-    const isDuplicate = order.trackingTimeline.some(t =>
-      t.status === mappedStatus &&
-      (new Date().getTime() - new Date(t.timestamp).getTime()) < 15 * 60 * 1000
-    );
-
-    if (!isDuplicate) {
-      order.orderStatus = mappedStatus;
-      order.trackingTimeline.push({
-        status: mappedStatus,
-        title: `Courier Update: ${currentStatus}`,
-        description: payload.activity || 'Parcel status updated by courier partner',
-        location: location,
-        timestamp: new Date(),
-        updatedBy: 'COURIER_WEBHOOK'
-      });
-
-      if (mappedStatus === 'DELIVERED') {
-        order.shipment.deliveredAt = new Date();
-        if (order.paymentInfo.method === 'COD') {
-          order.paymentInfo.status = 'PAID';
-        }
-      }
-
-      await order.save();
-    }
-
-    return { message: 'Webhook processed successfully' };
+  // Alias for backward compatibility with existing route callers
+  static async bookShipmentForOrder(orderId, adminUser) {
+    return this.updateTrackingDetails(orderId, {
+      courierName: 'India Post',
+      trackingNumber: `IP${Date.now().toString().slice(-8)}IN`,
+      trackingUrl: process.env.DEFAULT_TRACKING_PORTAL || 'https://www.indiapost.gov.in/'
+    }, adminUser);
   }
 
   static async manualOverrideStatus(orderId, { status, reason, note, location }, adminUser) {
@@ -116,7 +109,7 @@ export class ShippingService {
       throw error;
     }
 
-    const order = await Order.findOne({ orderId });
+    const order = await Order.findOne({ orderId: String(orderId).trim().toUpperCase() });
     if (!order) {
       const error = new Error('Order not found');
       error.statusCode = 404;
@@ -128,21 +121,29 @@ export class ShippingService {
 
     order.trackingTimeline.push({
       status,
-      title: `Manual Update: ${status}`,
-      description: `[Manual Override]: ${reason}. Note: ${note || 'None'}`,
-      location: location || 'Warehouse Admin Override',
+      title: `Status: ${status}`,
+      description: `[Manual Update]: ${reason}. Note: ${note || 'None'}`,
+      location: location || 'Warehouse Dispatch',
       timestamp: new Date(),
       updatedBy: adminUser?.email || 'ADMIN'
     });
 
     if (status === 'DELIVERED') {
+      if (!order.shipment) order.shipment = {};
       order.shipment.deliveredAt = new Date();
-      if (order.paymentInfo.method === 'COD') {
+      if (order.paymentInfo?.method === 'COD') {
         order.paymentInfo.status = 'PAID';
+        if (!order.paymentInfo.paidAt) {
+          order.paymentInfo.paidAt = new Date();
+        }
       }
     }
 
     await order.save();
+
+    if (status === 'DISPATCHED') {
+      sendOrderDispatchedEmail(order).catch(err => console.error('[Dispatch Email Error]:', err.message));
+    }
 
     await AuditLog.create({
       action: 'MANUAL_STATUS_OVERRIDE',
@@ -162,61 +163,84 @@ export class ShippingService {
   }
 
   static async getShippingLabelHTML(orderId) {
-    const order = await Order.findOne({ orderId });
+    const order = await Order.findOne({ orderId: String(orderId).trim().toUpperCase() });
     if (!order) {
       const error = new Error('Order not found');
       error.statusCode = 404;
       throw error;
     }
 
+    const trackingNumber = order.shipment?.trackingNumber || order.shipment?.awbCode || 'PENDING-DISPATCH';
+    const courierName = order.shipment?.courierName || 'India Post';
+    const isCod = order.paymentInfo?.method === 'COD';
+
     return `
       <!DOCTYPE html>
       <html>
       <head>
-        <title>Shipping Label - ${order.orderId}</title>
+        <meta charset="utf-8" />
+        <title>Shipping Dispatch Label - ${order.orderId}</title>
         <style>
-          body { font-family: 'Courier New', monospace; padding: 20px; max-width: 480px; margin: auto; border: 2px dashed #000; }
-          .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; }
-          .barcode { font-size: 24px; font-weight: bold; letter-spacing: 4px; text-align: center; margin: 15px 0; background: #eee; padding: 10px; }
-          .section { margin: 10px 0; border-bottom: 1px solid #ccc; padding-bottom: 8px; font-size: 13px; }
-          .bold { font-weight: bold; }
-          .print-btn { background: #0B3B24; color: white; border: none; padding: 8px 16px; cursor: pointer; border-radius: 4px; }
-          @media print { .print-btn { display: none; } }
+          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; padding: 24px; max-width: 520px; margin: auto; border: 2px dashed #0B3B24; border-radius: 8px; }
+          .header { text-align: center; border-bottom: 2px solid #0B3B24; padding-bottom: 12px; }
+          .brand { font-size: 20px; font-weight: 900; letter-spacing: 2px; color: #0B3B24; margin: 0; }
+          .sub { font-size: 11px; text-transform: uppercase; color: #666; margin-top: 4px; letter-spacing: 1px; }
+          .barcode-box { font-family: 'Courier New', monospace; font-size: 20px; font-weight: bold; letter-spacing: 3px; text-align: center; margin: 16px 0; background: #f4f6f4; border: 1px solid #dcdcdc; padding: 10px; border-radius: 4px; }
+          .section { margin: 12px 0; border-bottom: 1px solid #e5e5e5; padding-bottom: 10px; font-size: 13px; line-height: 1.5; }
+          .bold { font-weight: bold; color: #111; }
+          .payment-pill { display: inline-block; padding: 4px 10px; border-radius: 4px; font-weight: 800; font-size: 12px; margin-top: 4px; }
+          .prepaid { background: #e6f4ea; color: #137333; border: 1px solid #ceead6; }
+          .cod { background: #fef7e0; color: #b06000; border: 1px solid #fdd663; }
+          .print-btn { background: #0B3B24; color: #fff; font-weight: bold; border: none; padding: 10px 20px; cursor: pointer; border-radius: 6px; font-size: 13px; width: 100%; margin-top: 16px; }
+          @media print { .print-btn { display: none; } body { border: 1px solid #000; } }
         </style>
       </head>
       <body>
         <div class="header">
-          <h2>NOVIS HERBAL</h2>
-          <p>D2C Premium Hair Care Logistics</p>
+          <div class="brand">NOVIS HERBAL</div>
+          <div class="sub">100% Pure Botanical Ayurveda • Delivery Dispatch Label</div>
         </div>
-        <div class="barcode">
-          * ${order.shipment?.awbCode || 'AWB-PENDING'} *
+
+        <div class="barcode-box">
+          * ${trackingNumber} *
         </div>
+
         <div class="section">
-          <div><span class="bold">AWB:</span> ${order.shipment?.awbCode || 'Pending'}</div>
-          <div><span class="bold">Courier:</span> ${order.shipment?.courierName || 'Standard Express'}</div>
-          <div><span class="bold">Order ID:</span> ${order.orderId}</div>
-          <div><span class="bold">Payment Mode:</span> ${order.paymentInfo.method} ${order.paymentInfo.method === 'COD' ? `(Collect ₹${order.pricing.totalAmount})` : '(PREPAID - DO NOT COLLECT)'}</div>
+          <div><span class="bold">Consignment / Tracking No:</span> ${trackingNumber}</div>
+          <div><span class="bold">Courier Partner:</span> ${courierName}</div>
+          <div><span class="bold">Order ID:</span> #${order.orderId}</div>
+          <div><span class="bold">Order Date:</span> ${new Date(order.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</div>
+          <div>
+            <span class="bold">Payment Mode:</span>
+            <span class="payment-pill ${isCod ? 'cod' : 'prepaid'}">
+              ${isCod ? `CASH ON DELIVERY — COLLECT ₹${order.pricing.totalAmount}` : 'PREPAID — DO NOT COLLECT CASH'}
+            </span>
+          </div>
         </div>
+
         <div class="section">
-          <div class="bold">DELIVER TO:</div>
-          <div>${order.shippingAddress.fullName}</div>
+          <div class="bold" style="text-transform: uppercase; color: #0B3B24; margin-bottom: 4px;">Deliver To (Recipient):</div>
+          <div class="bold" style="font-size: 14px;">${order.shippingAddress.fullName}</div>
           <div>${order.shippingAddress.addressLine1}</div>
           ${order.shippingAddress.addressLine2 ? `<div>${order.shippingAddress.addressLine2}</div>` : ''}
-          <div>${order.shippingAddress.city}, ${order.shippingAddress.state} - <span class="bold">${order.shippingAddress.pincode}</span></div>
-          <div>Phone: ${order.shippingAddress.phone}</div>
+          ${order.shippingAddress.landmark ? `<div>Landmark: ${order.shippingAddress.landmark}</div>` : ''}
+          <div><span class="bold">${order.shippingAddress.city}, ${order.shippingAddress.state}</span> — <span class="bold" style="font-size: 15px;">PIN: ${order.shippingAddress.pincode}</span></div>
+          <div>Phone: <span class="bold">${order.shippingAddress.phone}</span></div>
         </div>
+
         <div class="section">
-          <div class="bold">RETURN / SHIPPER ADDRESS:</div>
-          <div>Novise Fulfillment Center</div>
-          <div>Plot 42, Green Valley Industrial Area, Mumbai, MH - 400001</div>
-          <div>Contact: support@novise.in | +91 98765 43210</div>
+          <div class="bold" style="text-transform: uppercase; color: #0B3B24; margin-bottom: 4px;">Sender / Shipper (Return Address):</div>
+          <div class="bold">Novis Herbal Care Center</div>
+          <div>Shop No 203, Market Yard, Near BOB Bank, Patan, Gujarat - 384151</div>
+          <div>Email: care@novise.in | Contact: +91 9316515672</div>
         </div>
+
         <div class="section">
-          <div><span class="bold">Items:</span> ${order.items.map(i => `${i.name} (Qty: ${i.quantity})`).join(', ')}</div>
-          <div><span class="bold">Weight:</span> ${order.shipment?.packageWeightGrams || 500}g</div>
+          <div class="bold">Enclosed Contents:</div>
+          <div>${order.items.map(i => `${i.name} (Qty: ${i.quantity})`).join(', ')}</div>
+          <div>Approx Weight: ${order.shipment?.packageWeightGrams || 500}g</div>
         </div>
-        <br />
+
         <button class="print-btn" onclick="window.print()">Print Shipping Label</button>
       </body>
       </html>

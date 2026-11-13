@@ -209,29 +209,26 @@ export interface Order {
   refundInfo?: OrderRefundInfo;
   rtoDetails?: OrderRTODetails;
   shipment?: {
-    provider: string;
-    shiprocketOrderId?: string;
-    shipmentId?: string;
-    awbCode?: string;
+    provider?: string;
     courierName?: string;
-    labelUrl?: string;
+    trackingNumber?: string;
+    awbCode?: string;
     trackingUrl?: string;
-    pickupScheduledAt?: string;
+    dispatchedAt?: string;
     deliveredAt?: string;
+    notes?: string;
+    labelUrl?: string;
     estimatedDeliveryDate?: string;
   };
   shippingDetails?: {
     provider?: string;
-    shiprocketOrderId?: string;
-    shipmentId?: string;
-    awbCode?: string;
     courierName?: string;
-    labelUrl?: string;
-    manifestUrl?: string;
+    trackingNumber?: string;
+    awbCode?: string;
     trackingUrl?: string;
+    dispatchedAt?: string;
+    labelUrl?: string;
     status?: string;
-    pickupScheduledAt?: string;
-    estimatedDeliveryDate?: string;
   };
   trackingTimeline?: TrackingEvent[];
   timeline?: {
@@ -331,12 +328,17 @@ export interface CMSData {
   };
   storeSettings?: {
     storeName?: string;
+    legalEntityName?: string;
+    sellerState?: string;
+    gstPercentage?: number;
     supportEmail?: string;
     supportPhone?: string;
     supportWhatsApp?: string;
     businessAddress?: string;
     gstNumber?: string;
+    invoiceTerms?: string;
     currencySymbol?: string;
+    isFreeShippingEnabled?: boolean;
     freeShippingThreshold?: number;
     standardShippingFee?: number;
     codFee?: number;

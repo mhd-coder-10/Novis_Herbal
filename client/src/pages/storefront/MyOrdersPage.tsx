@@ -35,7 +35,9 @@ import {
   Film,
   Phone,
   AlertTriangle,
-  Trash2
+  Trash2,
+  Copy,
+  ExternalLink
 } from 'lucide-react';
 import { toast } from '../../store/useToastStore';
 import { StoreSelect } from '../../components/common/StoreSelect';
@@ -145,7 +147,7 @@ export const MyOrdersPage: React.FC<MyOrdersProps> = ({ onNavigate }) => {
 
   // Filter calculations
   const activeCount = useMemo(() =>
-    orders.filter(o => ['PLACED', 'CONFIRMED', 'PACKED', 'SHIPMENT_BOOKED', 'IN_TRANSIT', 'OUT_FOR_DELIVERY', 'CANCELLATION_REQUESTED'].includes(o.orderStatus)).length
+    orders.filter(o => ['PLACED', 'CONFIRMED', 'PACKED', 'DISPATCHED', 'SHIPMENT_BOOKED', 'IN_TRANSIT', 'OUT_FOR_DELIVERY', 'CANCELLATION_REQUESTED'].includes(o.orderStatus)).length
     , [orders]);
 
   const deliveredCount = useMemo(() =>
@@ -170,7 +172,7 @@ export const MyOrdersPage: React.FC<MyOrdersProps> = ({ onNavigate }) => {
     return orders.filter(order => {
       // Tab filter
       if (statusFilter === 'active') {
-        if (!['PLACED', 'CONFIRMED', 'PACKED', 'SHIPMENT_BOOKED', 'IN_TRANSIT', 'OUT_FOR_DELIVERY', 'CANCELLATION_REQUESTED'].includes(order.orderStatus)) {
+        if (!['PLACED', 'CONFIRMED', 'PACKED', 'DISPATCHED', 'SHIPMENT_BOOKED', 'IN_TRANSIT', 'OUT_FOR_DELIVERY', 'CANCELLATION_REQUESTED'].includes(order.orderStatus)) {
           return false;
         }
       } else if (statusFilter === 'delivered') {
@@ -426,6 +428,13 @@ export const MyOrdersPage: React.FC<MyOrdersProps> = ({ onNavigate }) => {
           badgeClass: 'bg-indigo-50 text-indigo-900 border-indigo-200/90',
           dotClass: 'bg-indigo-600',
           icon: Package
+        };
+      case 'DISPATCHED':
+        return {
+          label: 'Dispatched',
+          badgeClass: 'bg-amber-50 text-amber-900 border-amber-300',
+          dotClass: 'bg-amber-600 animate-pulse',
+          icon: Truck
         };
       case 'IN_TRANSIT':
       case 'OUT_FOR_DELIVERY':
@@ -779,7 +788,7 @@ export const MyOrdersPage: React.FC<MyOrdersProps> = ({ onNavigate }) => {
   }
 
   return (
-    <div className="py-6 sm:py-14">
+    <div className="pt-4 pb-32 sm:py-14">
       {/* Full width container matching ShopPage, WishlistPage & ProfilePage */}
       <div className="w-full px-3.5 sm:px-6 lg:px-10 space-y-6 sm:space-y-10">
 
@@ -795,7 +804,7 @@ export const MyOrdersPage: React.FC<MyOrdersProps> = ({ onNavigate }) => {
           </h1>
 
           <p className="text-xs sm:text-sm text-slate-500 max-w-lg mx-auto leading-relaxed">
-            Track real-time shipments with Shiprocket, download official GST tax invoices, manage delivery requests, or report parcel issues.
+            Track consignment delivery via India Post & courier portals, download official GST tax invoices, manage delivery requests, or report parcel issues.
           </p>
         </div>
 
@@ -1024,10 +1033,16 @@ export const MyOrdersPage: React.FC<MyOrdersProps> = ({ onNavigate }) => {
                   const allowCancelAfterPacking = appConfig.orderSettings.allowCancellationAfterPacking !== false;
                   const canRequestCancel = allowCancelAfterPacking && ['PACKED', 'SHIPMENT_BOOKED'].includes(order.orderStatus);
                   const isPendingApprovalCancel = order.orderStatus === 'CANCELLATION_REQUESTED';
-                  const isInTransit = ['IN_TRANSIT', 'OUT_FOR_DELIVERY'].includes(order.orderStatus);
+                  const isInTransit = ['DISPATCHED', 'IN_TRANSIT', 'OUT_FOR_DELIVERY'].includes(order.orderStatus);
                   const statusMeta = getStatusMeta(order.orderStatus);
 
-                  const totalDisplay = order.pricing?.totalAmount || order.pricing?.finalTotal || 0;
+                  const sub = Number(order.pricing?.subtotal) || 0;
+                  const disc = Number(order.pricing?.discountAmount) || 0;
+                  const ship = Number(order.pricing?.shippingFee) || 0;
+                  const tax = Number(order.pricing?.taxAmount) || (sub > 0 ? Math.round((sub - disc) * 0.05) : 0);
+                  const totalDisplay = (order.pricing?.totalAmount && order.pricing.totalAmount > (sub - disc))
+                    ? order.pricing.totalAmount
+                    : ((sub - disc) + ship + tax);
                   const formattedDate = new Date(order.createdAt).toLocaleDateString('en-IN', {
                     day: 'numeric',
                     month: 'short',
@@ -1073,39 +1088,39 @@ export const MyOrdersPage: React.FC<MyOrdersProps> = ({ onNavigate }) => {
                       <div className="p-4 sm:p-6 space-y-4">
                         <div className="divide-y divide-slate-100 space-y-3">
                           {order.items.map((item, idx) => (
-                            <div key={idx} className="pt-3 first:pt-0 flex items-center justify-between gap-4">
-                              <div className="flex items-center space-x-3.5 sm:space-x-4 min-w-0">
+                            <div key={idx} className="pt-3 first:pt-0 flex items-center justify-between gap-3 sm:gap-4">
+                              <div className="flex items-center space-x-3 sm:space-x-4 min-w-0 flex-1">
                                 {item.image ? (
                                   <img
                                     src={getFullImageUrl(item.image, item.name)}
                                     alt={item.name}
-                                    className="w-16 h-16 sm:w-20 sm:h-20 object-cover rounded-2xl bg-amber-50/40 border border-slate-200/80 shadow-2xs shrink-0"
+                                    className="w-14 h-14 sm:w-20 sm:h-20 object-cover rounded-2xl bg-amber-50/40 border border-slate-200/80 shadow-2xs shrink-0"
                                     onError={(e) => {
                                       (e.target as HTMLImageElement).src = getFallbackProductImage(item.name);
                                     }}
                                   />
                                 ) : (
-                                  <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-forest-900/5 border border-forest-900/10 flex items-center justify-center shrink-0 text-forest-900">
-                                    <Package className="w-7 h-7" />
+                                  <div className="w-14 h-14 sm:w-20 sm:h-20 rounded-2xl bg-forest-900/5 border border-forest-900/10 flex items-center justify-center shrink-0 text-forest-900">
+                                    <Package className="w-6 h-6 sm:w-7 sm:h-7" />
                                   </div>
                                 )}
 
-                                <div className="min-w-0">
-                                  <h4 className="font-serif font-bold text-forest-950 text-sm sm:text-base leading-snug truncate">
+                                <div className="min-w-0 flex-1">
+                                  <h4 className="font-serif font-bold text-forest-950 text-xs sm:text-base leading-snug line-clamp-2">
                                     {item.name}
                                   </h4>
-                                  <p className="text-xs text-slate-500 mt-0.5">
-                                    Quantity: <span className="font-semibold text-slate-700">{item.quantity}</span> • Unit Price: <span className="font-semibold text-slate-700">₹{item.price}</span>
+                                  <p className="text-[11px] sm:text-xs text-slate-500 mt-0.5">
+                                    Qty: <span className="font-semibold text-slate-700">{item.quantity}</span> • Unit: <span className="font-semibold text-slate-700">₹{item.price}</span>
                                   </p>
                                   {item.sku && (
-                                    <span className="inline-block mt-1 text-[10px] font-mono font-medium text-slate-500 bg-slate-100 border border-slate-200/80 px-2 py-0.5 rounded-md">
+                                    <span className="inline-block mt-0.5 text-[9.5px] sm:text-[10px] font-mono font-medium text-slate-500 bg-slate-100 border border-slate-200/80 px-1.5 py-0.5 rounded-md">
                                       SKU: {item.sku}
                                     </span>
                                   )}
                                 </div>
                               </div>
 
-                              <div className="text-right shrink-0">
+                              <div className="text-right shrink-0 pl-1">
                                 <span className="font-serif font-black text-forest-950 text-sm sm:text-base block">
                                   ₹{item.price * item.quantity}
                                 </span>
@@ -1161,51 +1176,61 @@ export const MyOrdersPage: React.FC<MyOrdersProps> = ({ onNavigate }) => {
 
                         {/* Exceptional Complaint Banner if Submitted */}
                         {order.complaint?.hasComplaint && (
-                          <div className="p-4 rounded-2xl bg-amber-50/90 border border-amber-300 text-xs text-amber-950 space-y-2">
-                            <div className="flex items-center justify-between font-bold">
+                          <div className="p-3.5 sm:p-4 rounded-2xl bg-gradient-to-br from-amber-50/95 to-orange-50/70 border border-amber-300 shadow-2xs space-y-2.5">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 pb-2 border-b border-amber-200/80">
                               <div className="flex items-center space-x-2">
-                                <ShieldAlert className="w-4 h-4 text-amber-700" />
-                                <span>Issue Claim: {order.complaint?.reason}</span>
+                                <ShieldAlert className="w-4 h-4 text-amber-700 shrink-0" />
+                                <span className="font-bold text-xs sm:text-sm text-amber-950">
+                                  Issue Claim: {order.complaint?.reason}
+                                </span>
                               </div>
-                              <span className="text-[10px] bg-amber-200 text-amber-900 px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider">
-                                {order.complaint?.status || 'SUBMITTED'}
+                              <span className="inline-flex items-center self-start sm:self-auto text-[10px] bg-amber-200 text-amber-900 px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider border border-amber-300">
+                                {(order.complaint?.status || 'SUBMITTED').replace(/_/g, ' ')}
                               </span>
                             </div>
-                            <p className="text-amber-900">
-                              Description: "{order.complaint?.description || 'Damaged/Defective item reported'}"
-                            </p>
-                            {order.complaint.customerPhone && (
-                              <p className="text-[11px] text-slate-600 font-mono">
-                                Registered Mobile: <strong>+91 {order.complaint.customerPhone}</strong>
+                            <div className="space-y-1 text-xs text-amber-900">
+                              <p>
+                                <span className="font-medium text-amber-950">Description:</span> "{order.complaint?.description || 'Damaged/Defective item reported'}"
                               </p>
-                            )}
+                              {order.complaint.customerPhone && (
+                                <p className="text-[11px] text-slate-600 font-mono">
+                                  Registered Mobile: <strong>+91 {order.complaint.customerPhone}</strong>
+                                </p>
+                              )}
+                            </div>
                             {order.complaint.videoDeletedByAdmin ? (
                               <div className="flex items-center space-x-2 pt-1 text-xs">
-                                <div className="flex items-center space-x-1.5 px-3 py-1 bg-rose-50 rounded-lg border border-rose-200 text-rose-800 font-bold">
-                                  <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                                <div className="flex items-center space-x-1.5 px-3 py-1.5 bg-rose-50 rounded-xl border border-rose-200 text-rose-800 font-bold text-xs">
+                                  <Trash2 className="w-3.5 h-3.5 text-rose-600 shrink-0" />
                                   <span>Video Proof: Deleted by Admin</span>
                                 </div>
                               </div>
                             ) : order.complaint.videoUrl ? (
-                              <div className="flex items-center space-x-2 pt-1 text-xs">
-                                <div className="flex items-center space-x-1 px-2.5 py-1 bg-white rounded-lg border border-amber-200 text-amber-900 font-bold">
-                                  <Video className="w-3.5 h-3.5 text-amber-700" />
-                                  <span>Video Proof Uploaded</span>
-                                  <span className="text-[10px] text-slate-400 font-mono">(Order_Report_Videos)</span>
+                              <div className="pt-1">
+                                <div className="p-2.5 sm:p-3 bg-white rounded-xl border border-amber-200/90 shadow-2xs flex items-center justify-between gap-3">
+                                  <div className="flex items-center space-x-2.5 min-w-0">
+                                    <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center shrink-0 text-amber-800">
+                                      <Video className="w-4 h-4" />
+                                    </div>
+                                    <div className="min-w-0">
+                                      <span className="block font-bold text-slate-800 text-xs truncate">Video Proof Uploaded</span>
+                                      <span className="block text-[10px] text-slate-400">Recorded unboxing evidence</span>
+                                    </div>
+                                  </div>
+                                  <a
+                                    href={order.complaint.videoUrl}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="px-3.5 py-1.5 bg-forest-900 hover:bg-forest-950 text-gold-400 font-bold text-xs rounded-xl transition flex items-center space-x-1.5 shrink-0 shadow-xs cursor-pointer"
+                                  >
+                                    <Play className="w-3 h-3 fill-current" />
+                                    <span>Play Video</span>
+                                  </a>
                                 </div>
-                                <a
-                                  href={order.complaint.videoUrl}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="px-2.5 py-1 bg-amber-800 text-gold-300 rounded-lg text-xs font-bold hover:bg-amber-900 transition flex items-center space-x-1"
-                                >
-                                  <Play className="w-3 h-3 fill-current" />
-                                  <span>Play Video</span>
-                                </a>
                               </div>
                             ) : null}
                             {order.complaint?.status === 'RESOLVED' && (
-                              <div className="p-2.5 bg-white rounded-xl border border-amber-200 text-emerald-900 font-semibold">
+                              <div className="p-2.5 bg-white rounded-xl border border-amber-200 text-emerald-900 font-semibold text-xs">
                                 Resolution: <strong>{order.complaint.resolutionType}</strong> — {order.complaint.resolutionNotes || 'Processed by store administrator.'}
                               </div>
                             )}
@@ -1214,65 +1239,144 @@ export const MyOrdersPage: React.FC<MyOrdersProps> = ({ onNavigate }) => {
 
                         {/* Non-Returnable Policy Banner for Delivered orders */}
                         {isDelivered && (
-                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs p-3.5 rounded-2xl bg-[#FDFBF7] border border-amber-200/80">
-                            <div className="flex items-center space-x-2">
+                          <div className="flex items-center justify-between gap-2.5 text-xs p-3 sm:p-3.5 rounded-2xl bg-[#FDFBF7] border border-amber-200/80">
+                            <div className="flex items-center space-x-2 min-w-0">
                               <ShieldAlert className="w-4 h-4 text-emerald-700 shrink-0" />
-                              <span className="text-slate-700">
+                              <span className="text-slate-700 truncate sm:overflow-visible">
                                 Policy: <strong className="text-forest-950">Non-Returnable Product</strong> (100% Authentic, Pure & Sealed)
                               </span>
                             </div>
                             {!order.complaint?.hasComplaint && (() => {
                               const reportStatus = getDamageReportRemaining(order);
                               if (reportStatus.isExpired) {
-                                return (
-                                  <span className="text-slate-400 font-medium text-[11px] flex items-center space-x-1">
-                                    <Clock className="w-3.5 h-3.5 text-slate-400" />
-                                    <span>Reporting window closed ({appConfig.orderSettings.damagedReportWindowHours || 2}h limit reached)</span>
-                                  </span>
-                                );
+                                return null;
                               }
                               return (
-                                <div className="flex items-center space-x-2">
-                                  <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 font-mono text-[11px] font-bold border border-amber-300">
-                                    <Clock className="w-3 h-3 text-amber-700 animate-pulse" />
-                                    <span>Window: {reportStatus.text}</span>
-                                  </span>
-                                  <button
-                                    type="button"
-                                    onClick={() => openComplaintModal(order)}
-                                    className="text-amber-900 hover:text-amber-950 font-bold text-xs underline cursor-pointer"
-                                  >
-                                    Report Damaged / Missing Item?
-                                  </button>
-                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => openComplaintModal(order)}
+                                  className="px-3.5 py-1.5 bg-amber-100/90 hover:bg-amber-200 text-amber-950 border border-amber-300 font-bold text-xs rounded-xl transition flex items-center space-x-1.5 shrink-0 shadow-2xs cursor-pointer"
+                                  title={`Report parcel issue within ${reportStatus.text}`}
+                                >
+                                  <AlertTriangle className="w-3.5 h-3.5 text-amber-800" />
+                                  <span>Report</span>
+                                </button>
                               );
                             })()}
                           </div>
                         )}
 
+                        {/* Consignment & Courier Tracking Card */}
+                        {(order.shipment?.trackingNumber || order.shipment?.awbCode) ? (
+                          <div className="p-3.5 sm:p-4 rounded-2xl bg-gradient-to-r from-emerald-50/70 via-amber-50/40 to-slate-50 border border-emerald-200/90 shadow-2xs space-y-2.5">
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center space-x-2.5 min-w-0">
+                                <div className="w-8 h-8 rounded-xl bg-forest-900 text-gold-400 flex items-center justify-center font-bold shrink-0">
+                                  <Truck className="w-4 h-4" />
+                                </div>
+                                <div className="min-w-0">
+                                  <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                                    Courier Partner
+                                  </div>
+                                  <div className="font-serif font-bold text-forest-950 text-xs sm:text-sm truncate">
+                                    {order.shipment.courierName || 'India Post'}
+                                  </div>
+                                </div>
+                              </div>
+
+                              {order.shipment.dispatchedAt && (
+                                <span className="text-[11px] sm:text-xs text-slate-500 font-medium shrink-0">
+                                  Dispatched: <strong className="text-slate-700">{new Date(order.shipment.dispatchedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</strong>
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 pt-2 border-t border-emerald-100/90">
+                              <div className="flex items-center justify-between sm:justify-start space-x-2 bg-white px-3 py-1.5 rounded-xl border border-slate-200/90 shadow-2xs flex-1 sm:flex-initial">
+                                <div className="flex items-center space-x-1.5 truncate">
+                                  <span className="text-[10.5px] font-medium text-slate-500">Tracking:</span>
+                                  <span className="font-mono font-black text-forest-950 text-xs sm:text-sm tracking-wide truncate">
+                                    {order.shipment.trackingNumber || order.shipment.awbCode}
+                                  </span>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const val = order.shipment?.trackingNumber || order.shipment?.awbCode || '';
+                                    navigator.clipboard.writeText(val);
+                                    toast.success('Tracking number copied to clipboard!');
+                                  }}
+                                  className="p-1 hover:bg-slate-100 rounded-md text-slate-600 transition cursor-pointer shrink-0"
+                                  title="Copy Tracking Number"
+                                >
+                                  <Copy className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+
+                              <a
+                                href={order.shipment.trackingUrl || appConfig.defaultTrackingPortal}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center justify-center space-x-1.5 px-3.5 py-1.5 bg-forest-900 hover:bg-forest-950 text-gold-400 font-bold text-xs rounded-xl transition shadow-xs shrink-0 cursor-pointer"
+                              >
+                                <span>Track on India Post</span>
+                                <ExternalLink className="w-3.5 h-3.5" />
+                              </a>
+                            </div>
+
+                            {order.shipment.notes && (
+                              <p className="text-[11px] text-slate-600 italic bg-white/70 p-2 rounded-lg border border-emerald-100">
+                                Delivery Note: {order.shipment.notes}
+                              </p>
+                            )}
+                          </div>
+                        ) : ['CONFIRMED', 'PROCESSING', 'PACKED'].includes(order.orderStatus) ? (
+                          <div className="p-3.5 rounded-2xl bg-amber-50/70 border border-amber-200/80 text-xs text-amber-900 flex items-center space-x-2">
+                            <Package className="w-4 h-4 text-amber-700 shrink-0" />
+                            <span>Parcel is packed and awaiting courier handover. Tracking consignment number will appear here once dispatched.</span>
+                          </div>
+                        ) : null}
+
                         {/* Courier In-Transit Refusal Notice */}
                         {isInTransit && (
                           <p className="text-[11px] text-slate-500 italic bg-[#FAF8F5] p-2.5 rounded-xl border border-slate-200/60">
-                            Notice: Order is in transit with Shiprocket express courier. It cannot be cancelled directly. If you no longer wish to receive it, you may refuse delivery at your doorstep, and it will follow the automated RTO process.
+                            Notice: Order has been dispatched with our courier partner. It cannot be cancelled directly.
                           </p>
                         )}
                       </div>
 
                       {/* Card Footer Bar */}
-                      <div className="bg-slate-50/70 px-4 sm:px-6 py-3.5 sm:py-4 border-t border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-                        <div>
-                          <div className="text-xs text-slate-500 font-medium">
-                            {(order.paymentInfo?.method || order.paymentMethod) === 'COD' && order.orderStatus !== 'DELIVERED'
-                              ? 'To Pay on Delivery (COD)'
-                              : 'Total Paid'}
+                      <div className="bg-slate-50/80 px-4 sm:px-6 py-3 sm:py-4 border-t border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                        <div className="w-full sm:w-auto flex items-center justify-between sm:block">
+                          <div>
+                            <div className="text-[11px] sm:text-xs text-slate-500 font-medium">
+                              {(order.paymentInfo?.method || order.paymentMethod) === 'COD' && order.orderStatus !== 'DELIVERED'
+                                ? 'To Pay on Delivery (COD)'
+                                : 'Total Paid'}
+                            </div>
+                            <div className="font-serif font-black text-forest-950 text-base sm:text-lg">
+                              ₹{totalDisplay}
+                              <span className="text-[10px] font-sans font-normal text-slate-400 ml-1.5">
+                                {tax > 0 ? `(Includes ₹${tax} GST)` : '(Taxes & shipping included)'}
+                              </span>
+                            </div>
                           </div>
-                          <div className="font-serif font-black text-forest-950 text-base sm:text-lg">
-                            ₹{totalDisplay}
-                            <span className="text-[10px] font-sans font-normal text-slate-400 ml-1.5">(Taxes & shipping included)</span>
+
+                          {/* Mobile-only compact Invoice button placed inline with total */}
+                          <div className="sm:hidden">
+                            <button
+                              type="button"
+                              onClick={() => handleDownloadInvoice(order.orderId)}
+                              className="px-3 py-1.5 border border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50 text-slate-700 font-semibold text-xs rounded-xl transition flex items-center space-x-1.5 shadow-2xs cursor-pointer"
+                              title="Download GST Tax Invoice PDF"
+                            >
+                              <Printer className="w-3.5 h-3.5 text-slate-500" />
+                              <span>Invoice</span>
+                            </button>
                           </div>
                         </div>
 
-                        <div className="flex items-center space-x-2 flex-wrap gap-y-2">
+                        <div className="flex items-center space-x-2 flex-wrap gap-y-2 w-full sm:w-auto justify-end">
                           {/* Cancellation Buttons */}
                           {canDirectCancel && (
                             <button
@@ -1300,50 +1404,15 @@ export const MyOrdersPage: React.FC<MyOrdersProps> = ({ onNavigate }) => {
                             </span>
                           )}
 
-                          {/* Report Issue / Damage Button for Delivered Orders with Live Timer */}
-                          {isDelivered && !order.complaint?.hasComplaint && (() => {
-                            const reportStatus = getDamageReportRemaining(order);
-                            if (reportStatus.isExpired) {
-                              return (
-                                <span className="px-3 py-1.5 bg-slate-100 text-slate-400 font-medium text-[11px] rounded-xl border border-slate-200">
-                                  Report Window Closed ({appConfig.orderSettings.damagedReportWindowHours || 2}h)
-                                </span>
-                              );
-                            }
-                            return (
-                              <button
-                                type="button"
-                                onClick={() => openComplaintModal(order)}
-                                className="px-3.5 py-2 bg-gradient-to-r from-amber-50 to-orange-50 hover:from-amber-100 hover:to-orange-100 text-amber-950 border border-amber-300 font-bold text-xs rounded-xl transition flex items-center space-x-1.5 shadow-2xs group cursor-pointer"
-                              >
-                                <Video className="w-3.5 h-3.5 text-amber-700 group-hover:scale-110 transition" />
-                                <span>Report Damage (Video)</span>
-                                <span className="bg-amber-200 text-amber-900 px-1.5 py-0.5 rounded text-[10px] font-mono font-black ml-1">
-                                  {reportStatus.text}
-                                </span>
-                              </button>
-                            );
-                          })()}
-
-                          {/* Download Official Invoice */}
+                          {/* Desktop Download Official Invoice */}
                           <button
                             type="button"
                             onClick={() => handleDownloadInvoice(order.orderId)}
-                            className="px-3.5 py-2 border border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50 text-slate-700 font-semibold text-xs rounded-xl transition flex items-center space-x-1.5 shadow-2xs"
+                            className="hidden sm:inline-flex px-3.5 py-2 border border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50 text-slate-700 font-semibold text-xs rounded-xl transition items-center space-x-1.5 shadow-2xs cursor-pointer"
                             title="Download GST Tax Invoice PDF"
                           >
                             <Printer className="w-3.5 h-3.5 text-slate-500" />
                             <span>Invoice</span>
-                          </button>
-
-                          {/* Track Shipment Button */}
-                          <button
-                            type="button"
-                            onClick={() => onNavigate('track-order', order.orderId)}
-                            className="px-4 py-2 bg-forest-900 hover:bg-forest-950 text-gold-400 font-bold text-xs rounded-xl transition flex items-center space-x-1.5 shadow-xs"
-                          >
-                            <MapPin className="w-3.5 h-3.5 text-gold-400" />
-                            <span>Track Shipment</span>
                           </button>
                         </div>
                       </div>

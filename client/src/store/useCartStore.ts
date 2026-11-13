@@ -15,6 +15,7 @@ interface CartState {
   updateQuantity: (productId: string, quantity: number) => void;
   clearCart: () => void;
   getSubtotal: () => number;
+  getTaxAmount: () => number;
   getTotal: (paymentMethod?: 'ONLINE' | 'COD') => number;
   getShippingFee: () => number;
 }
@@ -86,17 +87,25 @@ export const useCartStore = create<CartState>()(
       getShippingFee: () => {
         const subtotal = get().getSubtotal();
         if (subtotal === 0) return 0;
-        const threshold = appConfig.freeShippingThreshold;
+        if (appConfig.isFreeShippingEnabled) return 0;
         const fee = appConfig.standardShippingFee;
-        return subtotal >= threshold ? 0 : fee;
+        return fee > 0 ? fee : 0;
+      },
+
+      getTaxAmount: () => {
+        const subtotal = get().getSubtotal();
+        if (subtotal === 0) return 0;
+        const gstRate = appConfig.gstPercentage;
+        return gstRate > 0 ? Math.round(subtotal * (gstRate / 100)) : 0;
       },
 
       getTotal: (paymentMethod?: 'ONLINE' | 'COD') => {
         const subtotal = get().getSubtotal();
         if (subtotal === 0) return 0;
         const shipping = get().getShippingFee();
+        const tax = get().getTaxAmount();
         const codFee = (paymentMethod === 'COD') ? appConfig.codFee : 0;
-        return subtotal + shipping + codFee;
+        return subtotal + shipping + tax + codFee;
       },
     }),
     {

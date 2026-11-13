@@ -21,7 +21,7 @@ declare global {
 }
 
 export const CheckoutPage: React.FC<CheckoutPageProps> = ({ onOrderSuccess, onBackToCart }) => {
-  const { items, getSubtotal, getShippingFee, getTotal, clearCart } = useCartStore();
+  const { items, getSubtotal, getShippingFee, getTaxAmount, getTotal, clearCart } = useCartStore();
   const { user, isAuthenticated } = useAuthStore();
 
   const savedAddress = (user?.addresses && user.addresses.length > 0)
@@ -82,8 +82,9 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({ onOrderSuccess, onBa
 
   const subtotal = getSubtotal();
   const shippingFee = getShippingFee();
+  const taxAmount = getTaxAmount ? getTaxAmount() : 0;
   const codFee = formData.paymentMethod === 'COD' ? appConfig.codFee : 0;
-  const total = subtotal + shippingFee + codFee;
+  const total = subtotal + shippingFee + taxAmount + codFee;
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     let value = e.target.value;
@@ -373,7 +374,7 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({ onOrderSuccess, onBa
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                   <h2 className="font-serif text-base sm:text-lg font-bold text-forest-950 flex items-center space-x-2">
                     <span className="w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-forest-950 text-gold-400 text-[10px] sm:text-xs font-extrabold flex items-center justify-center">2</span>
-                    <span>Delivery Address (Shiprocket Express)</span>
+                    <span>Delivery Address</span>
                   </h2>
                 </div>
 
@@ -608,6 +609,12 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({ onOrderSuccess, onBa
                     )}
                   </span>
                 </div>
+                {taxAmount > 0 && (
+                  <div className="flex justify-between">
+                    <span>GST ({appConfig.gstPercentage}%)</span>
+                    <span className="font-semibold text-slate-800">₹{taxAmount}</span>
+                  </div>
+                )}
                 {codFee > 0 && formData.paymentMethod === 'COD' && (
                   <div className="flex justify-between text-amber-900 font-semibold">
                     <span>COD Handling Fee</span>

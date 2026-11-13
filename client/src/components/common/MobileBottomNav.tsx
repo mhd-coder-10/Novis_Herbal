@@ -1,5 +1,5 @@
 import React from 'react';
-import { Home, ShoppingBag, Heart, Truck, ShoppingCart } from 'lucide-react';
+import { Home, ShoppingBag, Heart, Package, ShoppingCart } from 'lucide-react';
 import { useCartStore } from '../../store/useCartStore';
 import { useWishlistStore } from '../../store/useWishlistStore';
 
@@ -42,11 +42,11 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ currentPage, o
       isActive: currentPage === 'wishlist'
     },
     {
-      id: 'track',
-      label: 'Track',
-      icon: Truck,
-      action: () => onNavigate('track-order'),
-      isActive: currentPage === 'track-order'
+      id: 'orders',
+      label: 'Orders',
+      icon: Package,
+      action: () => onNavigate('my-orders'),
+      isActive: currentPage === 'my-orders'
     },
     {
       id: 'cart',

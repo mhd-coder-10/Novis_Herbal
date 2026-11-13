@@ -78,6 +78,7 @@ const orderSchema = new mongoose.Schema({
       'CONFIRMED',
       'PROCESSING',
       'PACKED',
+      'DISPATCHED',
       'SHIPMENT_BOOKED',
       'PICKED_UP',
       'IN_TRANSIT',
@@ -103,23 +104,24 @@ const orderSchema = new mongoose.Schema({
   isNonReturnable: { type: Boolean, default: true },
 
   shipment: {
-    provider: { type: String, default: 'SHIPROCKET' },
-    shiprocketOrderId: { type: String },
-    shipmentId: { type: String },
+    provider: { type: String, default: 'MANUAL_COURIER' },
+    courierName: { type: String, default: 'India Post' },
+    trackingNumber: { type: String },
     awbCode: { type: String },
-    courierName: { type: String },
+    trackingUrl: { 
+      type: String, 
+      default: () => process.env.DEFAULT_TRACKING_PORTAL || 'https://www.indiapost.gov.in/' 
+    },
+    dispatchedAt: { type: Date },
+    deliveredAt: { type: Date },
+    notes: { type: String },
     labelUrl: { type: String },
-    manifestUrl: { type: String },
-    trackingUrl: { type: String },
-    estimatedDeliveryDate: { type: Date },
     packageWeightGrams: { type: Number, default: 500 },
     dimensionsCm: {
       length: { type: Number, default: 15 },
       width: { type: Number, default: 10 },
       height: { type: Number, default: 8 }
-    },
-    pickupScheduledAt: { type: Date },
-    deliveredAt: { type: Date }
+    }
   },
 
   trackingTimeline: [trackingTimelineSchema],

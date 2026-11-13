@@ -25,7 +25,7 @@ export const FAQAccordion: React.FC = () => {
     },
     {
       question: 'How do I track my order once placed?',
-      answer: 'As soon as your parcel is packed and courier is booked through Shiprocket, you receive an SMS/Email with your live AWB tracking number. You can also track it directly on our Track Order page at any time.'
+      answer: 'As soon as your parcel is dispatched with our courier partner (such as India Post), you will receive your consignment tracking number and direct tracking link via WhatsApp. You can also view and track it anytime under your My Orders page.'
     }
   ];
 

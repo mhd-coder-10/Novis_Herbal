@@ -12,7 +12,6 @@ import { ShopPage } from './pages/storefront/ShopPage';
 import { ProductDetailPage } from './pages/storefront/ProductDetailPage';
 import { CheckoutPage } from './pages/storefront/CheckoutPage';
 import { OrderSuccessPage } from './pages/storefront/OrderSuccessPage';
-import { TrackOrderPage } from './pages/storefront/TrackOrderPage';
 import { PolicyPage } from './pages/storefront/PolicyPage';
 import { CustomerLoginPage } from './pages/storefront/CustomerLoginPage';
 import { MyOrdersPage } from './pages/storefront/MyOrdersPage';
@@ -137,7 +136,7 @@ export function App() {
           navigate(param ? `/order-success/${param}` : '/order-success');
           break;
         case 'track-order':
-          navigate(param ? `/track-order/${param}` : '/track-order');
+          navigate('/my-orders');
           break;
         case 'about-us':
           navigate('/about-us');
@@ -179,7 +178,7 @@ export function App() {
       if (path.startsWith('/wishlist')) return { page: 'wishlist', param: '' };
       if (path.startsWith('/profile')) return { page: 'profile', param: '' };
       if (path.startsWith('/order-success')) return { page: 'order-success', param: path.replace('/order-success/', '') };
-      if (path.startsWith('/track-order')) return { page: 'track-order', param: path.replace('/track-order/', '') };
+      if (path.startsWith('/track-order')) return { page: 'my-orders', param: '' };
       if (path === '/about-us') return { page: 'policy', param: 'aboutUs' };
       if (path.startsWith('/policy/')) return { page: 'policy', param: path.replace('/policy/', '') };
       if (path.startsWith('/policy')) return { page: 'policy', param: 'aboutUs' };
@@ -312,8 +311,8 @@ export function App() {
             />
             <Route path="/order-success/:orderId" element={<OrderSuccessPage onNavigate={handleNavigate} />} />
             <Route path="/order-success" element={<OrderSuccessPage onNavigate={handleNavigate} />} />
-            <Route path="/track-order/:orderId" element={<TrackOrderPage onNavigate={handleNavigate} />} />
-            <Route path="/track-order" element={<TrackOrderPage onNavigate={handleNavigate} />} />
+            <Route path="/track-order/*" element={<Navigate to="/my-orders" replace />} />
+            <Route path="/track-order" element={<Navigate to="/my-orders" replace />} />
             <Route path="/about-us" element={<PolicyPage policyType="aboutUs" onNavigate={handleNavigate} />} />
             <Route path="/policy/:policyType" element={<PolicyPage onNavigate={handleNavigate} />} />
             <Route path="/policy" element={<PolicyPage policyType="aboutUs" onNavigate={handleNavigate} />} />

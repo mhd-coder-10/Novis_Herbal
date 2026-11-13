@@ -10,7 +10,6 @@ import {
   Upload,
   Eye,
   Megaphone,
-  FileText,
   Mail,
   ExternalLink,
   HelpCircle,
@@ -36,7 +35,7 @@ const DEFAULT_SLIDE_IMAGES = [
 export const AdminCMS: React.FC = () => {
   const { cms, fetchCMS, updateCMSState } = useCMSStore();
   const [formData, setFormData] = useState<any>(null);
-  const [activeTab, setActiveTab] = useState<'banners' | 'announcement' | 'policies'>('banners');
+  const [activeTab, setActiveTab] = useState<'banners' | 'announcement'>('banners');
   const [isSaving, setIsSaving] = useState(false);
 
   // Store products list for dynamic catalog linking
@@ -529,15 +528,6 @@ export const AdminCMS: React.FC = () => {
         >
           <Megaphone className="w-4 h-4" />
           <span>2. Top Announcement Bar</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('policies')}
-          className={`inline-flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-bold transition cursor-pointer ${activeTab === 'policies' ? 'bg-forest-900 text-gold-400 shadow-sm' : 'text-slate-600 hover:text-forest-950 hover:bg-slate-100'
-            }`}
-        >
-          <FileText className="w-4 h-4" />
-          <span>3. Policy & Legal Content</span>
         </button>
       </div>
 
@@ -1321,104 +1311,6 @@ export const AdminCMS: React.FC = () => {
                   Announcement bar is currently disabled (hidden on storefront)
                 </div>
               )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ====================================================================
-          TAB 3: POLICY & LEGAL PAGES
-          ==================================================================== */}
-      {activeTab === 'policies' && (
-        <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200/90 shadow-xs space-y-6 text-xs">
-          <div>
-            <h3 className="font-serif text-lg font-bold text-forest-950">
-              Policy & Legal Documentation Pages
-            </h3>
-            <p className="text-xs text-slate-500 mt-0.5">
-              These policies are mandatory for payment gateway approvals (Razorpay/UPI) and are linked in your website footer.
-            </p>
-          </div>
-
-          <div className="space-y-5">
-            {/* About Us */}
-            <div className="p-5 rounded-2xl bg-slate-50/60 border border-slate-200/80 space-y-2">
-              <div className="flex items-center justify-between">
-                <label className="font-bold text-slate-800 text-sm">About Us & Brand Story</label>
-                <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-slate-200 text-slate-700 font-bold">
-                  Visible at /about
-                </span>
-              </div>
-              <p className="text-[11px] text-slate-500">Explain your brand origins, authentic Ayurvedic herbal formulations, and quality commitment.</p>
-              <textarea
-                rows={4}
-                value={formData.policies?.aboutUs || ''}
-                onChange={(e) => setFormData({
-                  ...formData,
-                  policies: { ...formData.policies, aboutUs: e.target.value }
-                })}
-                className="w-full p-3 border border-slate-200 rounded-xl bg-white text-slate-800 text-xs focus:outline-none focus:ring-1 focus:ring-forest-900"
-              />
-            </div>
-
-            {/* Shipping Policy */}
-            <div className="p-5 rounded-2xl bg-slate-50/60 border border-slate-200/80 space-y-2">
-              <div className="flex items-center justify-between">
-                <label className="font-bold text-slate-800 text-sm">Shipping & Delivery Policy</label>
-                <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-slate-200 text-slate-700 font-bold">
-                  Visible at /shipping
-                </span>
-              </div>
-              <p className="text-[11px] text-slate-500">Dispatch timelines (24-48 hrs), carrier courier partners, tracking guidelines, and estimated delivery windows (3-5 days).</p>
-              <textarea
-                rows={3}
-                value={formData.policies?.shippingPolicy || ''}
-                onChange={(e) => setFormData({
-                  ...formData,
-                  policies: { ...formData.policies, shippingPolicy: e.target.value }
-                })}
-                className="w-full p-3 border border-slate-200 rounded-xl bg-white text-slate-800 text-xs focus:outline-none focus:ring-1 focus:ring-forest-900"
-              />
-            </div>
-
-            {/* Refund, Non-Returnable & Cancellation Policy */}
-            <div className="p-5 rounded-2xl bg-slate-50/60 border border-slate-200/80 space-y-2">
-              <div className="flex items-center justify-between">
-                <label className="font-bold text-slate-800 text-sm">Refund, Non-Returnable & Cancellation Policy</label>
-                <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-slate-200 text-slate-700 font-bold">
-                  Visible at /refund
-                </span>
-              </div>
-              <p className="text-[11px] text-slate-500">Hygiene non-returnable and non-replaceable policy details, transit damage claim guidelines, and refund settlement timelines.</p>
-              <textarea
-                rows={3}
-                value={formData.policies?.refundAndCancellation || ''}
-                onChange={(e) => setFormData({
-                  ...formData,
-                  policies: { ...formData.policies, refundAndCancellation: e.target.value }
-                })}
-                className="w-full p-3 border border-slate-200 rounded-xl bg-white text-slate-800 text-xs focus:outline-none focus:ring-1 focus:ring-forest-900"
-              />
-            </div>
-
-            {/* Privacy Policy */}
-            <div className="p-5 rounded-2xl bg-slate-50/60 border border-slate-200/80 space-y-2">
-              <div className="flex items-center justify-between">
-                <label className="font-bold text-slate-800 text-sm">Privacy Policy & Data Security</label>
-                <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-slate-200 text-slate-700 font-bold">
-                  Visible at /privacy
-                </span>
-              </div>
-              <p className="text-[11px] text-slate-500">Customer phone/email data protection, encrypted payment transactions, and compliance with Indian data privacy regulations.</p>
-              <textarea
-                rows={3}
-                value={formData.policies?.privacyPolicy || ''}
-                onChange={(e) => setFormData({
-                  ...formData,
-                  policies: { ...formData.policies, privacyPolicy: e.target.value }
-                })}
-                className="w-full p-3 border border-slate-200 rounded-xl bg-white text-slate-800 text-xs focus:outline-none focus:ring-1 focus:ring-forest-900"
-              />
             </div>
           </div>
         </div>

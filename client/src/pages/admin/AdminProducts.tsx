@@ -761,7 +761,7 @@ export const AdminProducts: React.FC = () => {
 
                     <div>
                       <label className="block text-slate-700 font-bold mb-1.5 text-xs">
-                        Courier Package Weight <span className="text-slate-400 font-normal">(Grams for Shiprocket)</span>
+                        Courier Package Weight <span className="text-slate-400 font-normal">(Grams for Courier Parcel)</span>
                       </label>
                       <input
                         type="number"

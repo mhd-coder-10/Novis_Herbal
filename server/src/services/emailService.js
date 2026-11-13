@@ -288,6 +288,12 @@ export const sendOrderConfirmationEmail = async (order) => {
                 <td>Express Shipping</td>
                 <td align="right">${order.pricing.shippingFee === 0 ? '<span style="color:#2E7D32;">FREE</span>' : '₹' + order.pricing.shippingFee}</td>
               </tr>
+              ${(order.pricing.taxAmount && order.pricing.taxAmount > 0) ? `
+                <tr>
+                  <td>GST (${cms?.storeSettings?.gstPercentage ?? 5}%)</td>
+                  <td align="right">₹${order.pricing.taxAmount}</td>
+                </tr>
+              ` : ''}
               <tr style="font-weight: bold; font-size: 15px; color: #0B3B24; border-top: 2px solid #0B3B24;">
                 <td>Total Amount</td>
                 <td align="right">₹${order.pricing.totalAmount}</td>
@@ -301,8 +307,8 @@ export const sendOrderConfirmationEmail = async (order) => {
           </div>
 
           <div style="text-align: center; margin-top: 28px;">
-            <a href="${clientUrl}/track-order/${order.orderId}" class="btn" style="color: #D4AF37;">
-              TRACK YOUR ORDER LIVE ➔
+            <a href="${clientUrl}/my-orders" class="btn" style="color: #D4AF37;">
+              VIEW MY ORDERS ➔
             </a>
           </div>
         </div>
@@ -391,44 +397,37 @@ export const sendAdminOrderNotificationEmail = async (order) => {
   return await sendEmail({ to: adminEmail, subject, htmlContent });
 };
 
-// 4. Order Status and Delivery Update Email
-export const sendOrderStatusUpdateEmail = async (order, newStatus, note = '') => {
+// 4. Customer Order Dispatched Email (Strictly only email sent after order placement)
+export const sendOrderDispatchedEmail = async (order, note = '') => {
   const cms = await CMS.findOne({ key: 'global_cms' }).lean();
   if (cms?.storeSettings?.enableStatusUpdateEmails === false) {
-    console.log('[EmailService] Order status update email skipped: disabled in Store Settings');
+    console.log('[EmailService] Order dispatch email skipped: disabled in Store Settings');
     return { success: true, skipped: true };
   }
 
-  const storeName = cms?.storeSettings?.storeName || 'Novis Herbal';
+  const storeName = cms?.storeSettings?.storeName || 'Novise Herbal';
   const supportEmail = cms?.storeSettings?.supportEmail || 'support@novise.in';
   const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
-  const formattedStatus = newStatus.replace(/_/g, ' ');
-  const subject = `Order Update: #${order.orderId} is ${formattedStatus} - ${storeName}`;
+  const courier = order.shipment?.courierName || 'India Post';
+  const trackingNumber = order.shipment?.trackingNumber || order.shipment?.awbCode || 'Assigned on Dispatch';
+  const trackingUrl = order.shipment?.trackingUrl || process.env.DEFAULT_TRACKING_PORTAL || 'https://www.indiapost.gov.in/';
+  const estimatedDelivery = cms?.storeSettings?.estimatedDeliveryText || '3-5 Business Days';
 
-  const statusDescriptions = {
-    CONFIRMED: 'Your order has been verified and confirmed by our fulfillment team.',
-    PROCESSING: 'Your herbal hair formulation is currently being hand-packed with care.',
-    SHIPPED: `Your package has been dispatched via express courier.${order.shipment?.awbCode ? ' AWB: ' + order.shipment.awbCode : ''}`,
-    OUT_FOR_DELIVERY: 'Your package is out for delivery today! Please keep your phone reachable.',
-    DELIVERED: 'Your package has been successfully delivered! We hope you love your Novise botanical products.',
-    CANCELLED: 'Your order has been cancelled.'
-  };
-
-  const statusDesc = statusDescriptions[newStatus] || note || `Your order status has been updated to ${formattedStatus}.`;
+  const subject = `Your Order #${order.orderId} Has Been Dispatched via ${courier} - ${storeName}`;
 
   const htmlContent = `
     <!DOCTYPE html>
     <html>
     <head>
       <meta charset="utf-8">
-      <title>Order Status Update</title>
+      <title>Order Dispatched - ${storeName}</title>
       <style>
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; background-color: #FAF8F5; margin: 0; padding: 20px; color: #2C3E50; }
         .container { max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 16px; overflow: hidden; border: 1px solid #ECE7E1; }
-        .header { background: #0B3B24; padding: 28px 24px; text-align: center; }
-        .logo { font-size: 24px; font-weight: 800; letter-spacing: 4px; color: #D4AF37; margin: 0; }
+        .header { background: #0B3B24; padding: 30px 24px; text-align: center; }
+        .logo { font-size: 26px; font-weight: 800; letter-spacing: 4px; color: #D4AF37; margin: 0; }
         .content { padding: 32px 28px; }
-        .badge { display: inline-block; background: #0B3B24; color: #D4AF37; padding: 8px 18px; border-radius: 20px; font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 16px; }
+        .badge { display: inline-block; background: #E8F5E9; color: #1B5E20; padding: 7px 18px; border-radius: 20px; font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 16px; border: 1px solid #C8E6C9; }
         .box { background: #FAF8F5; border-radius: 12px; padding: 20px; margin: 20px 0; border: 1px solid #ECE7E1; font-size: 14px; line-height: 1.6; }
         .btn { display: inline-block; background: #0B3B24; color: #D4AF37; padding: 14px 28px; border-radius: 8px; font-weight: bold; text-decoration: none; text-align: center; font-size: 14px; margin-top: 16px; }
         .footer { background: #FAF8F5; padding: 20px; text-align: center; border-top: 1px solid #ECE7E1; font-size: 12px; color: #888888; }
@@ -441,33 +440,53 @@ export const sendOrderStatusUpdateEmail = async (order, newStatus, note = '') =>
           <p style="color: #E0E7E2; font-size: 11px; text-transform: uppercase; letter-spacing: 2px; margin: 4px 0 0 0;">Botanical Hair Care</p>
         </div>
         <div class="content">
-          <div class="badge">${formattedStatus}</div>
-          <h2 style="color: #0B3B24; margin-top: 0;">Order #${order.orderId} Update</h2>
+          <div class="badge">🚚 PARCEL DISPATCHED</div>
+          <h2 style="color: #0B3B24; margin-top: 0;">Good news, ${order.customerDetails.fullName}!</h2>
           <p style="font-size: 15px; color: #333; line-height: 1.6;">
-            Hello <strong>${order.customerDetails.fullName}</strong>,
+            Your order <strong>#${order.orderId}</strong> has been handed over to our courier partner and is on its way to you.
           </p>
+
           <div class="box">
-            <p style="margin: 0 0 10px 0; font-size: 15px; font-weight: 600; color: #0B3B24;">
-              ${statusDesc}
-            </p>
-            ${order.shipment?.awbCode ? `
-              <p style="margin: 8px 0; font-size: 13px; color: #555;">
-                <strong>Courier Partner:</strong> ${order.shipment.courierName || 'Express Courier'}<br>
-                <strong>Tracking / AWB Number:</strong> <span style="font-family: monospace; font-weight: bold;">${order.shipment.awbCode}</span>
-              </p>
-            ` : ''}
-            ${note ? `<p style="margin: 8px 0 0 0; font-size: 13px; color: #666; font-style: italic;">"${note}"</p>` : ''}
+            <h3 style="margin: 0 0 12px 0; font-size: 14px; color: #0B3B24; text-transform: uppercase; letter-spacing: 0.5px;">
+              Courier & Consignment Tracking Details
+            </h3>
+            <table width="100%" cellpadding="6" cellspacing="0" style="font-size: 13.5px;">
+              <tr>
+                <td style="color: #64748b; width: 140px;">Courier Partner:</td>
+                <td><strong>${courier}</strong></td>
+              </tr>
+              <tr>
+                <td style="color: #64748b;">Consignment / Tracking:</td>
+                <td><span style="font-family: monospace; font-size: 15px; font-weight: 800; color: #0B3B24; background: #e2e8f0; padding: 3px 8px; border-radius: 6px;">${trackingNumber}</span></td>
+              </tr>
+              <tr>
+                <td style="color: #64748b;">Estimated Delivery:</td>
+                <td><strong>${estimatedDelivery}</strong></td>
+              </tr>
+              <tr>
+                <td style="color: #64748b;">Delivery Address:</td>
+                <td>${order.shippingAddress?.addressLine1 || ''}, ${order.shippingAddress?.city || ''}, ${order.shippingAddress?.state || ''} - ${order.shippingAddress?.pincode || ''}</td>
+              </tr>
+            </table>
+            ${note ? `<p style="margin: 12px 0 0 0; font-size: 12px; color: #64748b; font-style: italic; border-top: 1px dashed #cbd5e1; padding-top: 8px;">Delivery Note: "${note}"</p>` : ''}
           </div>
 
-          <div style="text-align: center; margin-top: 24px;">
-            <a href="${clientUrl}/track-order/${order.orderId}" class="btn" style="color: #D4AF37;">
-              VIEW LIVE ORDER STATUS ➔
+          <div style="text-align: center; margin: 24px 0;">
+            <a href="${trackingUrl}" class="btn" style="color: #D4AF37;">
+              TRACK CONSIGNMENT ON ${courier.toUpperCase()} ➔
             </a>
+          </div>
+
+          <div style="font-size: 13px; color: #555; background: #fff; padding: 14px; border-radius: 8px; border: 1px solid #ECE7E1;">
+            <strong>Items in this shipment:</strong>
+            <ul style="margin: 6px 0 0 0; padding-left: 20px;">
+              ${(order.items || []).map(i => `<li>${i.name} (Qty: ${i.quantity})</li>`).join('')}
+            </ul>
           </div>
         </div>
         <div class="footer">
-          <p>© ${new Date().getFullYear()} Novis Herbal. All Rights Reserved.</p>
-          <p>For support, reach out to <a href="mailto:support@novise.in" style="color:#0B3B24; font-weight:bold;">support@novise.in</a></p>
+          <p>© ${new Date().getFullYear()} ${storeName}. All Rights Reserved.</p>
+          <p>For support, reach out to <a href="mailto:${supportEmail}" style="color:#0B3B24; font-weight:bold;">${supportEmail}</a></p>
         </div>
       </div>
     </body>
@@ -475,4 +494,13 @@ export const sendOrderStatusUpdateEmail = async (order, newStatus, note = '') =>
   `;
 
   return await sendEmail({ to: order.customerDetails.email, subject, htmlContent });
+};
+
+// Backward-compatible router that ONLY sends email if status is DISPATCHED
+export const sendOrderStatusUpdateEmail = async (order, newStatus, note = '') => {
+  if (newStatus !== 'DISPATCHED') {
+    // Strictly skip email for any status change other than DISPATCHED (CONFIRMED, PACKED, IN_TRANSIT, DELIVERED, CANCELLED, etc.)
+    return { success: true, skipped: true, reason: 'Status update emails only sent for DISPATCHED' };
+  }
+  return await sendOrderDispatchedEmail(order, note);
 };

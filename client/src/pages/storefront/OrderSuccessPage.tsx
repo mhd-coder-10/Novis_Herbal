@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { CheckCircle, ArrowRight, Printer, Sparkles, MapPin, Copy, Check } from 'lucide-react';
+import { CheckCircle, ArrowRight, Printer, Sparkles, MapPin, Copy, Check, Package } from 'lucide-react';
 import { appConfig } from '../../config/appConfig';
 import { toast } from '../../store/useToastStore';
 
@@ -40,7 +40,7 @@ export const OrderSuccessPage: React.FC<OrderSuccessProps> = ({ orderId, onNavig
 
   return (
     <div className="py-8 sm:py-16 w-full px-3.5 sm:px-6 lg:px-10 max-w-2xl mx-auto text-center space-y-6 sm:space-y-8 animate-fadeIn">
-      
+
       {/* Brand Logo */}
       <div className="flex justify-center">
         <img
@@ -96,22 +96,18 @@ export const OrderSuccessPage: React.FC<OrderSuccessProps> = ({ orderId, onNavig
         </div>
         <div className="flex justify-between items-center text-xs">
           <span className="text-slate-500">Logistics Carrier:</span>
-          <span className="font-semibold text-slate-800">Shiprocket Express</span>
-        </div>
-        <div className="flex justify-between items-center text-xs">
-          <span className="text-slate-500">Estimated Dispatch:</span>
-          <span className="font-semibold text-slate-800">Within 24 Hours</span>
+          <span className="font-semibold text-slate-800">India Post / Standard Courier</span>
         </div>
       </div>
 
       {/* Action Buttons */}
       <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4 max-w-md mx-auto">
         <button
-          onClick={() => onNavigate('track-order', effectiveOrderId)}
+          onClick={() => onNavigate('my-orders')}
           className="w-full sm:w-auto px-6 py-3.5 bg-forest-900 text-gold-400 font-bold text-xs uppercase tracking-wider rounded-xl hover:bg-forest-800 transition shadow-md shadow-forest-900/10 flex items-center justify-center space-x-2 cursor-pointer"
         >
-          <MapPin className="w-4 h-4" />
-          <span>Track Order Timeline</span>
+          <Package className="w-4 h-4" />
+          <span>View My Orders</span>
         </button>
 
         <button

@@ -1,6 +1,6 @@
 # Novis Herbal — Premium Single-Vendor E-Commerce Platform
 
-A production-ready, ultra-premium D2C Hair Care E-Commerce Web Application built with **React, Vite, TypeScript, Tailwind CSS, Node.js, Express, MongoDB Atlas, and Shiprocket Logistics Integration**.
+A production-ready, ultra-premium D2C Hair Care E-Commerce Web Application built with **React, Vite, TypeScript, Tailwind CSS, Node.js, Express, MongoDB Atlas, India Post / Courier Logistics Tracking, and WhatsApp Customer Alerts**.
 
 ---
 
@@ -27,8 +27,10 @@ A production-ready, ultra-premium D2C Hair Care E-Commerce Web Application built
   - Address validator with pincode and Indian states.
   - Dual payment modes: **Razorpay Online Payments (UPI, Cards, Netbanking)** and **Cash on Delivery (COD)**.
   - Server-side price tampering protection and real-time inventory decrement.
-- **Live Shipment & Order Tracking Page:**
-  - Enter Order ID (`NOV-2026-XXXX`) to view visual milestone stepper and Shiprocket courier event timeline.
+- **Consignment Tracking & My Orders:**
+  - View order details, status timeline, courier partner (e.g. India Post), and consignment tracking number with 1-click copy & direct portal link.
+- **WhatsApp Dispatch Alerts:**
+  - Direct 1-click WhatsApp customer dispatch notification with tracking details.
 
 ---
 
@@ -43,11 +45,12 @@ Access URL: `http://localhost:5173/` ➔ Click **Admin Portal** or navigate dire
   - Add, edit, delete, publish/unpublish products.
   - Full control over MRP, selling price, stock quantities, weight/dimensions for courier calculations, and image galleries.
   - Safety rule: If a product is linked to past orders, it is safely archived instead of hard-deleted.
-- **Orders & Shiprocket Fulfillment:**
-  - Filter orders by status (`PLACED`, `CONFIRMED`, `PACKED`, `SHIPMENT_BOOKED`, `IN_TRANSIT`, `DELIVERED`, `CANCELLED`).
-  - Progress order lifecycle: Confirm ➔ Mark Packed ➔ **Book Courier (Shiprocket API / Mock Engine)** ➔ Assign AWB tracking code.
-  - Generate & Print AWB Shipping Labels and GST Tax Invoices.
+- **Orders & Courier Fulfillment:**
+  - Filter orders by status (`PLACED`, `CONFIRMED`, `PACKED`, `DISPATCHED`, `OUT_FOR_DELIVERY`, `DELIVERED`, `CANCELLED`).
+  - Progress order lifecycle: Confirm ➔ Mark Packed ➔ **Add Courier Consignment ID (India Post, Delhivery, etc.)** ➔ 1-Click WhatsApp Customer Alert.
+  - Generate & Print Shipping Labels and GST Tax Invoices.
   - **Audited Manual Overrides:** Change order/delivery status with mandatory audit log reason.
+  - **Automatic Payment & Refund Sync:** Marking an order refunded automatically syncs payment and refund statuses.
 - **Dynamic CMS Manager:**
   - Edit homepage banners and sliders without touching code.
   - Edit announcement bar text and visibility.
@@ -89,7 +92,7 @@ Runs at: `http://localhost:5173`
 - `JWT_SECRET`
 - `ADMIN_EMAIL` & `ADMIN_PASSWORD`
 - `RAZORPAY_KEY_ID` & `RAZORPAY_KEY_SECRET`
-- `SHIPROCKET_EMAIL` & `SHIPROCKET_PASSWORD`
+- `DEFAULT_COURIER_NAME="India Post"`
 - `SMTP_HOST`, `SMTP_USER`, `SMTP_PASS`
 
 ### Frontend (`client/.env`)

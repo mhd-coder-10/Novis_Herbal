@@ -89,12 +89,16 @@ export const getInvoice = async (req, res) => {
 
     const cms = await CMS.findOne({ key: 'global_cms' }).lean();
     const storeSettings = cms?.storeSettings || {};
-    const storeName = storeSettings.storeName || 'Novis Herbal';
+    const storeName = storeSettings.storeName || 'Novise Herbal';
+    const legalEntityName = storeSettings.legalEntityName || 'Novis Herbal Naturals';
     const gstNumber = storeSettings.gstNumber || '27AAAAA0000A1Z5';
-    const businessAddress = storeSettings.businessAddress || 'Novise Naturals, Mumbai, Maharashtra, India';
+    const businessAddress = storeSettings.businessAddress || 'Novis Herbal Naturals, Sidhpur, Gujarat, India, 384151';
     const supportEmail = storeSettings.supportEmail || 'support@novise.in';
     const supportPhone = storeSettings.supportPhone || '+91 98765 43210';
     const currencySymbol = storeSettings.currencySymbol || '₹';
+    const sellerState = (storeSettings.sellerState || 'Gujarat').trim();
+    const gstRate = storeSettings.gstPercentage !== undefined ? Number(storeSettings.gstPercentage) : 5;
+    const invoiceTerms = storeSettings.invoiceTerms || '• Authentic Ayurvedic personal-care formulation with tamper-evident seal.\n• All items once delivered are strictly Non-Returnable and Non-Replaceable for hygiene & safety.\n• This is a computer-generated tax invoice and requires no physical signature.';
 
     const formattedDate = new Date(order.createdAt).toLocaleDateString('en-IN', {
       day: '2-digit',
@@ -105,10 +109,57 @@ export const getInvoice = async (req, res) => {
     const subtotal = order.pricing?.subtotal || 0;
     const discountAmount = order.pricing?.discountAmount || 0;
     const shippingFee = order.pricing?.shippingFee || 0;
-    const totalAmount = order.pricing?.totalAmount || 0;
-    const taxAmount = order.pricing?.taxAmount || Math.round(totalAmount * 0.05);
+    const effectiveGstRate = Math.max(0, gstRate);
     const taxableSubtotal = Math.max(0, subtotal - discountAmount);
+
+    let taxAmount = order.pricing?.taxAmount;
+    if (taxAmount === undefined || taxAmount === null || taxAmount === 0) {
+      taxAmount = effectiveGstRate > 0 ? Math.round(taxableSubtotal * (effectiveGstRate / 100)) : 0;
+    }
+
+    // Tax Exclusive Model: Grand Total = Subtotal - Discount + Shipping + Tax
+    const totalAmount = taxableSubtotal + shippingFee + taxAmount;
+
+    // Check customer state vs seller state for Intra-State (CGST + SGST) vs Inter-State (IGST)
+    const customerState = (order.shippingAddress?.state || '').trim();
+    const isInterState = Boolean(
+      customerState &&
+      sellerState &&
+      !customerState.toLowerCase().includes(sellerState.toLowerCase()) &&
+      !sellerState.toLowerCase().includes(customerState.toLowerCase())
+    );
+
     const halfTax = (taxAmount / 2).toFixed(2);
+    const fullTax = Number(taxAmount).toFixed(2);
+    const halfRate = (effectiveGstRate / 2).toString();
+
+    let taxRowsHtml = '';
+    if (effectiveGstRate === 0) {
+      taxRowsHtml = `
+        <tr>
+          <td>GST (Exempt / Nil Rated 0%)</td>
+          <td class="num">${currencySymbol}0.00</td>
+        </tr>
+      `;
+    } else if (isInterState) {
+      taxRowsHtml = `
+        <tr>
+          <td>IGST (${effectiveGstRate}%)</td>
+          <td class="num">${currencySymbol}${fullTax}</td>
+        </tr>
+      `;
+    } else {
+      taxRowsHtml = `
+        <tr>
+          <td>CGST (${halfRate}%)</td>
+          <td class="num">${currencySymbol}${halfTax}</td>
+        </tr>
+        <tr>
+          <td>SGST (${halfRate}%)</td>
+          <td class="num">${currencySymbol}${halfTax}</td>
+        </tr>
+      `;
+    }
 
     const html = `<!DOCTYPE html>
 <html lang="en">
@@ -147,6 +198,8 @@ export const getInvoice = async (req, res) => {
       border: 1px solid transparent;
       transition: all 0.15s ease;
     }
+    .btn-download { background: #047857; color: #ffffff; box-shadow: 0 2px 6px rgba(4, 120, 87, 0.3); }
+    .btn-download:hover { background: #065f46; }
     .btn-print { background: #0b3b24; color: #ffffff; }
     .btn-print:hover { background: #062316; }
     .btn-close { background: #ffffff; color: #475569; border-color: #cbd5e1; }
@@ -172,8 +225,14 @@ export const getInvoice = async (req, res) => {
       font-size: 24px;
       font-weight: 900;
       color: #0b3b24;
-      margin: 0 0 6px 0;
+      margin: 0 0 4px 0;
       letter-spacing: 0.5px;
+    }
+    .legal-entity-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: #334155;
+      margin-bottom: 6px;
     }
     .store-meta {
       font-size: 12px;
@@ -249,7 +308,7 @@ export const getInvoice = async (req, res) => {
       margin-bottom: 28px;
     }
     .summary-table {
-      width: 340px;
+      width: 360px;
       border-collapse: collapse;
     }
     .summary-table td {
@@ -272,11 +331,16 @@ export const getInvoice = async (req, res) => {
       color: #64748b;
       display: flex;
       justify-content: space-between;
-      align-items: center;
+      align-items: flex-start;
+      gap: 20px;
       line-height: 1.6;
     }
+    @page {
+      size: A4 portrait;
+      margin: 12mm 15mm;
+    }
     @media print {
-      body { background: #ffffff; padding: 0; }
+      body { background: #ffffff !important; padding: 0 !important; }
       .actions-bar { display: none !important; }
       .invoice-card {
         border: none !important;
@@ -291,11 +355,20 @@ export const getInvoice = async (req, res) => {
 <body>
 
   <div class="actions-bar">
-    <div style="font-weight: 700; color: #334155;">
-      <span>Tax Invoice Preview</span>
+    <div style="font-weight: 800; color: #0f172a; display: flex; align-items: center; gap: 8px;">
+      <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #059669;"></span>
+      <span>Official GST Tax Invoice Preview</span>
+      <span style="font-size: 11px; background: #e2e8f0; color: #475569; padding: 2px 8px; border-radius: 999px; font-family: monospace;">#INV-${order.orderId}</span>
     </div>
     <div style="display: flex; gap: 8px;">
-      <button onclick="window.print()" class="btn btn-print">🖨️ Print Invoice</button>
+      <button onclick="downloadAsPdf()" class="btn btn-download" title="Save as PDF document">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        <span>Download PDF</span>
+      </button>
+      <button onclick="window.print()" class="btn btn-print" title="Print physical invoice copy">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+        <span>Print Invoice</span>
+      </button>
       <button onclick="window.close()" class="btn btn-close">Close</button>
     </div>
   </div>
@@ -304,6 +377,7 @@ export const getInvoice = async (req, res) => {
     <div class="header-bar">
       <div>
         <h1 class="brand-title">${storeName}</h1>
+        ${legalEntityName && legalEntityName !== storeName ? `<div class="legal-entity-title">${legalEntityName}</div>` : ''}
         <div class="store-meta">
           ${businessAddress}<br>
           <strong>GSTIN:</strong> ${gstNumber}<br>
@@ -316,9 +390,9 @@ export const getInvoice = async (req, res) => {
           <strong>Invoice No:</strong> INV-${order.orderId}<br>
           <strong>Invoice Date:</strong> ${formattedDate}<br>
           <strong>Order ID:</strong> ${order.orderId}<br>
-          <span class="badge">${order.paymentInfo?.method === 'COD' 
-            ? (order.orderStatus === 'DELIVERED' ? 'COD - PAID (CASH COLLECTED)' : ['CANCELLED', 'RTO_COMPLETED', 'RETURNED_TO_SELLER'].includes(order.orderStatus) ? 'COD - NOT APPLICABLE' : 'COD - PENDING (COLLECT AT DOORSTEP)')
-            : `${order.paymentInfo?.method || 'ONLINE'} - ${order.paymentInfo?.status || 'PAID'}`}</span>
+          <span class="badge">${order.paymentInfo?.method === 'COD'
+        ? (order.orderStatus === 'DELIVERED' ? 'COD - PAID (CASH COLLECTED)' : ['CANCELLED', 'RTO_COMPLETED', 'RETURNED_TO_SELLER'].includes(order.orderStatus) ? 'COD - NOT APPLICABLE' : 'COD - PENDING (COLLECT AT DOORSTEP)')
+        : `${order.paymentInfo?.method || 'ONLINE'} - ${order.paymentInfo?.status || 'PAID'}`}</span>
         </div>
       </div>
     </div>
@@ -336,8 +410,8 @@ export const getInvoice = async (req, res) => {
 
       <div class="info-box">
         <h4>Shipment & Logistics</h4>
-        <strong>Courier Partner:</strong> ${order.shipment?.courierName || 'Shiprocket Express'}<br>
-        <strong>AWB Tracking:</strong> ${order.shipment?.awbCode || 'Assigned on Dispatch'}<br>
+        <strong>Courier Partner:</strong> ${order.shipment?.courierName || 'India Post'}<br>
+        <strong>Consignment Tracking No:</strong> ${order.shipment?.trackingNumber || order.shipment?.awbCode || 'Assigned on Dispatch'}<br>
         <strong>Destination:</strong> ${order.shippingAddress?.city || ''}, ${order.shippingAddress?.state || ''}<br>
         <strong>Order Status:</strong> ${order.orderStatus || 'CONFIRMED'}<br>
         <strong>Policy:</strong> Strictly Non-Returnable & Non-Replaceable
@@ -388,14 +462,7 @@ export const getInvoice = async (req, res) => {
           <td>Shipping & Handling</td>
           <td class="num">${shippingFee === 0 ? '<span style="color: #166534; font-weight: 700;">FREE</span>' : currencySymbol + shippingFee}</td>
         </tr>
-        <tr>
-          <td>CGST (2.5%)</td>
-          <td class="num">${currencySymbol}${halfTax}</td>
-        </tr>
-        <tr>
-          <td>SGST (2.5%)</td>
-          <td class="num">${currencySymbol}${halfTax}</td>
-        </tr>
+        ${taxRowsHtml}
         <tr class="grand-total">
           <td>Grand Total</td>
           <td class="num">${currencySymbol}${totalAmount}</td>
@@ -404,18 +471,27 @@ export const getInvoice = async (req, res) => {
     </div>
 
     <div class="footer-note">
-      <div>
-        <strong>Terms & Conditions:</strong><br>
-        • Authentic Ayurvedic personal-care formulation with tamper-evident seal.<br>
-        • All items once delivered are strictly Non-Returnable and Non-Replaceable for hygiene & safety.<br>
-        • This is a computer-generated tax invoice and requires no physical signature.
+      <div style="white-space: pre-line;">
+        <strong>Terms & Conditions / Declaration:</strong><br>
+        ${invoiceTerms}
       </div>
-      <div style="text-align: right;">
-        <strong>For ${storeName}</strong><br><br>
-        <span style="font-size: 11px; color: #64748b;">Authorized Signatory</span>
+      <div style="text-align: right; min-width: 180px;">
+        <strong>For ${legalEntityName || storeName}</strong><br><br><br>
+        <span style="font-size: 11px; color: #64748b; border-top: 1px dashed #94a3b8; padding-top: 4px; display: inline-block;">Authorized Signatory</span>
       </div>
     </div>
   </div>
+
+  <script>
+    function downloadAsPdf() {
+      const prevTitle = document.title;
+      document.title = 'Invoice_${order.orderId}_${storeName.replace(/[^a-zA-Z0-9]/g, '_')}';
+      window.print();
+      setTimeout(function() {
+        document.title = prevTitle;
+      }, 1500);
+    }
+  </script>
 
 </body>
 </html>`;
@@ -533,13 +609,11 @@ export const updateOrderPolicySettings = async (req, res) => {
   }
 };
 
-// @route DELETE /api/orders/admin/:id (Admin)
+// @route DELETE /api/orders/admin/:id (Admin) - Permanently blocked for GST compliance
 export const deleteOrder = async (req, res) => {
-  try {
-    const result = await OrderService.deleteOrder(req.params.id, req.user);
-    res.json(result);
-  } catch (error) {
-    res.status(error.statusCode || 500).json({ success: false, message: error.message });
-  }
+  return res.status(403).json({
+    success: false,
+    message: 'Orders cannot be permanently deleted to preserve GST tax invoice sequence, financial audit trails, and payment reconciliation. Please cancel the order instead.'
+  });
 };
 

@@ -91,14 +91,22 @@ const cmsSchema = new mongoose.Schema({
   // General Store, Shipping & Notification Settings
   storeSettings: {
     storeName: { type: String, default: 'Novise Herbal' },
+    legalEntityName: { type: String, default: 'Novis Herbal Naturals' },
+    sellerState: { type: String, default: 'Gujarat' },
+    gstPercentage: { type: Number, default: 5, min: 0, max: 28 },
     supportEmail: { type: String, default: 'support@novise.in' },
     supportPhone: { type: String, default: '+91 98765 43210' },
     supportWhatsApp: { type: String, default: '+91 98765 43210' },
     businessAddress: { type: String, default: 'Novise Naturals, Mumbai, Maharashtra, India' },
     gstNumber: { type: String, default: '27AAAAA0000A1Z5' },
+    invoiceTerms: {
+      type: String,
+      default: '• Authentic Ayurvedic personal-care formulation with tamper-evident seal.\n• All items once delivered are strictly Non-Returnable and Non-Replaceable for hygiene & safety.\n• This is a computer-generated tax invoice and requires no physical signature.'
+    },
     currencySymbol: { type: String, default: '₹' },
-    freeShippingThreshold: { type: Number, default: 499 },
-    standardShippingFee: { type: Number, default: 49 },
+    isFreeShippingEnabled: { type: Boolean, default: true },
+    freeShippingThreshold: { type: Number, default: 0 },
+    standardShippingFee: { type: Number, default: 0 },
     codFee: { type: Number, default: 0 },
     estimatedDeliveryText: { type: String, default: '3-5 Business Days' },
     enableOrderEmails: { type: Boolean, default: true },

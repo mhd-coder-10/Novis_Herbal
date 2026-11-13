@@ -107,7 +107,7 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
                 <button onClick={() => onNavigate('wishlist')} className="hover:text-white transition">My Wishlist</button>
               </li>
               <li>
-                <button onClick={() => onNavigate('track-order')} className="hover:text-white transition">Track Your Shipment</button>
+                <button onClick={() => onNavigate('my-orders')} className="hover:text-white transition">My Orders</button>
               </li>
             </ul>
           </div>

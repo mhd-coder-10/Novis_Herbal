@@ -91,7 +91,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
       group: 'STORE OPERATIONS',
       items: [
         { id: 'products', label: 'Products & Inventory', icon: Package },
-        { id: 'orders', label: 'Orders & Shiprocket Tracking', icon: Truck },
+        { id: 'orders', label: 'Orders & Courier Dispatch', icon: Truck },
         { id: 'customers', label: 'Customers & Users', icon: Users }
       ]
     },

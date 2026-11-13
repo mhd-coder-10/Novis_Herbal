@@ -445,8 +445,8 @@ export class AdminService {
         status: process.env.RAZORPAY_KEY_ID?.includes('sample') ? 'TEST_SIMULATED' : 'LIVE'
       },
       logistics: {
-        provider: 'Shiprocket Express',
-        status: process.env.SHIPROCKET_EMAIL?.includes('placeholder') ? 'MOCK_SANDBOX' : 'LIVE'
+        provider: 'India Post / Courier Dispatch',
+        status: 'ACTIVE_MANUAL'
       },
       emailMailer: {
         provider: 'Google SMTP (Gmail)',

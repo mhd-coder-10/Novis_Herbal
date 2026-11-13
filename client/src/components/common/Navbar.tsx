@@ -89,7 +89,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage, pagePar
               else if (link.startsWith('/')) onNavigate(link.replace('/', '') || 'home');
             }
           }}
-          className={`bg-forest-950 text-white py-1.5 px-3 sm:px-6 text-[10px] sm:text-xs font-semibold tracking-wide text-center flex items-center justify-center gap-1.5 sm:gap-2.5 border-b border-gold-500/20 w-full overflow-hidden ${cms?.announcementBar?.link ? 'cursor-pointer hover:bg-forest-900 transition' : ''
+          className={`hidden md:flex bg-forest-950 text-white py-1.5 px-3 sm:px-6 text-[10px] sm:text-xs font-semibold tracking-wide text-center items-center justify-center gap-1.5 sm:gap-2.5 border-b border-gold-500/20 w-full overflow-hidden ${cms?.announcementBar?.link ? 'cursor-pointer hover:bg-forest-900 transition' : ''
             }`}
         >
           <div className="flex items-center space-x-1 sm:space-x-1.5 text-gold-400 shrink-0">
@@ -191,20 +191,6 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage, pagePar
           >
             About Us
             {currentPage === 'policy' && pageParam === 'aboutUs' && (
-              <span className="absolute bottom-0 left-3 right-3 h-[2px] bg-forest-900 rounded-full" />
-            )}
-          </button>
-
-          <button
-            onClick={() => onNavigate('track-order')}
-            className={`relative px-3.5 py-1.5 rounded-full text-xs font-bold tracking-wide transition-all duration-200 outline-none focus:outline-none flex items-center space-x-1.5 ${currentPage === 'track-order'
-              ? 'text-forest-950 bg-forest-900/8 shadow-xs'
-              : 'text-stone-600 hover:text-forest-950 hover:bg-forest-900/5'
-              }`}
-          >
-            <MapPin className="w-3.5 h-3.5 text-forest-800" />
-            <span>Track Order</span>
-            {currentPage === 'track-order' && (
               <span className="absolute bottom-0 left-3 right-3 h-[2px] bg-forest-900 rounded-full" />
             )}
           </button>
@@ -429,7 +415,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage, pagePar
                       <button
                         onClick={() => {
                           setIsUserMenuOpen(false);
-                          onNavigate('track-order');
+                          onNavigate('my-orders');
                         }}
                         className="w-full flex items-center justify-between p-2.5 rounded-xl hover:bg-forest-900/5 text-xs font-semibold text-stone-700 hover:text-forest-950 transition"
                       >
@@ -437,7 +423,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage, pagePar
                           <div className="w-7 h-7 rounded-lg bg-forest-900/10 flex items-center justify-center text-forest-900">
                             <Package className="w-3.5 h-3.5" />
                           </div>
-                          <span>Track Live Order</span>
+                          <span>My Orders</span>
                         </div>
                         <ChevronRight className="w-3.5 h-3.5 text-stone-400" />
                       </button>
@@ -656,15 +642,15 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage, pagePar
 
               <button
                 onClick={() => {
-                  onNavigate('track-order');
+                  onNavigate('my-orders');
                   setIsMobileMenuOpen(false);
                 }}
-                className={`w-full text-left px-3.5 py-2.5 rounded-xl transition flex items-center justify-between ${currentPage === 'track-order' ? 'bg-forest-900/10 text-forest-950 font-bold' : 'hover:bg-slate-50'
+                className={`w-full text-left px-3.5 py-2.5 rounded-xl transition flex items-center justify-between ${currentPage === 'my-orders' ? 'bg-forest-900/10 text-forest-950 font-bold' : 'hover:bg-slate-50'
                   }`}
               >
                 <div className="flex items-center space-x-2">
                   <Package className="w-4 h-4 text-forest-800" />
-                  <span>Track Your Order</span>
+                  <span>My Orders</span>
                 </div>
                 <ArrowRight className="w-3.5 h-3.5 text-slate-400" />
               </button>

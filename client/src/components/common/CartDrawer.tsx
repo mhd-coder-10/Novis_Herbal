@@ -18,6 +18,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ onCheckout, onNavigatePr
     removeItem,
     updateQuantity,
     getSubtotal,
+    getTaxAmount,
     getTotal,
     getShippingFee,
     addItem
@@ -38,6 +39,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ onCheckout, onNavigatePr
 
   const subtotal = getSubtotal();
   const shippingFee = getShippingFee();
+  const taxAmount = getTaxAmount ? getTaxAmount() : 0;
   const total = getTotal();
   const totalQuantity = items.reduce((sum, i) => sum + i.quantity, 0);
 
@@ -98,15 +100,15 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ onCheckout, onNavigatePr
           <span className="flex items-center space-x-1.5">
             <Truck className="w-4 h-4 text-gold-400 shrink-0" />
             <span className="text-slate-200">
-              {subtotal >= appConfig.freeShippingThreshold
+              {appConfig.isFreeShippingEnabled || shippingFee === 0
                 ? 'FREE Express Delivery Unlocked!'
-                : `Free delivery on orders above ₹${appConfig.freeShippingThreshold}`}
+                : `Express Courier Delivery`}
             </span>
           </span>
           <span className="text-[10px] sm:text-[11px] text-gold-400 font-medium">
-            {subtotal >= appConfig.freeShippingThreshold
+            {appConfig.isFreeShippingEnabled || shippingFee === 0
               ? 'Complimentary Delivery'
-              : `Add ₹${Math.max(0, appConfig.freeShippingThreshold - subtotal)} more`}
+            : `₹${shippingFee} Courier Fee`}
           </span>
         </div>
 
@@ -287,12 +289,19 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ onCheckout, onNavigatePr
                 <span>Shipping</span>
                 <span>
                   {shippingFee === 0 ? (
-                    <span className="font-semibold text-emerald-700">₹0</span>
+                    <span className="font-semibold text-emerald-700">FREE</span>
                   ) : (
                     <span className="font-semibold text-slate-900">₹{shippingFee}</span>
                   )}
                 </span>
               </div>
+
+              {taxAmount > 0 && (
+                <div className="flex justify-between text-slate-600">
+                  <span>GST ({appConfig.gstPercentage}%)</span>
+                  <span className="font-semibold text-slate-900">₹{taxAmount}</span>
+                </div>
+              )}
 
               <div className="pt-2 border-t border-slate-100 flex justify-between items-baseline text-base font-extrabold text-forest-950">
                 <span>Final Payable Amount</span>

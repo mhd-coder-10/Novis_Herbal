@@ -929,7 +929,7 @@ export const AdminFinance: React.FC = () => {
 
   // Custom Delete Confirmation Modal State
   const [deleteConfirmation, setDeleteConfirmation] = useState<{
-    type: 'offline' | 'online' | 'mfg' | 'operating';
+    type: 'offline' | 'mfg' | 'operating';
     id: string;
     title: string;
     itemBadge?: string;
@@ -946,17 +946,6 @@ export const AdminFinance: React.FC = () => {
       itemBadge: saleId,
       itemName: `Offline Invoice #${saleId}`,
       message: 'Are you sure you want to delete this offline retail sale record? If inventory was deducted, warehouse stock will be automatically restored.'
-    });
-  };
-
-  const handleDeleteOnlineOrder = (id: string, orderId: string) => {
-    setDeleteConfirmation({
-      type: 'online',
-      id,
-      title: 'Delete Online Order Record',
-      itemBadge: orderId,
-      itemName: `Online Order #${orderId}`,
-      message: 'Are you sure you want to delete this online order record? This will remove the record from ledger and restore product inventory stock for active orders.'
     });
   };
 
@@ -989,12 +978,6 @@ export const AdminFinance: React.FC = () => {
         const res = await api.delete(`/finance/offline-sales/${deleteConfirmation.id}`);
         if (res.data?.success) {
           toast.success(`Sale ${deleteConfirmation.itemBadge || ''} deleted successfully!`, 'Deleted');
-          fetchData();
-        }
-      } else if (deleteConfirmation.type === 'online') {
-        const res = await api.delete(`/orders/admin/${deleteConfirmation.id}`);
-        if (res.data?.success) {
-          toast.success(`Online order ${deleteConfirmation.itemBadge || ''} deleted successfully!`, 'Order Deleted');
           fetchData();
         }
       } else if (deleteConfirmation.type === 'mfg') {
@@ -1814,7 +1797,7 @@ export const AdminFinance: React.FC = () => {
                             </div>
                             <div>
                               <h4 className="font-serif font-bold text-forest-950 text-sm">Online E-Commerce Channel</h4>
-                              <p className="text-[11px] text-slate-400">Direct Store Orders & Shiprocket Logistics</p>
+                              <p className="text-[11px] text-slate-400">Direct Store Orders & Courier Logistics</p>
                             </div>
                           </div>
                           <span className="px-2.5 py-1 bg-blue-50 text-blue-800 border border-blue-200 text-xs font-black font-mono rounded-lg">
@@ -2001,13 +1984,17 @@ export const AdminFinance: React.FC = () => {
                                     )}
                                   </td>
                                   <td className="py-3.5 px-4 text-right" onClick={(e) => e.stopPropagation()}>
-                                    <button
-                                      onClick={() => item.type === 'ONLINE' ? handleDeleteOnlineOrder(item._id, item.id) : handleDeleteOfflineSale(item._id, item.id)}
-                                      className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer"
-                                      title={`Delete ${item.type === 'ONLINE' ? 'online order' : 'offline sale'}`}
-                                    >
-                                      <Trash2 className="w-3.5 h-3.5" />
-                                    </button>
+                                    {item.type === 'OFFLINE' ? (
+                                      <button
+                                        onClick={() => handleDeleteOfflineSale(item._id, item.id)}
+                                        className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer"
+                                        title="Delete offline sale record"
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                      </button>
+                                    ) : (
+                                      <span className="text-[10px] text-slate-400 font-semibold px-2 py-0.5 bg-slate-100 rounded border border-slate-200">Order Locked</span>
+                                    )}
                                   </td>
                                 </tr>
                               ))
@@ -2164,13 +2151,7 @@ export const AdminFinance: React.FC = () => {
                                     ₹{order.pricing?.totalAmount || 0}
                                   </td>
                                   <td className="py-3.5 px-4 text-right" onClick={(e) => e.stopPropagation()}>
-                                    <button
-                                      onClick={() => handleDeleteOnlineOrder(order._id, order.orderId)}
-                                      className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer"
-                                      title="Delete online order record and restore inventory"
-                                    >
-                                      <Trash2 className="w-3.5 h-3.5" />
-                                    </button>
+                                    <span className="text-[10px] text-slate-400 font-semibold px-2 py-0.5 bg-slate-100 rounded border border-slate-200">GST Locked</span>
                                   </td>
                                 </tr>
                               ))

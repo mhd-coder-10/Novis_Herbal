@@ -263,7 +263,7 @@ export const PolicyPage: React.FC<PolicyPageProps> = ({ policyType, onNavigate }
             <div className="space-y-3">
               <h3 className="font-serif text-base font-bold text-forest-950">1. Pan-India Delivery Coverage</h3>
               <p>
-                Novise delivers to all states and union territories across India, covering over 26,000+ postal pincodes through our logistics partners via Shiprocket, including Delhivery, BlueDart, Xpressbees, DTDC, and Amazon Shipping.
+                Novise delivers to all states and union territories across India, covering over 26,000+ postal pincodes through trusted national logistics partners including India Post, Delhivery, DTDC, and standard courier networks.
               </p>
             </div>
 
@@ -298,7 +298,7 @@ export const PolicyPage: React.FC<PolicyPageProps> = ({ policyType, onNavigate }
             <div className="space-y-3">
               <h3 className="font-serif text-base font-bold text-forest-950">5. Real-Time Tracking & Notifications</h3>
               <p>
-                As soon as your shipment is scanned by the courier service, you will receive an automated SMS and Email with your live <strong>AWB Tracking Number</strong>. You can check real-time courier updates at any time directly on our website’s <button onClick={() => onNavigate?.('track-order')} className="text-forest-900 font-bold underline">Track Order</button> page.
+                As soon as your shipment is dispatched with the courier service, your consignment tracking number and direct tracking link are updated in your <button onClick={() => onNavigate?.('my-orders')} className="text-forest-900 font-bold underline">My Orders</button> page and sent directly to your WhatsApp. You can track your parcel anytime directly on the official India Post / courier tracking portal.
               </p>
             </div>
 
@@ -389,7 +389,7 @@ export const PolicyPage: React.FC<PolicyPageProps> = ({ policyType, onNavigate }
             <div className="space-y-3">
               <h3 className="font-serif text-base font-bold text-forest-950">1. Information We Collect</h3>
               <p>
-                When you make a purchase on Novis Herbal (novise.in), we collect your name, postal shipping address, email address, and phone number. This information is utilized solely to process your order, provide Shiprocket shipping tracking alerts, and generate mandatory GST invoices.
+                When you make a purchase on Novis Herbal (novise.in), we collect your name, postal shipping address, email address, and phone number. This information is utilized solely to process your order, provide courier consignment tracking alerts via WhatsApp, and generate mandatory GST invoices.
               </p>
             </div>
 

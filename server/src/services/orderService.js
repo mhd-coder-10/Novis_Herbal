@@ -8,7 +8,7 @@ import { createRazorpayOrder, verifyRazorpaySignature } from './razorpayService.
 import {
   sendOrderConfirmationEmail,
   sendAdminOrderNotificationEmail,
-  sendOrderStatusUpdateEmail
+  sendOrderDispatchedEmail
 } from './emailService.js';
 import { sanitizePhoneNumber, isValidIndianPhone } from '../utils/phoneValidation.js';
 
@@ -108,14 +108,21 @@ export class OrderService {
 
     const cmsConfig = await CMS.findOne({ key: 'global_cms' }).lean();
     const storeSettings = cmsConfig?.storeSettings || {};
-    const freeShippingThreshold = storeSettings.freeShippingThreshold !== undefined ? Number(storeSettings.freeShippingThreshold) : 499;
-    const standardShippingFee = storeSettings.standardShippingFee !== undefined ? Number(storeSettings.standardShippingFee) : 49;
+    const isFreeShipping = storeSettings.isFreeShippingEnabled !== false;
+    const freeShippingThreshold = storeSettings.freeShippingThreshold !== undefined ? Number(storeSettings.freeShippingThreshold) : 0;
+    const standardShippingFee = storeSettings.standardShippingFee !== undefined ? Number(storeSettings.standardShippingFee) : 0;
     const codFee = (paymentMethod === 'COD' && storeSettings.codFee !== undefined) ? Number(storeSettings.codFee) : 0;
 
     const discountAmount = 0;
-    const baseShippingFee = calculatedSubtotal >= freeShippingThreshold ? 0 : standardShippingFee;
+    let baseShippingFee = 0;
+    if (!isFreeShipping && standardShippingFee > 0) {
+      baseShippingFee = standardShippingFee;
+    }
     const shippingFee = baseShippingFee + codFee;
-    const totalAmount = Math.max(0, calculatedSubtotal - discountAmount + shippingFee);
+    const taxableSubtotal = Math.max(0, calculatedSubtotal - discountAmount);
+    const gstRate = storeSettings.gstPercentage !== undefined ? Number(storeSettings.gstPercentage) : 5;
+    const taxAmount = gstRate > 0 ? Math.round(taxableSubtotal * (gstRate / 100)) : 0;
+    const totalAmount = taxableSubtotal + shippingFee + taxAmount;
 
     const orderId = await this.generateOrderId();
     const invoiceNumber = `INV-${orderId}`;
@@ -144,7 +151,7 @@ export class OrderService {
         subtotal: calculatedSubtotal,
         discountAmount,
         shippingFee,
-        taxAmount: Math.round(totalAmount * 0.05),
+        taxAmount,
         totalAmount
       },
       paymentInfo: {
@@ -331,8 +338,38 @@ export class OrderService {
     };
   }
 
+  static normalizeOrderPricing(order) {
+    if (!order || !order.pricing) return order;
+    const subtotal = Number(order.pricing.subtotal) || 0;
+    const discountAmount = Number(order.pricing.discountAmount) || 0;
+    const shippingFee = Number(order.pricing.shippingFee) || 0;
+    const taxableSubtotal = Math.max(0, subtotal - discountAmount);
+
+    let taxAmount = order.pricing.taxAmount;
+    if (taxAmount === undefined || taxAmount === null || taxAmount === 0) {
+      taxAmount = taxableSubtotal > 0 ? Math.round(taxableSubtotal * 0.05) : 0;
+      order.pricing.taxAmount = taxAmount;
+    }
+
+    const calculatedTotal = taxableSubtotal + shippingFee + taxAmount;
+    if (order.pricing.totalAmount !== calculatedTotal) {
+      order.pricing.totalAmount = calculatedTotal;
+      if (order._id) {
+        Order.updateOne(
+          { _id: order._id },
+          { $set: { 'pricing.taxAmount': taxAmount, 'pricing.totalAmount': calculatedTotal } }
+        ).catch(() => { });
+      }
+    }
+    return order;
+  }
+
   static async getMyOrders(userId) {
-    return await Order.find({ user: userId }).sort({ createdAt: -1 });
+    const orders = await Order.find({ user: userId }).sort({ createdAt: -1 });
+    for (const order of orders) {
+      this.normalizeOrderPricing(order);
+    }
+    return orders;
   }
 
   static async getAllOrdersAdmin({ status, search, paymentMethod, period, startDate, endDate, page = 1, limit = 200 }) {
@@ -425,9 +462,20 @@ export class OrderService {
       Order.find(query).select('orderStatus pricing paymentInfo')
     ]);
 
+    for (const order of orders) {
+      this.normalizeOrderPricing(order);
+    }
+
     const summary = {
       totalOrders: allMatching.length,
-      totalRevenue: allMatching.reduce((acc, o) => acc + (o.pricing?.totalAmount || 0), 0),
+      totalRevenue: allMatching.reduce((acc, o) => {
+        const sub = Number(o.pricing?.subtotal) || 0;
+        const disc = Number(o.pricing?.discountAmount) || 0;
+        const ship = Number(o.pricing?.shippingFee) || 0;
+        const tax = Number(o.pricing?.taxAmount) || (sub > 0 ? Math.round((sub - disc) * 0.05) : 0);
+        const tot = (o.pricing?.totalAmount && o.pricing.totalAmount > (sub - disc)) ? o.pricing.totalAmount : (sub - disc + ship + tax);
+        return acc + tot;
+      }, 0),
       deliveredCount: allMatching.filter(o => o.orderStatus === 'DELIVERED').length,
       inTransitCount: allMatching.filter(o => ['IN_TRANSIT', 'OUT_FOR_DELIVERY', 'SHIPMENT_BOOKED', 'PACKED', 'CONFIRMED', 'PICKED_UP'].includes(o.orderStatus)).length,
       cancelledCount: allMatching.filter(o => ['CANCELLED', 'CANCELLATION_REQUESTED'].includes(o.orderStatus)).length,
@@ -450,20 +498,6 @@ export class OrderService {
     if (!order) {
       const error = new Error('Order not found');
       error.statusCode = 404;
-      throw error;
-    }
-
-    // Validation Guardrails for Strict E-Commerce Order Lifecycle (Non-Returnable Products)
-    if ((order.orderStatus === 'CANCELLED' || order.orderStatus === 'RTO_COMPLETED') && status !== order.orderStatus) {
-      const error = new Error('Closed orders (Cancelled or RTO Completed) are permanently closed and cannot be re-opened.');
-      error.statusCode = 400;
-      throw error;
-    }
-
-    // Delivered orders cannot revert to unfulfilled, and cannot be normally returned
-    if (order.orderStatus === 'DELIVERED' && status !== 'DELIVERED') {
-      const error = new Error('Delivered orders cannot be reverted to earlier fulfillment stages. All products are strictly non-returnable.');
-      error.statusCode = 400;
       throw error;
     }
 
@@ -560,8 +594,10 @@ export class OrderService {
       newState: { status: order.orderStatus }
     });
 
-    // Send Real-Time Status & Delivery Update Email to Customer via Nodemailer
-    sendOrderStatusUpdateEmail(order, status, note).catch(err => console.error('[Order Status Email Error]:', err.message));
+    // Send Courier Dispatch Email with tracking details to Customer via Nodemailer ONLY when DISPATCHED
+    if (status === 'DISPATCHED') {
+      sendOrderDispatchedEmail(order, note).catch(err => console.error('[Dispatch Email Error]:', err.message));
+    }
 
     return order;
   }
@@ -618,6 +654,17 @@ export class OrderService {
 
     if (paymentStatus === 'PAID' && !order.paymentInfo.paidAt) {
       order.paymentInfo.paidAt = new Date();
+    }
+
+    if (paymentStatus === 'REFUNDED') {
+      if (!order.refundInfo) order.refundInfo = {};
+      order.refundInfo.status = 'REFUNDED';
+      order.refundInfo.isRefunded = true;
+      order.refundInfo.refundedAt = new Date();
+      order.refundInfo.amount = order.pricing?.totalAmount || 0;
+      if (!order.refundInfo.gatewayRefundId) {
+        order.refundInfo.gatewayRefundId = `REF-SETTLE-${Date.now()}`;
+      }
     }
 
     order.trackingTimeline.push({
@@ -730,7 +777,6 @@ export class OrderService {
       });
 
       await order.save();
-      sendOrderStatusUpdateEmail(order, 'CANCELLED', 'Order cancelled by customer. Inventory restored.').catch(console.error);
 
       return {
         success: true,
@@ -767,7 +813,6 @@ export class OrderService {
       });
 
       await order.save();
-      sendOrderStatusUpdateEmail(order, 'CANCELLATION_REQUESTED', 'Your cancellation request has been received and is being reviewed.').catch(console.error);
 
       return {
         success: true,
@@ -882,7 +927,6 @@ export class OrderService {
       });
 
       await order.save();
-      sendOrderStatusUpdateEmail(order, 'CANCELLED', 'Your cancellation request was approved and order has been cancelled.').catch(console.error);
 
       return { success: true, message: 'Cancellation approved. Order is now cancelled and stock restored.', order };
     }
@@ -905,7 +949,6 @@ export class OrderService {
       });
 
       await order.save();
-      sendOrderStatusUpdateEmail(order, revertStatus, `Cancellation request was rejected: ${order.cancellation.rejectionReason}`).catch(console.error);
 
       return { success: true, message: 'Cancellation request rejected. Order reverted to active fulfillment.', order };
     }
@@ -1348,20 +1391,27 @@ export class OrderService {
         damagedReportWindowHours: cms?.orderSettings?.damagedReportWindowHours ?? 2,
         maxReportVideoMinutes: cms?.orderSettings?.maxReportVideoMinutes ?? 3
       },
-      storeSettings: cms?.storeSettings || {
-        storeName: 'Novise Herbal',
-        supportEmail: 'support@novise.in',
-        supportPhone: '+91 98765 43210',
-        businessAddress: 'Novise Naturals, Mumbai, Maharashtra, India',
-        gstNumber: '27AAAAA0000A1Z5',
-        currencySymbol: '₹',
-        freeShippingThreshold: 499,
-        standardShippingFee: 49,
-        codFee: 0,
-        estimatedDeliveryText: '3-5 Business Days',
-        enableOrderEmails: true,
-        enableStatusUpdateEmails: true,
-        enableAdminAlerts: true
+      storeSettings: {
+        storeName: cms?.storeSettings?.storeName || 'Novise Herbal',
+        legalEntityName: cms?.storeSettings?.legalEntityName || 'Novis Herbal Naturals',
+        sellerState: cms?.storeSettings?.sellerState || 'Gujarat',
+        gstPercentage: cms?.storeSettings?.gstPercentage !== undefined ? Number(cms.storeSettings.gstPercentage) : 5,
+        supportEmail: cms?.storeSettings?.supportEmail || 'support@novise.in',
+        supportPhone: cms?.storeSettings?.supportPhone || '+91 98765 43210',
+        supportWhatsApp: cms?.storeSettings?.supportWhatsApp || '+91 98765 43210',
+        businessAddress: cms?.storeSettings?.businessAddress || 'Novise Naturals, Mumbai, Maharashtra, India',
+        gstNumber: cms?.storeSettings?.gstNumber || '27AAAAA0000A1Z5',
+        invoiceTerms: cms?.storeSettings?.invoiceTerms || '• Authentic Ayurvedic personal-care formulation with tamper-evident seal.\n• All items once delivered are strictly Non-Returnable and Non-Replaceable for hygiene & safety.\n• This is a computer-generated tax invoice and requires no physical signature.',
+        currencySymbol: cms?.storeSettings?.currencySymbol || '₹',
+        isFreeShippingEnabled: cms?.storeSettings?.isFreeShippingEnabled !== false,
+        freeShippingThreshold: cms?.storeSettings?.freeShippingThreshold ?? 0,
+        standardShippingFee: cms?.storeSettings?.standardShippingFee ?? 0,
+        codFee: cms?.storeSettings?.codFee ?? 0,
+        estimatedDeliveryText: cms?.storeSettings?.estimatedDeliveryText || '3-5 Business Days',
+        enableOrderEmails: cms?.storeSettings?.enableOrderEmails !== false,
+        enableStatusUpdateEmails: cms?.storeSettings?.enableStatusUpdateEmails !== false,
+        enableAdminAlerts: cms?.storeSettings?.enableAdminAlerts !== false,
+        ...(cms?.storeSettings || {})
       }
     };
   }
@@ -1432,7 +1482,7 @@ export class OrderService {
       throw error;
     }
 
-    return order;
+    return this.normalizeOrderPricing(order);
   }
 
   static async deleteOrder(orderId, adminUser) {

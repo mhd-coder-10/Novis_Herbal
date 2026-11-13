@@ -31,18 +31,27 @@ export const appConfig = {
     );
   },
 
+  get isFreeShippingEnabled(): boolean {
+    const cms = useCMSStore.getState().cms;
+    if (cms?.storeSettings?.isFreeShippingEnabled !== undefined) {
+      return Boolean(cms.storeSettings.isFreeShippingEnabled);
+    }
+    return true; // Free shipping is enabled by default
+  },
+
   get freeShippingThreshold(): number {
     const cms = useCMSStore.getState().cms;
     return cms?.storeSettings?.freeShippingThreshold !== undefined
       ? Number(cms.storeSettings.freeShippingThreshold)
-      : 499;
+      : 0;
   },
 
   get standardShippingFee(): number {
+    if (this.isFreeShippingEnabled) return 0;
     const cms = useCMSStore.getState().cms;
     return cms?.storeSettings?.standardShippingFee !== undefined
       ? Number(cms.storeSettings.standardShippingFee)
-      : 49;
+      : 0;
   },
 
   get codFee(): number {
@@ -56,13 +65,20 @@ export const appConfig = {
     const cms = useCMSStore.getState().cms;
     return (
       cms?.storeSettings?.estimatedDeliveryText ||
-      'Dispatched within 24h via Shiprocket Express'
+      'Dispatched within 24h via India Post / Standard Courier'
     );
   },
 
   get gstNumber(): string {
     const cms = useCMSStore.getState().cms;
     return cms?.storeSettings?.gstNumber || '27AAAAA0000A1Z5';
+  },
+
+  get gstPercentage(): number {
+    const cms = useCMSStore.getState().cms;
+    return cms?.storeSettings?.gstPercentage !== undefined
+      ? Number(cms.storeSettings.gstPercentage)
+      : 5;
   },
 
   get currencySymbol(): string {
@@ -120,6 +136,13 @@ export const appConfig = {
       cms?.policies?.contactUs?.address ||
       import.meta.env.VITE_STORE_ADDRES ||
       'Novise Herbal, India'
+    );
+  },
+
+  get defaultTrackingPortal(): string {
+    return (
+      (import.meta.env.VITE_DEFAULT_TRACKING_PORTAL as string) ||
+      'https://www.indiapost.gov.in/'
     );
   },
 

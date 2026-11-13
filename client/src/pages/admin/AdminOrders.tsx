@@ -40,9 +40,11 @@ import {
   Play,
   MessageCircle,
   Phone,
-  ExternalLink
+  ExternalLink,
+  Copy
 } from 'lucide-react';
 import { Order } from '../../types';
+import { appConfig } from '../../config/appConfig';
 import api, { getFullImageUrl } from '../../services/api';
 import { toast } from '../../store/useToastStore';
 import { AdminPagination } from '../../components/common/AdminPagination';
@@ -74,10 +76,12 @@ export const AdminOrders: React.FC<AdminOrdersProps> = ({
 
   // Custom Dropdown Open States & Refs
   const [isOrderStatusOpen, setIsOrderStatusOpen] = useState(false);
+  const [isFilterStatusOpen, setIsFilterStatusOpen] = useState(false);
   const [isPaymentStatusOpen, setIsPaymentStatusOpen] = useState(false);
   const [isRefundStatusOpen, setIsRefundStatusOpen] = useState(false);
   const [isRtoReasonDropdownOpen, setIsRtoReasonDropdownOpen] = useState(false);
   const orderStatusDropdownRef = useRef<HTMLDivElement>(null);
+  const filterStatusDropdownRef = useRef<HTMLDivElement>(null);
   const paymentStatusDropdownRef = useRef<HTMLDivElement>(null);
   const refundStatusDropdownRef = useRef<HTMLDivElement>(null);
   const rtoReasonDropdownRef = useRef<HTMLDivElement>(null);
@@ -86,6 +90,9 @@ export const AdminOrders: React.FC<AdminOrdersProps> = ({
     const handleClickOutside = (event: MouseEvent) => {
       if (orderStatusDropdownRef.current && !orderStatusDropdownRef.current.contains(event.target as Node)) {
         setIsOrderStatusOpen(false);
+      }
+      if (filterStatusDropdownRef.current && !filterStatusDropdownRef.current.contains(event.target as Node)) {
+        setIsFilterStatusOpen(false);
       }
       if (paymentStatusDropdownRef.current && !paymentStatusDropdownRef.current.contains(event.target as Node)) {
         setIsPaymentStatusOpen(false);
@@ -129,6 +136,35 @@ export const AdminOrders: React.FC<AdminOrdersProps> = ({
   const [refundStatus, setRefundStatus] = useState<'NOT_APPLICABLE' | 'PENDING_APPROVAL' | 'PROCESSING' | 'REFUNDED' | 'FAILED'>('PROCESSING');
   const [refundTransactionId, setRefundTransactionId] = useState('');
   const [refundNotes, setRefundNotes] = useState('');
+
+  // 4b. Consignment Tracking Modal State (India Post / Courier)
+  const [showTrackingModal, setShowTrackingModal] = useState(false);
+  const [systemDefaultTrackingUrl, setSystemDefaultTrackingUrl] = useState<string>(
+    appConfig.defaultTrackingPortal || 'https://www.indiapost.gov.in/'
+  );
+  const [trackingCourierName, setTrackingCourierName] = useState('India Post');
+  const [selectedCourierOption, setSelectedCourierOption] = useState('India Post');
+  const [customCourierName, setCustomCourierName] = useState('');
+  const [trackingNumber, setTrackingNumber] = useState('');
+  const [trackingPortalUrl, setTrackingPortalUrl] = useState(
+    appConfig.defaultTrackingPortal || 'https://www.indiapost.gov.in/'
+  );
+  const [trackingDispatchDate, setTrackingDispatchDate] = useState(new Date().toISOString().slice(0, 10));
+  const [trackingNotes, setTrackingNotes] = useState('');
+  const [trackingUpdateStatus, setTrackingUpdateStatus] = useState(true);
+
+  // Automatically fetch default tracking portal from backend .env config
+  useEffect(() => {
+    api.get('/shipping/config')
+      .then(res => {
+        if (res.data?.success && res.data.defaultTrackingPortal) {
+          setSystemDefaultTrackingUrl(res.data.defaultTrackingPortal);
+        }
+      })
+      .catch(() => {
+        // graceful fallback to client appConfig
+      });
+  }, []);
 
   // 5. Date & Period Filter States
   type DatePeriod = 'ALL' | 'TODAY' | 'THIS_WEEK' | 'THIS_MONTH' | 'THIS_YEAR' | 'CUSTOM';
@@ -300,10 +336,6 @@ export const AdminOrders: React.FC<AdminOrdersProps> = ({
     setCurrentPage(1);
   }, [activeTab, search, selectedStatus, selectedPeriod, customStartDate, customEndDate]);
 
-  // Custom Delete Order Confirmation Modal State
-  const [orderToDelete, setOrderToDelete] = useState<{ id: string; displayId: string } | null>(null);
-  const [isDeletingOrder, setIsDeletingOrder] = useState(false);
-
   // Action Confirmation Modal State
   const [actionConfirm, setActionConfirm] = useState<{
     title: string;
@@ -326,31 +358,6 @@ export const AdminOrders: React.FC<AdminOrdersProps> = ({
       toast.error(err.response?.data?.message || err.message || 'Action failed');
     } finally {
       setIsExecutingActionConfirm(false);
-    }
-  };
-
-  const handleDeleteOrder = (orderId: string, displayId: string) => {
-    setOrderToDelete({ id: orderId, displayId });
-  };
-
-  const handleConfirmDeleteOrder = async () => {
-    if (!orderToDelete) return;
-    setIsDeletingOrder(true);
-    try {
-      const res = await api.delete(`/orders/admin/${orderToDelete.id}`);
-      if (res.data?.success) {
-        toast.success(res.data.message || `Order ${orderToDelete.displayId} deleted successfully!`, 'Order Deleted');
-        if (selectedOrder?._id === orderToDelete.id) {
-          setIsViewingComplaintPage(false);
-          setSelectedOrder(null);
-        }
-        setOrderToDelete(null);
-        await fetchOrders();
-      }
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to delete order', 'Delete Error');
-    } finally {
-      setIsDeletingOrder(false);
     }
   };
 
@@ -611,9 +618,19 @@ export const AdminOrders: React.FC<AdminOrdersProps> = ({
           refundMethod: selectedOrder.paymentInfo?.method === 'COD' ? 'BANK_TRANSFER' : 'ORIGINAL_SOURCE'
         });
         if (res.data?.success) {
-          toast.success(`Refund status updated to ${newRefundStatus}.`);
-          setSelectedOrder(res.data.order);
+          toast.success(newRefundStatus === 'REFUNDED' ? 'Refund marked as REFUNDED. Payment status automatically updated to REFUNDED.' : `Refund status updated to ${newRefundStatus}.`, 'Refund Updated');
+          const updatedOrder = res.data.order || {
+            ...selectedOrder,
+            refundInfo: { ...selectedOrder.refundInfo, status: newRefundStatus, isRefunded: newRefundStatus === 'REFUNDED' },
+            ...(newRefundStatus === 'REFUNDED' ? { paymentInfo: { ...selectedOrder.paymentInfo, status: 'REFUNDED' }, paymentStatus: 'REFUNDED' } : {})
+          };
+          setSelectedOrder(updatedOrder);
           fetchOrders();
+          emitLiveEvent('ORDER_UPDATED', {
+            orderId: selectedOrder.orderId,
+            mongoId: selectedOrder._id,
+            order: updatedOrder
+          });
         }
       } catch (err: any) {
         toast.error(err.response?.data?.message || 'Failed to update refund');
@@ -658,12 +675,22 @@ export const AdminOrders: React.FC<AdminOrdersProps> = ({
         refundMethod: selectedOrder.paymentInfo?.method === 'COD' ? 'BANK_TRANSFER' : 'ORIGINAL_SOURCE'
       });
       if (res.data?.success) {
-        toast.success(`Refund status updated to ${refundStatus}.`);
-        setSelectedOrder(res.data.order);
+        toast.success(refundStatus === 'REFUNDED' ? 'Refund settled as REFUNDED. Payment status automatically updated to REFUNDED.' : `Refund status updated to ${refundStatus}.`, 'Refund Updated');
+        const updatedOrder = res.data.order || {
+          ...selectedOrder,
+          refundInfo: { ...selectedOrder.refundInfo, status: refundStatus, isRefunded: refundStatus === 'REFUNDED' },
+          ...(refundStatus === 'REFUNDED' ? { paymentInfo: { ...selectedOrder.paymentInfo, status: 'REFUNDED' }, paymentStatus: 'REFUNDED' } : {})
+        };
+        setSelectedOrder(updatedOrder);
         setShowRefundModal(false);
         setRefundTransactionId('');
         setRefundNotes('');
         fetchOrders();
+        emitLiveEvent('ORDER_UPDATED', {
+          orderId: selectedOrder.orderId,
+          mongoId: selectedOrder._id,
+          order: updatedOrder
+        });
       }
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'Failed to update refund');
@@ -672,19 +699,9 @@ export const AdminOrders: React.FC<AdminOrdersProps> = ({
     }
   };
 
-  // Order Lifecycle Status Update with Strict E-Commerce Validation
+  // Order Status Update (Owner Direct Authority)
   const handleOrderStatusUpdate = async (order: Order, newStatus: string) => {
     if (order.orderStatus === newStatus) return;
-
-    if (order.orderStatus === 'CANCELLED' || order.orderStatus === 'RTO_COMPLETED') {
-      toast.warning('Closed orders (Cancelled or RTO) are permanently closed and cannot be re-opened.', 'Order Locked');
-      return;
-    }
-
-    if (order.orderStatus === 'DELIVERED' && ['PLACED', 'CONFIRMED', 'PROCESSING', 'PACKED', 'SHIPPED', 'SHIPMENT_BOOKED', 'PICKED_UP', 'IN_TRANSIT', 'OUT_FOR_DELIVERY', 'CANCELLED'].includes(newStatus)) {
-      toast.warning('Delivered orders cannot be reverted back to active fulfillment. Products once delivered are strictly non-returnable and non-replaceable.', 'Order Completed');
-      return;
-    }
 
     const executeStatusUpdate = async () => {
       setIsProcessingAction(true);
@@ -768,16 +785,22 @@ export const AdminOrders: React.FC<AdminOrdersProps> = ({
           note: `Payment status marked as ${newPaymentStatus}`
         });
         if (res.data?.success) {
-          toast.success(`Payment status updated to ${newPaymentStatus}.`, 'Payment Updated');
+          toast.success(newPaymentStatus === 'REFUNDED' ? 'Payment marked as REFUNDED. Refund status automatically updated to REFUNDED.' : `Payment status updated to ${newPaymentStatus}.`, 'Payment Updated');
+          const updatedOrder = res.data.order || {
+            ...order,
+            paymentInfo: { ...order.paymentInfo, status: newPaymentStatus },
+            paymentStatus: newPaymentStatus,
+            ...(newPaymentStatus === 'REFUNDED' ? { refundInfo: { ...order.refundInfo, status: 'REFUNDED', isRefunded: true } } : {})
+          };
           if (selectedOrder && selectedOrder._id === order._id) {
-            setSelectedOrder(res.data.order);
+            setSelectedOrder(updatedOrder);
           }
           fetchOrders();
           emitLiveEvent('ORDER_UPDATED', {
             orderId: order.orderId,
             mongoId: order._id,
             paymentStatus: newPaymentStatus,
-            order: res.data.order
+            order: updatedOrder
           });
         }
       } catch (err: any) {
@@ -803,25 +826,187 @@ export const AdminOrders: React.FC<AdminOrdersProps> = ({
     await executePaymentUpdate();
   };
 
-  // Courier Shipment Booking
-  const handleBookShipment = async (order: Order) => {
+  // Known courier list for preset options
+  const KNOWN_COURIER_LIST = [
+    'India Post',
+    'Speed Post',
+    'Delhivery',
+    'DTDC',
+    'Blue Dart',
+    'Trackon',
+    'The Professional Couriers',
+    'Professional Couriers',
+    'Shree Maruti Courier',
+    'Shree Tirupati Courier',
+    'Shree Anjani Courier',
+    'Shadowfax'
+  ];
+
+  const getDefaultTrackingUrl = (courier: string) => {
+    switch (courier) {
+      case 'India Post':
+      case 'Speed Post':
+        return systemDefaultTrackingUrl;
+      case 'Delhivery':
+        return 'https://www.delhivery.com/tracking';
+      case 'DTDC':
+        return 'https://www.dtdc.in/tracking.asp';
+      case 'Blue Dart':
+        return 'https://www.bluedart.com/tracking';
+      case 'Trackon':
+        return 'https://trackon.in/';
+      case 'The Professional Couriers':
+      case 'Professional Couriers':
+        return 'https://www.tpcindia.com/';
+      case 'Shree Maruti Courier':
+        return 'https://www.shreemaruticourier.com/';
+      case 'Shree Tirupati Courier':
+        return 'https://www.shreetirupaticourier.net/';
+      case 'Shree Anjani Courier':
+        return 'https://www.shreeanjanicourier.com/';
+      case 'Shadowfax':
+        return 'https://www.shadowfax.in/tracker';
+      case 'Other':
+        return '';
+      default:
+        return systemDefaultTrackingUrl;
+    }
+  };
+
+  // Open Consignment Tracking Modal
+  const handleOpenTrackingModal = (order: Order) => {
+    const courier = order.shipment?.courierName || 'India Post';
+    if (KNOWN_COURIER_LIST.includes(courier)) {
+      setSelectedCourierOption(courier === 'Professional Couriers' ? 'The Professional Couriers' : courier);
+      setCustomCourierName('');
+      setTrackingCourierName(courier);
+    } else {
+      setSelectedCourierOption('Other');
+      setCustomCourierName(courier);
+      setTrackingCourierName(courier);
+    }
+    setTrackingNumber(order.shipment?.trackingNumber || order.shipment?.awbCode || '');
+
+    // Automatically sanitize / update tracking URL:
+    // If empty or if it contains the legacy broken URL ('_layouts/15' or '/VAS/Pages/'), reset to system default from .env!
+    const rawUrl = order.shipment?.trackingUrl || '';
+    const isLegacyOrEmpty = !rawUrl || rawUrl.includes('_layouts/15') || rawUrl.includes('/VAS/Pages/');
+    setTrackingPortalUrl(isLegacyOrEmpty ? getDefaultTrackingUrl(courier) : rawUrl);
+
+    setTrackingDispatchDate(order.shipment?.dispatchedAt ? new Date(order.shipment.dispatchedAt).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10));
+    setTrackingNotes(order.shipment?.notes || '');
+    setTrackingUpdateStatus(!['DELIVERED', 'CANCELLED', 'RETURNED'].includes(order.orderStatus));
+    setShowTrackingModal(true);
+  };
+
+  const handleCourierSelectChange = (newCourier: string) => {
+    setSelectedCourierOption(newCourier);
+    if (newCourier === 'Other') {
+      const eff = customCourierName.trim();
+      setTrackingCourierName(eff || 'Other Courier');
+      if (!trackingPortalUrl || trackingPortalUrl === systemDefaultTrackingUrl || trackingPortalUrl.includes('_layouts/15')) {
+        setTrackingPortalUrl('');
+      }
+    } else {
+      setTrackingCourierName(newCourier);
+      setTrackingPortalUrl(getDefaultTrackingUrl(newCourier));
+    }
+  };
+
+  // Save Tracking Details to Server
+  const handleSaveTrackingDetails = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedOrder) return;
+
+    const finalCourierName = selectedCourierOption === 'Other'
+      ? (customCourierName.trim() || 'Courier Partner')
+      : trackingCourierName;
+
+    if (selectedCourierOption === 'Other' && !customCourierName.trim()) {
+      toast.error('Please enter the name of your Custom Courier Partner', 'Courier Name Required');
+      return;
+    }
+
+    if (!trackingNumber.trim()) {
+      toast.error('Please enter the Tracking / Consignment Number', 'Missing Information');
+      return;
+    }
+
+    const finalPortalUrl = (trackingPortalUrl && trackingPortalUrl.trim())
+      ? trackingPortalUrl.trim()
+      : getDefaultTrackingUrl(finalCourierName);
+
     setIsProcessingAction(true);
     try {
-      const res = await api.post(`/shipping/book/${order.orderId}`);
+      const res = await api.post(`/shipping/update-tracking/${selectedOrder.orderId}`, {
+        courierName: finalCourierName,
+        trackingNumber: trackingNumber.trim(),
+        trackingUrl: finalPortalUrl,
+        dispatchedAt: trackingDispatchDate,
+        notes: trackingNotes.trim(),
+        updateStatusToDispatched: trackingUpdateStatus
+      });
+
       if (res.data?.success) {
-        toast.success(res.data.message || 'Courier shipment booked successfully with Shiprocket!', 'Shipment Booked');
+        toast.success(`Tracking saved! Dispatched via ${finalCourierName} (${trackingNumber.trim()})`, 'Consignment Updated');
+        setSelectedOrder(res.data.order);
+        setShowTrackingModal(false);
         fetchOrders();
         emitLiveEvent('ORDER_UPDATED', {
-          orderId: order.orderId,
-          mongoId: order._id,
+          orderId: selectedOrder.orderId,
+          mongoId: selectedOrder._id,
           order: res.data.order
         });
       }
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Courier booking failed', 'Logistics Error');
+      toast.error(err.response?.data?.message || 'Failed to save tracking details', 'Update Error');
     } finally {
       setIsProcessingAction(false);
     }
+  };
+
+  // Send WhatsApp Tracking Alert to Customer
+  const handleSendWhatsAppTracking = (order: Order) => {
+    const rawPhone = order.shippingAddress?.phone || order.customerDetails?.phone || '';
+    const phone = rawPhone.replace(/\D/g, '').slice(-10);
+    if (!phone) {
+      toast.error('Customer phone number is missing', 'Cannot Send WhatsApp');
+      return;
+    }
+
+    const trackingNo = order.shipment?.trackingNumber || order.shipment?.awbCode || 'Pending';
+    const courier = order.shipment?.courierName || 'India Post';
+    const trackUrl = (order.shipment?.trackingUrl && !order.shipment.trackingUrl.includes('_layouts/15'))
+      ? order.shipment.trackingUrl
+      : systemDefaultTrackingUrl;
+    const customerName = order.shippingAddress?.fullName || order.customerDetails?.fullName || 'Customer';
+    const itemsText = (order.items || []).map(it => `• ${it.name} (Qty: ${it.quantity})`).join('\n');
+    const dispatchDate = order.shipment?.dispatchedAt ? new Date(order.shipment.dispatchedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+
+    const messageLines = [
+      `Namaste ${customerName} ji! 🌿`,
+      ``,
+      `Your order #${order.orderId} from Novis Herbal has been dispatched! 📦`,
+      ``,
+      `*Delivery & Consignment Details:*`,
+      `• *Courier Partner:* ${courier}`,
+      `• *Consignment / Tracking No:* ${trackingNo}`,
+      `• *Dispatch Date:* ${dispatchDate}`,
+      ``,
+      `🔍 *Track Your Parcel Live on Official Portal:*`,
+      `${trackUrl}`,
+      ``,
+      `*Items in your package:*`,
+      `${itemsText}`,
+      ``,
+      `If you have any questions, feel free to reply directly to this message.`,
+      ``,
+      `Thank you for choosing Novis Herbal! 🌸`,
+      `*Novis Herbal Care Team*`
+    ];
+
+    const waUrl = `https://wa.me/91${phone}?text=${encodeURIComponent(messageLines.join('\n'))}`;
+    window.open(waUrl, '_blank');
   };
 
   // Helper format name (Strict Non-Returnable Lifecycle)
@@ -830,7 +1015,8 @@ export const AdminOrders: React.FC<AdminOrdersProps> = ({
       case 'PLACED': return 'Placed';
       case 'CONFIRMED': return 'Confirmed';
       case 'PACKED': return 'Packed';
-      case 'SHIPMENT_BOOKED': return 'Shipment Booked (AWB Assigned)';
+      case 'DISPATCHED': return 'Dispatched';
+      case 'SHIPMENT_BOOKED': return 'Dispatched';
       case 'IN_TRANSIT': return 'In Transit';
       case 'OUT_FOR_DELIVERY': return 'Out for Delivery';
       case 'DELIVERED': return 'Delivered';
@@ -851,6 +1037,7 @@ export const AdminOrders: React.FC<AdminOrdersProps> = ({
       case 'PLACED': return 'bg-amber-100 text-amber-900 border-amber-300';
       case 'CONFIRMED': return 'bg-blue-100 text-blue-900 border-blue-300';
       case 'PACKED': return 'bg-indigo-100 text-indigo-900 border-indigo-300';
+      case 'DISPATCHED': return 'bg-purple-100 text-purple-900 border-purple-300';
       case 'SHIPMENT_BOOKED': return 'bg-purple-100 text-purple-900 border-purple-300';
       case 'IN_TRANSIT': return 'bg-cyan-100 text-cyan-900 border-cyan-300';
       case 'OUT_FOR_DELIVERY': return 'bg-teal-100 text-teal-900 border-teal-300';
@@ -894,6 +1081,7 @@ export const AdminOrders: React.FC<AdminOrdersProps> = ({
       case 'PLACED': return 'bg-amber-500';
       case 'CONFIRMED': return 'bg-blue-500';
       case 'PACKED': return 'bg-indigo-500';
+      case 'DISPATCHED': return 'bg-purple-500';
       case 'SHIPMENT_BOOKED': return 'bg-purple-500';
       case 'IN_TRANSIT': return 'bg-cyan-500';
       case 'OUT_FOR_DELIVERY': return 'bg-teal-500';
@@ -924,7 +1112,7 @@ export const AdminOrders: React.FC<AdminOrdersProps> = ({
     { value: 'PLACED', label: 'Placed', dot: 'bg-amber-500', stage: '1. Placed' },
     { value: 'CONFIRMED', label: 'Confirmed', dot: 'bg-blue-500', stage: '2. Confirmed' },
     { value: 'PACKED', label: 'Packed', dot: 'bg-indigo-500', stage: '3. Packed' },
-    { value: 'SHIPMENT_BOOKED', label: 'Shipment Booked (AWB)', dot: 'bg-purple-500', stage: '4. AWB Assigned' },
+    { value: 'DISPATCHED', label: 'Dispatched', dot: 'bg-purple-500', stage: '4. Dispatched' },
     { value: 'IN_TRANSIT', label: 'In Transit', dot: 'bg-cyan-500', stage: '5. In Transit' },
     { value: 'OUT_FOR_DELIVERY', label: 'Out for Delivery', dot: 'bg-teal-500', stage: '6. Out for Delivery' },
     { value: 'DELIVERED', label: 'Delivered', dot: 'bg-emerald-500', stage: '7. Delivered (Non-Returnable)' },
@@ -1022,61 +1210,12 @@ export const AdminOrders: React.FC<AdminOrdersProps> = ({
     }
   ];
 
-  // Lifecycle transition validator (Enforces document rules)
+  // Direct status transition (Owner has full freedom to update to any status)
   const checkStatusTransition = (currentStatus: string, targetStatus: string): { allowed: boolean; reason?: string } => {
     if (currentStatus === targetStatus) {
       return { allowed: false, reason: 'Current Status' };
     }
-
-    if (['CANCELLED', 'RTO_COMPLETED'].includes(currentStatus)) {
-      return { allowed: false, reason: 'Order Closed' };
-    }
-
-    if (currentStatus === 'DELIVERED') {
-      return { allowed: false, reason: 'Delivered (Non-Returnable)' };
-    }
-
-    switch (currentStatus) {
-      case 'PLACED':
-        if (['CONFIRMED', 'CANCELLED'].includes(targetStatus)) return { allowed: true };
-        return { allowed: false, reason: 'Confirm order first' };
-
-      case 'CONFIRMED':
-        if (['PACKED', 'CANCELLED'].includes(targetStatus)) return { allowed: true };
-        return { allowed: false, reason: 'Pack parcel first' };
-
-      case 'PACKED':
-        if (['SHIPMENT_BOOKED', 'CANCELLED'].includes(targetStatus)) return { allowed: true };
-        return { allowed: false, reason: 'Book courier shipment first' };
-
-      case 'SHIPMENT_BOOKED':
-        if (['IN_TRANSIT', 'CANCELLED'].includes(targetStatus)) return { allowed: true };
-        return { allowed: false, reason: 'Awaiting courier pickup' };
-
-      case 'IN_TRANSIT':
-        if (['OUT_FOR_DELIVERY', 'RTO_INITIATED'].includes(targetStatus)) return { allowed: true };
-        return { allowed: false, reason: 'Cannot cancel after courier pickup' };
-
-      case 'OUT_FOR_DELIVERY':
-        if (['DELIVERED', 'RTO_INITIATED'].includes(targetStatus)) return { allowed: true };
-        return { allowed: false, reason: 'Pending delivery attempt' };
-
-      case 'RTO_INITIATED':
-        if (['IN_TRANSIT_TO_SELLER'].includes(targetStatus)) return { allowed: true };
-        return { allowed: false, reason: 'Must move in transit to seller' };
-
-      case 'IN_TRANSIT_TO_SELLER':
-      case 'RTO_IN_TRANSIT':
-        if (['RETURNED_TO_SELLER'].includes(targetStatus)) return { allowed: true };
-        return { allowed: false, reason: 'Awaiting arrival at seller warehouse' };
-
-      case 'RETURNED_TO_SELLER':
-        if (['RTO_COMPLETED'].includes(targetStatus)) return { allowed: true };
-        return { allowed: false, reason: 'Perform inspection to complete RTO' };
-
-      default:
-        return { allowed: false, reason: 'Locked' };
-    }
+    return { allowed: true };
   };
 
   // Payment Status options
@@ -1335,7 +1474,7 @@ export const AdminOrders: React.FC<AdminOrdersProps> = ({
                           {o.shipment?.awbCode ? (
                             <>
                               <p className="font-mono font-bold text-slate-800">{o.shipment.awbCode}</p>
-                              <p className="text-[10px] text-slate-500">{o.shipment.courierName || 'Shiprocket'}</p>
+                              <p className="text-[10px] text-slate-500">{o.shipment.courierName || 'India Post'}</p>
                             </>
                           ) : (
                             <span className="text-slate-400 text-[10px]">Pending AWB</span>
@@ -1773,7 +1912,7 @@ export const AdminOrders: React.FC<AdminOrdersProps> = ({
               {/* Quick Actions */}
               <div className="flex items-center space-x-2.5 flex-wrap gap-y-2">
                 <button
-                  onClick={() => window.open(`http://localhost:5000/api/orders/${selectedOrder.orderId}/invoice`, '_blank')}
+                  onClick={() => window.open(`${appConfig.apiBaseUrl}/orders/${selectedOrder.orderId}/invoice`, '_blank')}
                   className="inline-flex items-center space-x-1.5 px-3.5 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs transition shadow-xs"
                   title="Download Tax Invoice"
                 >
@@ -1792,25 +1931,39 @@ export const AdminOrders: React.FC<AdminOrdersProps> = ({
                   </button>
                 )}
 
-                {!selectedOrder.shipment?.awbCode && !['CANCELLED', 'DELIVERED', 'RETURNED'].includes(selectedOrder.orderStatus) && (
+                {!['CANCELLED', 'RETURNED'].includes(selectedOrder.orderStatus) && (
                   <button
-                    onClick={() => handleBookShipment(selectedOrder)}
+                    onClick={() => handleOpenTrackingModal(selectedOrder)}
                     disabled={isProcessingAction}
-                    className="inline-flex items-center space-x-1.5 px-4 py-2 bg-gradient-to-r from-gold-500 to-amber-500 hover:from-gold-600 hover:to-amber-600 text-forest-950 font-black text-xs rounded-xl shadow-md transition transform hover:scale-[1.02]"
+                    className="inline-flex items-center space-x-1.5 px-3.5 py-2 bg-gradient-to-r from-gold-500 to-amber-500 hover:from-gold-600 hover:to-amber-600 text-forest-950 font-black text-xs rounded-xl shadow-md transition transform hover:scale-[1.02]"
                   >
                     <Truck className="w-4 h-4" />
-                    <span>Book Shiprocket Courier</span>
+                    <span>{selectedOrder.shipment?.trackingNumber || selectedOrder.shipment?.awbCode ? 'Update Tracking' : 'Add Tracking'}</span>
                   </button>
                 )}
 
-                <button
-                  onClick={() => handleDeleteOrder(selectedOrder._id, selectedOrder.orderId)}
-                  className="inline-flex items-center space-x-1.5 px-3 py-2 rounded-xl border border-rose-200 bg-rose-50/60 hover:bg-rose-100 text-rose-700 font-bold text-xs transition shadow-xs cursor-pointer"
-                  title="Delete Order Record"
-                >
-                  <Trash2 className="w-4 h-4 text-rose-600" />
-                  <span>Delete Order</span>
-                </button>
+                {selectedOrder.orderStatus !== 'DELIVERED' && selectedOrder.orderStatus !== 'CANCELLED' && (
+                  <button
+                    onClick={() => handleOrderStatusUpdate(selectedOrder, 'DELIVERED')}
+                    disabled={isProcessingAction}
+                    className="inline-flex items-center space-x-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition shadow-xs cursor-pointer"
+                    title="Mark this order as Delivered"
+                  >
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>Mark Delivered</span>
+                  </button>
+                )}
+
+                {(selectedOrder.shipment?.trackingNumber || selectedOrder.shipment?.awbCode) && (
+                  <button
+                    onClick={() => handleSendWhatsAppTracking(selectedOrder)}
+                    className="inline-flex items-center space-x-1.5 px-3.5 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs transition shadow-xs"
+                    title="Send tracking details to customer on WhatsApp"
+                  >
+                    <MessageCircle className="w-4 h-4" />
+                    <span>WhatsApp Alert</span>
+                  </button>
+                )}
               </div>
             </div>
 
@@ -1998,16 +2151,16 @@ export const AdminOrders: React.FC<AdminOrdersProps> = ({
                           {isOrderStatusOpen && (
                             <div className="absolute right-0 mt-2 z-50 w-80 bg-white rounded-2xl shadow-2xl border border-slate-200/90 py-2 animate-fadeIn overflow-hidden">
                               <div className="px-3.5 py-2 border-b border-slate-100 flex items-center justify-between text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                                <span>Lifecycle Progression</span>
-                                <span className="text-[10px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full font-semibold">
-                                  Select Valid Step
+                                <span>Change Order Status</span>
+                                <span className="text-[10px] text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full font-semibold">
+                                  Owner Direct Control
                                 </span>
                               </div>
 
                               <div className="max-h-80 overflow-y-auto no-scrollbar py-1 divide-y divide-slate-50">
                                 {ALL_ORDER_STATUSES.map((item) => {
                                   const isCurrent = selectedOrder.orderStatus === item.value;
-                                  const { allowed, reason } = checkStatusTransition(selectedOrder.orderStatus, item.value);
+                                  const { allowed } = checkStatusTransition(selectedOrder.orderStatus, item.value);
 
                                   return (
                                     <button
@@ -2022,9 +2175,7 @@ export const AdminOrders: React.FC<AdminOrdersProps> = ({
                                       }}
                                       className={`w-full text-left px-3.5 py-2.5 flex items-center justify-between text-xs transition ${isCurrent
                                         ? 'bg-forest-900/5 text-forest-950 font-bold border-l-4 border-forest-900 cursor-default'
-                                        : allowed
-                                          ? 'hover:bg-[#FAF8F5] text-slate-800 hover:text-forest-950 font-medium cursor-pointer group'
-                                          : 'opacity-40 text-slate-400 cursor-not-allowed bg-slate-50/40'
+                                        : 'hover:bg-[#FAF8F5] text-slate-800 hover:text-forest-950 font-medium cursor-pointer group'
                                         }`}
                                     >
                                       <div className="flex items-center space-x-2.5 min-w-0 pr-2">
@@ -2038,20 +2189,13 @@ export const AdminOrders: React.FC<AdminOrdersProps> = ({
                                       </div>
 
                                       <div className="shrink-0 flex items-center space-x-1.5">
-                                        {isCurrent && (
+                                        {isCurrent ? (
                                           <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-forest-900 text-gold-400">
                                             Current
                                           </span>
-                                        )}
-                                        {!isCurrent && allowed && (
-                                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 group-hover:bg-emerald-200 transition">
-                                            Allowed
-                                          </span>
-                                        )}
-                                        {!isCurrent && !allowed && (
-                                          <span className="flex items-center space-x-1 text-[10px] text-slate-400 font-medium">
-                                            <Lock className="w-2.5 h-2.5" />
-                                            <span>{reason || 'Locked'}</span>
+                                        ) : (
+                                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 group-hover:bg-forest-900 group-hover:text-gold-400 transition">
+                                            Select
                                           </span>
                                         )}
                                       </div>
@@ -2138,72 +2282,148 @@ export const AdminOrders: React.FC<AdminOrdersProps> = ({
                         {selectedOrder.pricing?.shippingFee === 0 ? 'FREE' : `₹${selectedOrder.pricing?.shippingFee}`}
                       </span>
                     </div>
-                    <div className="flex justify-between text-sm font-bold text-forest-950 pt-2 border-t border-slate-100">
-                      <span>Total Amount</span>
-                      <span className="text-lg text-forest-950 font-black">₹{selectedOrder.pricing?.totalAmount || selectedOrder.pricing?.finalTotal}</span>
-                    </div>
+                    {(() => {
+                      const sub = Number(selectedOrder.pricing?.subtotal) || 0;
+                      const disc = Number(selectedOrder.pricing?.discountAmount) || 0;
+                      const ship = Number(selectedOrder.pricing?.shippingFee) || 0;
+                      const tax = Number(selectedOrder.pricing?.taxAmount) || (sub > 0 ? Math.round((sub - disc) * 0.05) : 0);
+                      const total = (selectedOrder.pricing?.totalAmount && selectedOrder.pricing.totalAmount > (sub - disc))
+                        ? selectedOrder.pricing.totalAmount
+                        : ((sub - disc) + ship + tax);
+                      return (
+                        <>
+                          {tax > 0 && (
+                            <div className="flex justify-between text-slate-500">
+                              <span>GST (5%)</span>
+                              <span className="font-medium text-slate-700">₹{tax}</span>
+                            </div>
+                          )}
+                          <div className="flex justify-between text-sm font-bold text-forest-950 pt-2 border-t border-slate-100">
+                            <span>Total Amount</span>
+                            <span className="text-lg text-forest-950 font-black">₹{total}</span>
+                          </div>
+                        </>
+                      );
+                    })()}
                   </div>
                 </div>
 
-                {/* 4. SHIPROCKET LOGISTICS */}
+                {/* 4. COURIER DISPATCH & TRACKING (India Post / Manual Courier) */}
                 <div className="bg-white p-6 rounded-3xl border border-slate-200/90 shadow-sm space-y-4">
-                  <div className="flex items-center justify-between">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
                     <div className="flex items-center space-x-2.5">
-                      <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center border border-amber-200/80">
-                        <Truck className="w-5 h-5" />
+                      <div className="w-9 h-9 rounded-xl bg-forest-50 text-forest-800 flex items-center justify-center border border-forest-200/80">
+                        <Truck className="w-5 h-5 text-forest-800" />
                       </div>
                       <div>
-                        <h3 className="font-serif text-lg font-bold text-forest-950">Shiprocket Logistics</h3>
-                        <p className="text-xs text-slate-500">Live courier tracking & AWB lifecycle events</p>
+                        <h3 className="font-serif text-lg font-bold text-forest-950">Courier Dispatch & Tracking</h3>
+                        <p className="text-xs text-slate-500">Consignment number, India Post / Courier portal tracking & WhatsApp notification</p>
                       </div>
                     </div>
 
-                    {selectedOrder.shipment?.awbCode ? (
-                      <span className="px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold flex items-center space-x-1.5">
-                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                        <span>AWB Assigned</span>
-                      </span>
-                    ) : (
-                      <span className="px-3 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200 text-xs font-bold">
-                        Awaiting Courier Booking
-                      </span>
-                    )}
+                    <div className="flex items-center space-x-2">
+                      {selectedOrder.shipment?.trackingNumber || selectedOrder.shipment?.awbCode ? (
+                        <span className="px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold flex items-center space-x-1.5">
+                          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                          <span>Dispatched</span>
+                        </span>
+                      ) : (
+                        <span className="px-3 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200 text-xs font-bold">
+                          Pending Dispatch
+                        </span>
+                      )}
+                    </div>
                   </div>
 
-                  {selectedOrder.shipment?.awbCode ? (
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-4 rounded-2xl bg-amber-50/50 border border-amber-200/60 text-xs">
-                      <div>
-                        <span className="text-slate-400 font-bold block text-[10px] uppercase">AWB Tracking Code</span>
-                        <span className="font-mono font-bold text-forest-950 text-sm mt-0.5 block">
-                          {selectedOrder.shipment.awbCode}
-                        </span>
+                  {selectedOrder.shipment?.trackingNumber || selectedOrder.shipment?.awbCode ? (
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-4 rounded-2xl bg-forest-50/50 border border-forest-200/60 text-xs">
+                        <div>
+                          <span className="text-slate-400 font-bold block text-[10px] uppercase">Consignment / Tracking No.</span>
+                          <div className="flex items-center space-x-1.5 mt-0.5">
+                            <span className="font-mono font-black text-forest-950 text-sm">
+                              {selectedOrder.shipment.trackingNumber || selectedOrder.shipment.awbCode}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const code = selectedOrder.shipment?.trackingNumber || selectedOrder.shipment?.awbCode || '';
+                                navigator.clipboard.writeText(code);
+                                toast.success(`Copied Tracking ID "${code}"`, 'Copied to Clipboard');
+                              }}
+                              className="text-slate-400 hover:text-slate-700 p-0.5"
+                              title="Copy Tracking ID"
+                            >
+                              <Copy className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+
+                        <div>
+                          <span className="text-slate-400 font-bold block text-[10px] uppercase">Courier Partner</span>
+                          <span className="font-bold text-forest-950 text-sm mt-0.5 block">
+                            {selectedOrder.shipment.courierName || 'India Post'}
+                          </span>
+                        </div>
+
+                        <div>
+                          <span className="text-slate-400 font-bold block text-[10px] uppercase">Dispatch Date</span>
+                          <span className="font-bold text-forest-950 text-sm mt-0.5 block">
+                            {selectedOrder.shipment.dispatchedAt
+                              ? new Date(selectedOrder.shipment.dispatchedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+                              : 'Dispatched'}
+                          </span>
+                        </div>
                       </div>
-                      <div>
-                        <span className="text-slate-400 font-bold block text-[10px] uppercase">Courier Partner</span>
-                        <span className="font-bold text-amber-900 text-sm mt-0.5 block">
-                          {selectedOrder.shipment.courierName || 'Shiprocket Surface'}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-slate-400 font-bold block text-[10px] uppercase">Estimated Delivery</span>
-                        <span className="font-bold text-forest-950 text-sm mt-0.5 block">
-                          {selectedOrder.shipment.estimatedDeliveryDate
-                            ? new Date(selectedOrder.shipment.estimatedDeliveryDate).toLocaleDateString()
-                            : '3-5 Business Days'}
-                        </span>
+
+                      <div className="flex flex-wrap items-center justify-between gap-2.5 pt-1">
+                        <a
+                          href={selectedOrder.shipment?.trackingUrl || 'https://www.indiapost.gov.in/'}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center space-x-1.5 px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs rounded-xl transition"
+                        >
+                          <span>Track on India Post</span>
+                          <ExternalLink className="w-3.5 h-3.5 text-slate-500" />
+                        </a>
+
+                        <div className="flex items-center space-x-2">
+                          <button
+                            type="button"
+                            onClick={() => handleSendWhatsAppTracking(selectedOrder)}
+                            className="inline-flex items-center space-x-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs transition"
+                            title="Send tracking details to customer's WhatsApp"
+                          >
+                            <MessageCircle className="w-4 h-4" />
+                            <span>Send Tracking on WhatsApp</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleOpenTrackingModal(selectedOrder)}
+                            className="inline-flex items-center space-x-1.5 px-3.5 py-2 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs rounded-xl transition"
+                          >
+                            <span>Edit Tracking</span>
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ) : (
-                    <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-                      <p className="text-slate-600">
-                        Order is ready for logistics pickup. Generate courier shipment label via Shiprocket API.
-                      </p>
+                    <div className="p-4 rounded-2xl bg-amber-50/60 border border-amber-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                      <div>
+                        <p className="font-bold text-amber-950">Awaiting Courier Dispatch</p>
+                        <p className="text-slate-600 text-[11px] mt-0.5">
+                          Hand over parcel to India Post / Courier, then enter the Consignment Tracking Number here.
+                        </p>
+                      </div>
                       <button
-                        onClick={() => handleBookShipment(selectedOrder)}
-                        disabled={isProcessingAction || ['CANCELLED', 'DELIVERED'].includes(selectedOrder.orderStatus)}
-                        className="px-4 py-2 bg-gradient-to-r from-gold-500 to-amber-500 hover:from-gold-600 hover:to-amber-600 text-forest-950 font-black rounded-xl shadow-sm transition disabled:opacity-50 shrink-0"
+                        type="button"
+                        onClick={() => handleOpenTrackingModal(selectedOrder)}
+                        disabled={isProcessingAction || ['CANCELLED'].includes(selectedOrder.orderStatus)}
+                        className="px-4 py-2 bg-forest-900 hover:bg-forest-950 text-gold-400 font-black rounded-xl shadow-xs transition disabled:opacity-50 shrink-0 inline-flex items-center space-x-1.5 cursor-pointer"
                       >
-                        Book Courier Now
+                        <Truck className="w-4 h-4 text-gold-400" />
+                        <span>Add Tracking ID & Dispatch</span>
                       </button>
                     </div>
                   )}
@@ -2257,7 +2477,7 @@ export const AdminOrders: React.FC<AdminOrdersProps> = ({
                   const isSelectedOrderCod = selectedOrder.paymentInfo?.method === 'COD' || selectedOrder.paymentMethod === 'COD';
                   const isSelectedOrderCancelledBeforeDel = ['CANCELLED', 'CANCELLATION_REQUESTED', 'RTO_COMPLETED', 'RETURNED_TO_SELLER'].includes(selectedOrder.orderStatus);
                   const isSelectedOrderCodCancelled = isSelectedOrderCod && isSelectedOrderCancelledBeforeDel && selectedOrder.orderStatus !== 'DELIVERED';
-                  
+
                   let currentPayStatus = selectedOrder.paymentInfo?.status || selectedOrder.paymentStatus || 'PENDING';
                   if (isSelectedOrderCod) {
                     if (isSelectedOrderCodCancelled) {
@@ -2332,13 +2552,12 @@ export const AdminOrders: React.FC<AdminOrdersProps> = ({
                                               handlePaymentStatusUpdate(selectedOrder, opt.value);
                                             }
                                           }}
-                                          className={`w-full text-left px-3.5 py-2.5 flex items-center justify-between text-xs transition ${
-                                            isCurrent
-                                              ? 'bg-forest-900/5 text-forest-950 font-bold border-l-4 border-forest-900 cursor-default'
-                                              : isOptionDisabled
-                                                ? 'opacity-40 text-slate-400 bg-slate-50/50 cursor-not-allowed'
-                                                : 'hover:bg-[#FAF8F5] text-slate-700 hover:text-forest-950 font-medium cursor-pointer'
-                                          }`}
+                                          className={`w-full text-left px-3.5 py-2.5 flex items-center justify-between text-xs transition ${isCurrent
+                                            ? 'bg-forest-900/5 text-forest-950 font-bold border-l-4 border-forest-900 cursor-default'
+                                            : isOptionDisabled
+                                              ? 'opacity-40 text-slate-400 bg-slate-50/50 cursor-not-allowed'
+                                              : 'hover:bg-[#FAF8F5] text-slate-700 hover:text-forest-950 font-medium cursor-pointer'
+                                            }`}
                                         >
                                           <div className="space-y-0.5 min-w-0 pr-2">
                                             <div className="flex items-center space-x-2">
@@ -2819,27 +3038,248 @@ export const AdminOrders: React.FC<AdminOrdersProps> = ({
               />
             </div>
 
-            <div className="flex items-center space-x-2 w-full md:w-auto">
-              <span className="text-slate-500 font-semibold">Filter Status:</span>
-              <select
-                value={selectedStatus}
-                onChange={(e) => setSelectedStatus(e.target.value)}
-                className="border border-slate-200 rounded-xl px-3 py-1.5 bg-[#FAF8F5] font-semibold text-slate-700 focus:outline-none focus:ring-1 focus:ring-forest-900 cursor-pointer"
+            <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-2 w-full md:w-auto relative" ref={filterStatusDropdownRef}>
+              <div className="flex items-center justify-between sm:justify-start">
+                <span className="text-slate-500 font-semibold text-xs whitespace-nowrap">Filter Status:</span>
+                {selectedStatus !== 'ALL' && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedStatus('ALL')}
+                    className="text-[11px] text-emerald-800 font-bold hover:underline sm:hidden"
+                  >
+                    Reset Filter
+                  </button>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsFilterStatusOpen(!isFilterStatusOpen)}
+                className={`w-full sm:w-auto inline-flex items-center justify-between space-x-2.5 px-3.5 py-2.5 sm:py-2 rounded-xl border transition-all shadow-2xs hover:shadow-xs cursor-pointer min-w-0 sm:min-w-[240px] bg-[#FAF8F5] ${isFilterStatusOpen
+                  ? 'border-forest-900 ring-2 ring-forest-900/10 bg-white'
+                  : 'border-slate-200 hover:border-slate-300'
+                  }`}
               >
-                <option value="ALL">All Statuses (12 Lifecycle Steps)</option>
-                <option value="PLACED">Placed</option>
-                <option value="CONFIRMED">Confirmed</option>
-                <option value="PACKED">Packed</option>
-                <option value="SHIPMENT_BOOKED">Shipment Booked (AWB)</option>
-                <option value="IN_TRANSIT">In Transit</option>
-                <option value="OUT_FOR_DELIVERY">Out for Delivery</option>
-                <option value="DELIVERED">Delivered (Terminal)</option>
-                <option value="CANCELLED">Cancelled (Terminal)</option>
-                <option value="RTO_INITIATED">RTO Initiated</option>
-                <option value="IN_TRANSIT_TO_SELLER">In Transit to Seller</option>
-                <option value="RETURNED_TO_SELLER">Returned to Seller Warehouse</option>
-                <option value="RTO_COMPLETED">RTO Completed (Terminal)</option>
-              </select>
+                <div className="flex items-center space-x-2 truncate">
+                  <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${selectedStatus === 'ALL'
+                    ? 'bg-slate-400'
+                    : (ALL_ORDER_STATUSES.find(s => s.value === selectedStatus)?.dot || 'bg-slate-400')
+                    }`} />
+                  <span className="font-semibold text-xs text-slate-800 truncate">
+                    {selectedStatus === 'ALL'
+                      ? 'All Statuses (12 Lifecycle Steps)'
+                      : (ALL_ORDER_STATUSES.find(s => s.value === selectedStatus)?.label || selectedStatus)}
+                  </span>
+                </div>
+                <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-200 shrink-0 ${isFilterStatusOpen ? 'rotate-180 text-forest-900' : ''}`} />
+              </button>
+
+              {/* MOBILE VIEW: Luxury Bottom Sheet Drawer (Screen < sm) */}
+              {isFilterStatusOpen && typeof document !== 'undefined' && createPortal(
+                <div
+                  className="fixed inset-0 z-[9999] bg-slate-950/70 backdrop-blur-xs flex items-end justify-center p-0 sm:hidden animate-in fade-in duration-200"
+                  onClick={() => setIsFilterStatusOpen(false)}
+                >
+                  <div
+                    className="bg-white w-full max-w-lg rounded-t-3xl max-h-[82vh] flex flex-col shadow-2xl border-t border-slate-200 overflow-hidden animate-in slide-in-from-bottom duration-250"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {/* Pull Bar */}
+                    <div className="pt-3 pb-1 flex justify-center">
+                      <div className="w-12 h-1.5 bg-slate-200 rounded-full" />
+                    </div>
+
+                    {/* Sheet Header */}
+                    <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
+                      <div>
+                        <h3 className="font-bold text-slate-900 text-sm">Filter by Order Status</h3>
+                        <p className="text-[11px] text-slate-400">Tap a lifecycle stage to filter orders</p>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <span className="text-[10px] text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full font-semibold">
+                          12 Steps
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setIsFilterStatusOpen(false)}
+                          className="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 transition"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Scrollable Status Options */}
+                    <div className="flex-1 overflow-y-auto overscroll-contain py-1 divide-y divide-slate-100 px-3 pb-8">
+                      {/* ALL STATUSES OPTION */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedStatus('ALL');
+                          setIsFilterStatusOpen(false);
+                        }}
+                        className={`w-full text-left px-3.5 py-3 rounded-xl flex items-center justify-between text-xs transition my-1 ${selectedStatus === 'ALL'
+                          ? 'bg-[#FAF8F5] text-forest-950 font-bold border-l-4 border-forest-900 shadow-2xs'
+                          : 'hover:bg-slate-50 text-slate-800 font-medium'
+                          }`}
+                      >
+                        <div className="flex items-center space-x-3 min-w-0 pr-2">
+                          <span className="w-3 h-3 rounded-full bg-slate-400 shrink-0" />
+                          <div className="truncate">
+                            <p className={`truncate text-sm ${selectedStatus === 'ALL' ? 'font-bold text-forest-950' : 'font-semibold text-slate-800'}`}>
+                              All Statuses
+                            </p>
+                            <p className="text-[11px] text-slate-400 truncate">Show all orders across all 12 stages</p>
+                          </div>
+                        </div>
+
+                        <div className="shrink-0 flex items-center space-x-1.5">
+                          {selectedStatus === 'ALL' ? (
+                            <span className="px-3 py-1 rounded-full text-xs font-bold bg-forest-900 text-gold-400 shadow-2xs">
+                              Selected
+                            </span>
+                          ) : (
+                            <span className="px-3 py-1 rounded-full text-xs font-bold bg-[#0B3B24] text-[#ECC94B] shadow-2xs">
+                              Select
+                            </span>
+                          )}
+                        </div>
+                      </button>
+
+                      {/* 12 LIFECYCLE STEPS */}
+                      {ALL_ORDER_STATUSES.map((item) => {
+                        const isSelected = selectedStatus === item.value;
+                        return (
+                          <button
+                            key={item.value}
+                            type="button"
+                            onClick={() => {
+                              setSelectedStatus(item.value);
+                              setIsFilterStatusOpen(false);
+                            }}
+                            className={`w-full text-left px-3.5 py-3 rounded-xl flex items-center justify-between text-xs transition my-1 ${isSelected
+                              ? 'bg-[#FAF8F5] text-forest-950 font-bold border-l-4 border-forest-900 shadow-2xs'
+                              : 'hover:bg-slate-50 text-slate-800 font-medium'
+                              }`}
+                          >
+                            <div className="flex items-center space-x-3 min-w-0 pr-2">
+                              <span className={`w-3 h-3 rounded-full ${item.dot} shrink-0`} />
+                              <div className="truncate">
+                                <p className={`truncate text-sm ${isSelected ? 'font-bold text-forest-950' : 'font-semibold text-slate-800'}`}>
+                                  {item.label}
+                                </p>
+                                <p className="text-[11px] text-slate-400 truncate">{item.stage}</p>
+                              </div>
+                            </div>
+
+                            <div className="shrink-0 flex items-center space-x-1.5">
+                              {isSelected ? (
+                                <span className="px-3 py-1 rounded-full text-xs font-bold bg-forest-900 text-gold-400 shadow-2xs">
+                                  Selected
+                                </span>
+                              ) : (
+                                <span className="px-3 py-1 rounded-full text-xs font-bold bg-[#0B3B24] text-[#ECC94B] shadow-2xs">
+                                  Select
+                                </span>
+                              )}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>,
+                document.body
+              )}
+
+              {/* DESKTOP VIEW: Anchored Floating Dropdown (Screen >= sm) */}
+              {isFilterStatusOpen && (
+                <div className="hidden sm:block absolute right-0 top-full mt-2 z-50 w-84 bg-white rounded-2xl shadow-2xl border border-slate-200/90 py-2 animate-fadeIn overflow-hidden">
+                  <div className="px-4 py-2 border-b border-slate-100 flex items-center justify-between text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                    <span>Filter Order Status</span>
+                    <span className="text-[10px] text-emerald-800 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full font-semibold">
+                      12 Lifecycle Steps
+                    </span>
+                  </div>
+
+                  <div className="max-h-80 overflow-y-auto no-scrollbar py-1 divide-y divide-slate-50">
+                    {/* ALL STATUSES OPTION */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedStatus('ALL');
+                        setIsFilterStatusOpen(false);
+                      }}
+                      className={`w-full text-left px-4 py-2.5 flex items-center justify-between text-xs transition ${selectedStatus === 'ALL'
+                        ? 'bg-[#FAF8F5] text-forest-950 font-bold border-l-4 border-forest-900'
+                        : 'hover:bg-[#FAF8F5] text-slate-800 hover:text-forest-950 font-medium cursor-pointer group'
+                        }`}
+                    >
+                      <div className="flex items-center space-x-3 min-w-0 pr-2">
+                        <span className="w-2.5 h-2.5 rounded-full bg-slate-400 shrink-0" />
+                        <div className="truncate">
+                          <p className={`truncate text-xs ${selectedStatus === 'ALL' ? 'font-bold text-forest-950' : 'font-semibold text-slate-800'}`}>
+                            All Statuses
+                          </p>
+                          <p className="text-[10px] text-slate-400 truncate">All 12 lifecycle stages</p>
+                        </div>
+                      </div>
+
+                      <div className="shrink-0 flex items-center space-x-1.5">
+                        {selectedStatus === 'ALL' ? (
+                          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-forest-900 text-gold-400 shadow-2xs">
+                            Selected
+                          </span>
+                        ) : (
+                          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#0B3B24] text-[#ECC94B] group-hover:brightness-110 transition shadow-2xs">
+                            Select
+                          </span>
+                        )}
+                      </div>
+                    </button>
+
+                    {/* 12 LIFECYCLE STEPS */}
+                    {ALL_ORDER_STATUSES.map((item) => {
+                      const isSelected = selectedStatus === item.value;
+                      return (
+                        <button
+                          key={item.value}
+                          type="button"
+                          onClick={() => {
+                            setSelectedStatus(item.value);
+                            setIsFilterStatusOpen(false);
+                          }}
+                          className={`w-full text-left px-4 py-2.5 flex items-center justify-between text-xs transition ${isSelected
+                            ? 'bg-[#FAF8F5] text-forest-950 font-bold border-l-4 border-forest-900'
+                            : 'hover:bg-[#FAF8F5] text-slate-800 hover:text-forest-950 font-medium cursor-pointer group'
+                            }`}
+                        >
+                          <div className="flex items-center space-x-3 min-w-0 pr-2">
+                            <span className={`w-2.5 h-2.5 rounded-full ${item.dot} shrink-0`} />
+                            <div className="truncate">
+                              <p className={`truncate text-xs ${isSelected ? 'font-bold text-forest-950' : 'font-semibold text-slate-800'}`}>
+                                {item.label}
+                              </p>
+                              <p className="text-[10px] text-slate-400 truncate">{item.stage}</p>
+                            </div>
+                          </div>
+
+                          <div className="shrink-0 flex items-center space-x-1.5">
+                            {isSelected ? (
+                              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-forest-900 text-gold-400 shadow-2xs">
+                                Selected
+                              </span>
+                            ) : (
+                              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#0B3B24] text-[#ECC94B] group-hover:brightness-110 transition shadow-2xs">
+                                Select
+                              </span>
+                            )}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -2887,7 +3327,16 @@ export const AdminOrders: React.FC<AdminOrdersProps> = ({
                         </td>
 
                         <td className="p-4">
-                          <p className="font-bold text-slate-900">₹{order.pricing?.totalAmount || order.pricing?.finalTotal}</p>
+                          {(() => {
+                            const sub = Number(order.pricing?.subtotal) || 0;
+                            const disc = Number(order.pricing?.discountAmount) || 0;
+                            const ship = Number(order.pricing?.shippingFee) || 0;
+                            const tax = Number(order.pricing?.taxAmount) || (sub > 0 ? Math.round((sub - disc) * 0.05) : 0);
+                            const total = (order.pricing?.totalAmount && order.pricing.totalAmount > (sub - disc))
+                              ? order.pricing.totalAmount
+                              : ((sub - disc) + ship + tax);
+                            return <p className="font-bold text-slate-900">₹{total}</p>;
+                          })()}
                           <div className="flex items-center space-x-1 mt-0.5" onClick={(e) => e.stopPropagation()}>
                             <span className="text-[10px] font-semibold text-slate-500">
                               {order.paymentInfo?.method || order.paymentMethod || 'ONLINE'}:
@@ -2954,14 +3403,6 @@ export const AdminOrders: React.FC<AdminOrdersProps> = ({
                                 Manage
                               </button>
                             )}
-
-                            <button
-                              onClick={() => handleDeleteOrder(order._id, order.orderId)}
-                              className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer"
-                              title="Delete Order Record"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
                           </div>
                         </td>
                       </tr>
@@ -3741,20 +4182,219 @@ export const AdminOrders: React.FC<AdminOrdersProps> = ({
 
 
 
-      {/* Centered Luxury Delete Order Confirmation Modal */}
-      <AdminConfirmModal
-        isOpen={!!orderToDelete}
-        title="Delete Order Permanently"
-        itemBadge={orderToDelete?.displayId}
-        itemName={orderToDelete ? `Order #${orderToDelete.displayId}` : undefined}
-        message="Are you sure you want to permanently delete this order record? This will remove the order from the database and automatically restore warehouse product inventory for active orders."
-        confirmLabel="Yes, Delete Order"
-        cancelLabel="Cancel"
-        variant="danger"
-        isLoading={isDeletingOrder}
-        onClose={() => setOrderToDelete(null)}
-        onConfirm={handleConfirmDeleteOrder}
-      />
+
+
+      {/* 7. Consignment & Delivery Tracking Modal (India Post / Courier) */}
+      {showTrackingModal && selectedOrder && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-[9999] bg-slate-950/75 backdrop-blur-md flex items-center justify-center p-3 sm:p-5 overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-3xl w-full max-h-[92vh] flex flex-col shadow-2xl border border-slate-100 animate-in fade-in zoom-in-95 duration-200 overflow-hidden my-auto">
+            {/* Modal Header */}
+            <div className="px-5 sm:px-7 py-4 sm:py-5 bg-gradient-to-r from-forest-900 via-forest-950 to-slate-900 text-white flex justify-between items-center shrink-0">
+              <div className="flex items-center space-x-3 min-w-0">
+                <div className="w-10 h-10 rounded-2xl bg-gold-400/20 border border-gold-400/30 flex items-center justify-center text-gold-400 shrink-0 shadow-inner">
+                  <Truck className="w-5 h-5 text-gold-400" />
+                </div>
+                <div className="min-w-0">
+                  <h3 className="font-serif text-base sm:text-lg font-bold text-white tracking-wide truncate">
+                    Update Delivery & Consignment Tracking
+                  </h3>
+                  <p className="text-xs text-gold-300/90 font-mono mt-0.5 truncate">
+                    Order #{selectedOrder.orderId} • <span className="text-white font-sans font-medium">{selectedOrder.shippingAddress?.fullName}</span>
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowTrackingModal(false)}
+                className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition cursor-pointer shrink-0 ml-3"
+                title="Close modal"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Scrollable Form Body */}
+            <form onSubmit={handleSaveTrackingDetails} className="flex flex-col flex-1 overflow-hidden">
+              <div className="p-5 sm:p-7 overflow-y-auto space-y-4 sm:space-y-5 flex-1 text-xs">
+
+                {/* Row 1: Courier Partner & Tracking Number (2 columns on tablet/desktop) */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5">
+                  <div>
+                    <label className="block text-slate-700 font-bold mb-1.5 uppercase tracking-wider text-[10px]">
+                      Courier Partner Name *
+                    </label>
+                    <select
+                      value={selectedCourierOption}
+                      onChange={(e) => handleCourierSelectChange(e.target.value)}
+                      className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl bg-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-forest-900 cursor-pointer shadow-2xs"
+                    >
+                      <option value="India Post">India Post (Speed Post / Parcel)</option>
+                      <option value="Speed Post">Speed Post</option>
+                      <option value="Delhivery">Delhivery</option>
+                      <option value="DTDC">DTDC</option>
+                      <option value="Blue Dart">Blue Dart</option>
+                      <option value="Trackon">Trackon</option>
+                      <option value="The Professional Couriers">The Professional Couriers</option>
+                      <option value="Shree Maruti Courier">Shree Maruti Courier</option>
+                      <option value="Shree Tirupati Courier">Shree Tirupati Courier</option>
+                      <option value="Shree Anjani Courier">Shree Anjani Courier</option>
+                      <option value="Shadowfax">Shadowfax</option>
+                      <option value="Other">Other Courier Partner (Manual Entry)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-700 font-bold mb-1.5 uppercase tracking-wider text-[10px]">
+                      Consignment / Tracking Number *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. CP123456789IN or Tracking ID"
+                      value={trackingNumber}
+                      onChange={(e) => setTrackingNumber(e.target.value.toUpperCase())}
+                      className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white text-xs font-mono font-bold tracking-wider focus:outline-none focus:ring-2 focus:ring-forest-900 uppercase shadow-2xs"
+                    />
+                    <p className="text-[10px] text-slate-500 mt-1">
+                      Enter the tracking number from your courier booking receipt.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Custom Courier Input (if Other selected) */}
+                {selectedCourierOption === 'Other' && (
+                  <div className="p-4 bg-amber-50/80 border border-amber-200 rounded-2xl space-y-1.5 animate-in fade-in duration-150">
+                    <label className="block text-amber-950 font-bold uppercase tracking-wider text-[10px]">
+                      Specify Custom Courier Partner Name *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Shadowfax, Shree Tirupati Courier, Maruti Courier, Local Courier, etc."
+                      value={customCourierName}
+                      onChange={(e) => {
+                        setCustomCourierName(e.target.value);
+                        setTrackingCourierName(e.target.value);
+                      }}
+                      className="w-full px-3.5 py-2.5 border border-amber-300 rounded-xl bg-white text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500 shadow-2xs"
+                      autoFocus
+                    />
+                    <p className="text-[10px] text-amber-800">
+                      This custom courier name will appear on the customer's order tracking card and in their WhatsApp dispatch notification.
+                    </p>
+                  </div>
+                )}
+
+                {/* Row 2: Official Courier Tracking Portal URL */}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-slate-700 font-bold uppercase tracking-wider text-[10px]">
+                      Official Courier Tracking Portal URL
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setTrackingPortalUrl(systemDefaultTrackingUrl)}
+                      className="text-[11px] text-forest-800 hover:text-forest-950 font-semibold underline cursor-pointer"
+                    >
+                      Reset to Default
+                    </button>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="url"
+                      value={trackingPortalUrl}
+                      onChange={(e) => setTrackingPortalUrl(e.target.value)}
+                      placeholder={systemDefaultTrackingUrl}
+                      className="flex-1 px-3.5 py-2.5 border border-slate-200 rounded-xl bg-white text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-forest-900 font-mono shadow-2xs"
+                    />
+                    {trackingPortalUrl && (
+                      <a
+                        href={trackingPortalUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-xs flex items-center space-x-1 transition shrink-0"
+                        title="Test link in new tab"
+                      >
+                        <span>Test</span>
+                        <ExternalLink className="w-3.5 h-3.5" />
+                      </a>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-slate-500 mt-1">
+                    Auto-loaded from system <code className="bg-slate-100 px-1 py-0.5 rounded font-mono text-[10px]">DEFAULT_TRACKING_PORTAL</code>. Customer clicks this to track their parcel.
+                  </p>
+                </div>
+
+                {/* Row 3: Dispatch Date & Dispatch Notes (2 columns) */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
+                  <div>
+                    <label className="block text-slate-700 font-bold mb-1.5 uppercase tracking-wider text-[10px]">
+                      Dispatch Date
+                    </label>
+                    <input
+                      type="date"
+                      value={trackingDispatchDate}
+                      onChange={(e) => setTrackingDispatchDate(e.target.value)}
+                      className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl bg-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-forest-900 shadow-2xs"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-700 font-bold mb-1.5 uppercase tracking-wider text-[10px]">
+                      Dispatch Notes (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      value={trackingNotes}
+                      onChange={(e) => setTrackingNotes(e.target.value)}
+                      placeholder="e.g. Handed over at Market Yard Branch"
+                      className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl bg-white text-xs focus:outline-none focus:ring-2 focus:ring-forest-900 shadow-2xs"
+                    />
+                  </div>
+                </div>
+
+                {/* Row 4: Status Checkbox */}
+                <div className="p-3.5 bg-slate-50 border border-slate-200/80 rounded-2xl">
+                  <label className="flex items-center space-x-2.5 text-xs text-slate-700 font-medium cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={trackingUpdateStatus}
+                      onChange={(e) => setTrackingUpdateStatus(e.target.checked)}
+                      className="rounded text-forest-900 focus:ring-forest-900 w-4 h-4 cursor-pointer"
+                    />
+                    <span>Automatically set Order Status to <strong className="text-forest-950">"Dispatched (With Courier)"</strong></span>
+                  </label>
+                </div>
+              </div>
+
+              {/* Fixed Footer */}
+              <div className="px-5 sm:px-7 py-3.5 sm:py-4 bg-slate-50/90 border-t border-slate-100 flex items-center justify-between gap-3 shrink-0">
+                <span className="text-[11px] text-slate-400 hidden sm:inline">
+                  Updates sync in real-time to customer order details & WhatsApp
+                </span>
+                <div className="flex items-center space-x-2.5 ml-auto w-full sm:w-auto justify-end">
+                  <button
+                    type="button"
+                    onClick={() => setShowTrackingModal(false)}
+                    className="w-1/2 sm:w-auto px-4 py-2.5 border border-slate-200 rounded-xl font-bold text-slate-600 hover:bg-white hover:border-slate-300 transition cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isProcessingAction || !trackingNumber.trim()}
+                    className="w-1/2 sm:w-auto px-5 py-2.5 bg-forest-900 hover:bg-forest-950 text-gold-400 font-bold rounded-xl shadow-md transition disabled:opacity-50 flex items-center justify-center space-x-2 cursor-pointer"
+                  >
+                    {isProcessingAction ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                    <span>Save Tracking & Dispatch</span>
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>,
+        document.body
+      )}
 
       {/* Centered Luxury Action Confirmation Modal */}
       <AdminConfirmModal
