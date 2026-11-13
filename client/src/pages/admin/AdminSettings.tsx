@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import {
   Settings,
   Calendar,
-  RotateCcw,
   Truck,
   Building,
   Mail,
@@ -11,7 +10,6 @@ import {
   Check,
   Plus,
   Minus,
-  RefreshCw,
   Loader2,
   AlertCircle,
   HelpCircle,
@@ -193,18 +191,6 @@ export const AdminSettings: React.FC = () => {
               </p>
             </div>
           </div>
-        </div>
-
-        <div className="flex items-center space-x-2.5">
-          <button
-            type="button"
-            onClick={fetchSettings}
-            disabled={isLoading || isSaving}
-            className="px-3.5 py-2 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs rounded-xl transition shadow-xs flex items-center space-x-1.5"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
-            <span>Reset</span>
-          </button>
         </div>
       </div>
 
@@ -562,386 +548,386 @@ export const AdminSettings: React.FC = () => {
                 </div>
               )}
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-xs pt-2">
-                  <div>
-                    <label className="font-bold text-slate-700 block mb-1">
-                      Courier Shipping Charge (₹)
-                    </label>
-                    <p className="text-[11px] text-slate-400 mb-2">Applied to customer orders when Dynamic mode is active.</p>
-                    <div className="relative">
-                      <span className="absolute left-3.5 top-1/2 -translate-y-1/2 font-bold text-slate-500">₹</span>
-                      <input
-                        type="number"
-                        required
-                        min="0"
-                        disabled={storeSettings.isFreeShippingEnabled}
-                        value={storeSettings.standardShippingFee}
-                        onChange={(e) => setStoreSettings({ ...storeSettings, standardShippingFee: Math.max(0, Number(e.target.value)) })}
-                        className={`w-full pl-8 pr-4 py-2.5 border rounded-xl font-bold text-forest-950 focus:outline-none focus:ring-1 focus:ring-forest-900 ${storeSettings.isFreeShippingEnabled
-                          ? 'border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed'
-                          : 'border-slate-200 bg-slate-50'
-                          }`}
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="font-bold text-slate-700 block mb-1">
-                      Cash on Delivery (COD) Convenience Fee (₹)
-                    </label>
-                    <p className="text-[11px] text-slate-400 mb-2">Extra fee for handling COD doorstep collections (0 for free).</p>
-                    <div className="relative">
-                      <span className="absolute left-3.5 top-1/2 -translate-y-1/2 font-bold text-slate-500">₹</span>
-                      <input
-                        type="number"
-                        min="0"
-                        value={storeSettings.codFee}
-                        onChange={(e) => setStoreSettings({ ...storeSettings, codFee: Math.max(0, Number(e.target.value)) })}
-                        className="w-full pl-8 pr-4 py-2.5 border border-slate-200 rounded-xl bg-slate-50 font-bold text-forest-950 focus:outline-none focus:ring-1 focus:ring-forest-900"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="font-bold text-slate-700 block mb-1">
-                      Estimated Courier Delivery Display Text
-                    </label>
-                    <p className="text-[11px] text-slate-400 mb-2">Shown on checkout and product pages (e.g. 3-5 Days).</p>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-xs pt-2">
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">
+                    Courier Shipping Charge (₹)
+                  </label>
+                  <p className="text-[11px] text-slate-400 mb-2">Applied to customer orders when Dynamic mode is active.</p>
+                  <div className="relative">
+                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 font-bold text-slate-500">₹</span>
                     <input
-                      type="text"
-                      value={storeSettings.estimatedDeliveryText}
-                      onChange={(e) => setStoreSettings({ ...storeSettings, estimatedDeliveryText: e.target.value })}
-                      className="w-full px-4 py-2.5 border border-slate-200 rounded-xl bg-slate-50 font-medium text-slate-800 focus:outline-none focus:ring-1 focus:ring-forest-900"
+                      type="number"
+                      required
+                      min="0"
+                      disabled={storeSettings.isFreeShippingEnabled}
+                      value={storeSettings.standardShippingFee}
+                      onChange={(e) => setStoreSettings({ ...storeSettings, standardShippingFee: Math.max(0, Number(e.target.value)) })}
+                      className={`w-full pl-8 pr-4 py-2.5 border rounded-xl font-bold text-forest-950 focus:outline-none focus:ring-1 focus:ring-forest-900 ${storeSettings.isFreeShippingEnabled
+                        ? 'border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed'
+                        : 'border-slate-200 bg-slate-50'
+                        }`}
                     />
                   </div>
                 </div>
+
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">
+                    Cash on Delivery (COD) Convenience Fee (₹)
+                  </label>
+                  <p className="text-[11px] text-slate-400 mb-2">Extra fee for handling COD doorstep collections (0 for free).</p>
+                  <div className="relative">
+                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 font-bold text-slate-500">₹</span>
+                    <input
+                      type="number"
+                      min="0"
+                      value={storeSettings.codFee}
+                      onChange={(e) => setStoreSettings({ ...storeSettings, codFee: Math.max(0, Number(e.target.value)) })}
+                      className="w-full pl-8 pr-4 py-2.5 border border-slate-200 rounded-xl bg-slate-50 font-bold text-forest-950 focus:outline-none focus:ring-1 focus:ring-forest-900"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">
+                    Estimated Courier Delivery Display Text
+                  </label>
+                  <p className="text-[11px] text-slate-400 mb-2">Shown on checkout and product pages (e.g. 3-5 Days).</p>
+                  <input
+                    type="text"
+                    value={storeSettings.estimatedDeliveryText}
+                    onChange={(e) => setStoreSettings({ ...storeSettings, estimatedDeliveryText: e.target.value })}
+                    className="w-full px-4 py-2.5 border border-slate-200 rounded-xl bg-slate-50 font-medium text-slate-800 focus:outline-none focus:ring-1 focus:ring-forest-900"
+                  />
+                </div>
               </div>
+            </div>
           )}
 
-              {/* ================================================================
+          {/* ================================================================
              TAB 3: STORE & BUSINESS INFORMATION
              ================================================================ */}
-              {activeTab === 'STORE' && (
-                <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200/90 shadow-sm space-y-6">
-                  <div className="flex items-center space-x-2.5 pb-3 border-b border-slate-100">
-                    <Building className="w-5 h-5 text-forest-900" />
-                    <div>
-                      <h3 className="font-serif text-lg font-bold text-forest-950">
-                        Store Identity & GST Configuration
-                      </h3>
-                      <p className="text-xs text-slate-500">
-                        Details printed on official GST Tax Invoices, order notifications, and customer return labels.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs">
-                    {/* Store Brand Name */}
-                    <div>
-                      <label className="font-bold text-slate-700 block mb-1">Store / Brand Name *</label>
-                      <input
-                        type="text"
-                        required
-                        value={storeSettings.storeName}
-                        onChange={(e) => setStoreSettings({ ...storeSettings, storeName: e.target.value })}
-                        className="w-full px-4 py-2.5 border border-slate-200 rounded-xl bg-slate-50 font-medium text-slate-800 focus:outline-none focus:ring-1 focus:ring-forest-900"
-                        placeholder="Novise Herbal"
-                      />
-                      <p className="text-[10px] text-slate-400 mt-1">Brand header printed on invoices and website branding.</p>
-                    </div>
-
-                    {/* Legal Entity Name */}
-                    <div>
-                      <label className="font-bold text-slate-700 block mb-1">Legal Registered Entity Name *</label>
-                      <input
-                        type="text"
-                        required
-                        value={storeSettings.legalEntityName}
-                        onChange={(e) => setStoreSettings({ ...storeSettings, legalEntityName: e.target.value })}
-                        className="w-full px-4 py-2.5 border border-slate-200 rounded-xl bg-slate-50 font-medium text-slate-800 focus:outline-none focus:ring-1 focus:ring-forest-900"
-                        placeholder="Novis Herbal Naturals"
-                      />
-                      <p className="text-[10px] text-slate-400 mt-1">Official registered legal business name printed on GST invoices.</p>
-                    </div>
-
-                    {/* GSTIN Number */}
-                    <div>
-                      <label className="font-bold text-slate-700 block mb-1">GSTIN / Tax ID Number *</label>
-                      <input
-                        type="text"
-                        required
-                        value={storeSettings.gstNumber}
-                        onChange={(e) => setStoreSettings({ ...storeSettings, gstNumber: e.target.value.toUpperCase() })}
-                        className="w-full px-4 py-2.5 border border-slate-200 rounded-xl bg-slate-50 font-mono font-bold text-slate-900 uppercase focus:outline-none focus:ring-1 focus:ring-forest-900"
-                        placeholder="27AAAAA0000A1Z5"
-                      />
-                      <p className="text-[10px] text-slate-400 mt-1">15-character GST Identification Number.</p>
-                    </div>
-
-                    {/* Seller State */}
-                    <div>
-                      <label className="font-bold text-slate-700 block mb-1">Seller Registered State *</label>
-                      <input
-                        type="text"
-                        required
-                        value={storeSettings.sellerState}
-                        onChange={(e) => setStoreSettings({ ...storeSettings, sellerState: e.target.value })}
-                        className="w-full px-4 py-2.5 border border-slate-200 rounded-xl bg-slate-50 font-medium text-slate-800 focus:outline-none focus:ring-1 focus:ring-forest-900"
-                        placeholder="Gujarat"
-                      />
-                      <p className="text-[10px] text-slate-400 mt-1">Used to calculate CGST + SGST (same state) vs IGST (inter-state).</p>
-                    </div>
-
-                    {/* GST Rate (%) Selector & Presets */}
-                    <div className="md:col-span-2 p-4 bg-emerald-50/50 rounded-2xl border border-emerald-200/80 space-y-3">
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                        <div>
-                          <label className="font-bold text-slate-800 text-xs flex items-center space-x-1.5">
-                            <Percent className="w-4 h-4 text-emerald-700" />
-                            <span>GST Tax Rate & Slabs Management *</span>
-                          </label>
-                          <p className="text-[11px] text-slate-500 mt-0.5">
-                            Select an applicable GST slab or enter custom rate. This dynamically determines CGST & SGST on all newly generated invoices.
-                          </p>
-                        </div>
-
-                        <div className="flex items-center space-x-2">
-                          <input
-                            type="number"
-                            min="0"
-                            max="28"
-                            step="0.5"
-                            value={storeSettings.gstPercentage}
-                            onChange={(e) => setStoreSettings({ ...storeSettings, gstPercentage: parseFloat(e.target.value) || 0 })}
-                            className="w-20 px-3 py-1.5 bg-white border border-emerald-300 rounded-xl font-mono font-bold text-emerald-950 text-center text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
-                          />
-                          <span className="font-bold text-emerald-900 text-sm">%</span>
-                        </div>
-                      </div>
-
-                      {/* Preset Pills */}
-                      <div className="flex flex-wrap gap-2 pt-1">
-                        {[
-                          { rate: 0, label: '0% (Exempt / Nil Rated)' },
-                          { rate: 5, label: '5% (Ayurvedic/Herbal: 2.5% CGST + 2.5% SGST)' },
-                          { rate: 12, label: '12% (FMCG: 6% CGST + 6% SGST)' },
-                          { rate: 18, label: '18% (Cosmetics: 9% CGST + 9% SGST)' }
-                        ].map(preset => (
-                          <button
-                            key={preset.rate}
-                            type="button"
-                            onClick={() => setStoreSettings({ ...storeSettings, gstPercentage: preset.rate })}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition border ${storeSettings.gstPercentage === preset.rate
-                              ? 'bg-emerald-700 text-white border-emerald-700 shadow-2xs'
-                              : 'bg-white text-slate-700 border-slate-200 hover:bg-emerald-50 hover:border-emerald-300'
-                              }`}
-                          >
-                            {preset.label}
-                          </button>
-                        ))}
-                      </div>
-
-                      {/* Live Breakdown Preview Banner */}
-                      <div className="flex flex-wrap items-center gap-3 p-3 bg-white rounded-xl border border-emerald-100 text-[11px] text-slate-600">
-                        <span className="font-bold text-emerald-800">Invoice Tax Breakdown:</span>
-                        <span>
-                          🏛️ <strong>Intra-State ({storeSettings.sellerState || 'Local'}):</strong> CGST ({(storeSettings.gstPercentage / 2).toFixed(1)}%) + SGST ({(storeSettings.gstPercentage / 2).toFixed(1)}%) = {storeSettings.gstPercentage}%
-                        </span>
-                        <span className="text-slate-300">|</span>
-                        <span>
-                          🌐 <strong>Inter-State (Other States):</strong> IGST ({storeSettings.gstPercentage}%)
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Customer Support Email */}
-                    <div>
-                      <label className="font-bold text-slate-700 block mb-1">Customer Support Email *</label>
-                      <input
-                        type="email"
-                        required
-                        value={storeSettings.supportEmail}
-                        onChange={(e) => setStoreSettings({ ...storeSettings, supportEmail: e.target.value })}
-                        className="w-full px-4 py-2.5 border border-slate-200 rounded-xl bg-slate-50 font-medium text-slate-800 focus:outline-none focus:ring-1 focus:ring-forest-900"
-                      />
-                      <p className="text-[10px] text-slate-400 mt-1">Printed on invoice header and customer communications.</p>
-                    </div>
-
-                    {/* Calling Phone Number Field */}
-                    <div>
-                      <div className="flex justify-between items-center mb-1">
-                        <label className="font-bold text-slate-700 flex items-center space-x-1.5">
-                          <PhoneCall className="w-3.5 h-3.5 text-forest-900" />
-                          <span>Customer Calling Phone Hotline *</span>
-                        </label>
-                        <span className="text-[10px] text-slate-400 font-mono">
-                          {storeSettings.supportPhone ? `${sanitizePhoneNumber(storeSettings.supportPhone).length}/10 digits` : '10 digits'}
-                        </span>
-                      </div>
-                      <div className="relative">
-                        <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs">+91</span>
-                        <input
-                          type="tel"
-                          required
-                          inputMode="numeric"
-                          maxLength={10}
-                          pattern="[6-9][0-9]{9}"
-                          placeholder="9876543210"
-                          value={sanitizePhoneNumber(storeSettings.supportPhone)}
-                          onChange={(e) => setStoreSettings({ ...storeSettings, supportPhone: sanitizePhoneNumber(e.target.value) })}
-                          onKeyDown={handlePhoneKeyDown}
-                          className="w-full pl-12 pr-4 py-2.5 border border-slate-200 rounded-xl bg-slate-50 font-mono font-medium text-slate-800 focus:outline-none focus:ring-1 focus:ring-forest-900"
-                        />
-                      </div>
-                      <p className="text-[10px] text-slate-400 mt-1">Printed on invoice helpline and dialed when clicked.</p>
-                    </div>
-
-                    {/* WhatsApp Support Number Field */}
-                    <div>
-                      <div className="flex justify-between items-center mb-1">
-                        <label className="font-bold text-slate-700 flex items-center space-x-1.5">
-                          <MessageCircle className="w-3.5 h-3.5 text-emerald-600" />
-                          <span>Direct WhatsApp Support Number *</span>
-                        </label>
-                        <span className="text-[10px] text-slate-400 font-mono">
-                          {storeSettings.supportWhatsApp ? `${sanitizePhoneNumber(storeSettings.supportWhatsApp).length}/10 digits` : '10 digits'}
-                        </span>
-                      </div>
-                      <div className="relative">
-                        <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs">+91</span>
-                        <input
-                          type="tel"
-                          required
-                          inputMode="numeric"
-                          maxLength={10}
-                          pattern="[6-9][0-9]{9}"
-                          placeholder="9876543210"
-                          value={sanitizePhoneNumber(storeSettings.supportWhatsApp)}
-                          onChange={(e) => setStoreSettings({ ...storeSettings, supportWhatsApp: sanitizePhoneNumber(e.target.value) })}
-                          onKeyDown={handlePhoneKeyDown}
-                          className="w-full pl-12 pr-4 py-2.5 border border-emerald-200/80 rounded-xl bg-emerald-50/20 font-mono font-medium text-slate-800 focus:outline-none focus:ring-1 focus:ring-emerald-600"
-                        />
-                      </div>
-                      <p className="text-[10px] text-slate-400 mt-1">Direct WhatsApp chat helpline.</p>
-                    </div>
-
-                    {/* Business Address */}
-                    <div className="md:col-span-2">
-                      <label className="font-bold text-slate-700 block mb-1">Warehouse & Operating Business Address *</label>
-                      <textarea
-                        rows={2}
-                        required
-                        value={storeSettings.businessAddress}
-                        onChange={(e) => setStoreSettings({ ...storeSettings, businessAddress: e.target.value })}
-                        className="w-full px-4 py-2.5 border border-slate-200 rounded-xl bg-slate-50 font-medium text-slate-800 focus:outline-none focus:ring-1 focus:ring-forest-900"
-                        placeholder="Novis Herbal Naturals, Sidhpur, Gujarat, India, 384151"
-                      />
-                      <p className="text-[10px] text-slate-400 mt-1">Printed under store name on the top left of tax invoices.</p>
-                    </div>
-
-                    {/* Invoice Terms & Declaration */}
-                    <div className="md:col-span-2">
-                      <label className="font-bold text-slate-700 block mb-1 flex items-center space-x-1.5">
-                        <FileText className="w-3.5 h-3.5 text-slate-500" />
-                        <span>Invoice Declaration, Terms & Conditions</span>
-                      </label>
-                      <textarea
-                        rows={3}
-                        value={storeSettings.invoiceTerms}
-                        onChange={(e) => setStoreSettings({ ...storeSettings, invoiceTerms: e.target.value })}
-                        className="w-full px-4 py-2.5 border border-slate-200 rounded-xl bg-slate-50 font-medium text-slate-800 focus:outline-none focus:ring-1 focus:ring-forest-900 font-mono text-[11px]"
-                        placeholder="Terms printed at the bottom of the invoice..."
-                      />
-                      <p className="text-[10px] text-slate-400 mt-1">Custom terms printed at the footer of official tax invoices.</p>
-                    </div>
-                  </div>
+          {activeTab === 'STORE' && (
+            <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200/90 shadow-sm space-y-6">
+              <div className="flex items-center space-x-2.5 pb-3 border-b border-slate-100">
+                <Building className="w-5 h-5 text-forest-900" />
+                <div>
+                  <h3 className="font-serif text-lg font-bold text-forest-950">
+                    Store Identity & GST Configuration
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Details printed on official GST Tax Invoices, order notifications, and customer return labels.
+                  </p>
                 </div>
-              )}
-
-              {/* ================================================================
-             TAB 4: NOTIFICATIONS
-             ================================================================ */}
-              {activeTab === 'NOTIFICATIONS' && (
-                <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200/90 shadow-sm space-y-6">
-                  <div className="flex items-center space-x-2.5 pb-3 border-b border-slate-100">
-                    <Mail className="w-5 h-5 text-forest-900" />
-                    <div>
-                      <h3 className="font-serif text-lg font-bold text-forest-950">
-                        Automated Transactional Emails & Alerts
-                      </h3>
-                      <p className="text-xs text-slate-500">
-                        Control which transactional emails are dispatched to customers and administrators.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="space-y-4 text-xs">
-                    <div className="flex items-center justify-between p-4 rounded-2xl bg-slate-50 border border-slate-200/80">
-                      <div>
-                        <strong className="text-slate-900 font-bold block text-sm">Send Order Confirmation Emails</strong>
-                        <span className="text-slate-500">Dispatches invoice and order receipt to customer immediately upon placement.</span>
-                      </div>
-                      <label className="relative inline-flex items-center cursor-pointer shrink-0">
-                        <input
-                          type="checkbox"
-                          checked={storeSettings.enableOrderEmails}
-                          onChange={(e) => setStoreSettings(prev => ({ ...prev, enableOrderEmails: e.target.checked }))}
-                          className="sr-only peer"
-                        />
-                        <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-forest-900"></div>
-                      </label>
-                    </div>
-
-                    <div className="flex items-center justify-between p-4 rounded-2xl bg-slate-50 border border-slate-200/80">
-                      <div>
-                        <strong className="text-slate-900 font-bold block text-sm">Send Courier Dispatch Email with Tracking Details</strong>
-                        <span className="text-slate-500">Notifies customer only when owner dispatches order with courier name and tracking consignment details. (No emails sent on intermediate status changes).</span>
-                      </div>
-                      <label className="relative inline-flex items-center cursor-pointer shrink-0">
-                        <input
-                          type="checkbox"
-                          checked={storeSettings.enableStatusUpdateEmails}
-                          onChange={(e) => setStoreSettings(prev => ({ ...prev, enableStatusUpdateEmails: e.target.checked }))}
-                          className="sr-only peer"
-                        />
-                        <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-forest-900"></div>
-                      </label>
-                    </div>
-
-                    <div className="flex items-center justify-between p-4 rounded-2xl bg-slate-50 border border-slate-200/80">
-                      <div>
-                        <strong className="text-slate-900 font-bold block text-sm">Send Admin Order Alerts</strong>
-                        <span className="text-slate-500">Sends instant notification to store support team whenever a new order is received.</span>
-                      </div>
-                      <label className="relative inline-flex items-center cursor-pointer shrink-0">
-                        <input
-                          type="checkbox"
-                          checked={storeSettings.enableAdminAlerts}
-                          onChange={(e) => setStoreSettings(prev => ({ ...prev, enableAdminAlerts: e.target.checked }))}
-                          className="sr-only peer"
-                        />
-                        <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-forest-900"></div>
-                      </label>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Bottom Save Bar */}
-              <div className="flex items-center justify-end space-x-3 pt-2">
-                <button
-                  type="submit"
-                  disabled={isSaving}
-                  className="px-6 py-3 bg-forest-900 hover:bg-forest-800 text-gold-400 font-bold text-xs rounded-xl shadow-lg transition flex items-center space-x-2"
-                >
-                  {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                  <span>{isSaving ? 'Saving Changes...' : 'Save Changes'}</span>
-                </button>
               </div>
 
-            </form>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs">
+                {/* Store Brand Name */}
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Store / Brand Name *</label>
+                  <input
+                    type="text"
+                    required
+                    value={storeSettings.storeName}
+                    onChange={(e) => setStoreSettings({ ...storeSettings, storeName: e.target.value })}
+                    className="w-full px-4 py-2.5 border border-slate-200 rounded-xl bg-slate-50 font-medium text-slate-800 focus:outline-none focus:ring-1 focus:ring-forest-900"
+                    placeholder="Novise Herbal"
+                  />
+                  <p className="text-[10px] text-slate-400 mt-1">Brand header printed on invoices and website branding.</p>
+                </div>
+
+                {/* Legal Entity Name */}
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Legal Registered Entity Name *</label>
+                  <input
+                    type="text"
+                    required
+                    value={storeSettings.legalEntityName}
+                    onChange={(e) => setStoreSettings({ ...storeSettings, legalEntityName: e.target.value })}
+                    className="w-full px-4 py-2.5 border border-slate-200 rounded-xl bg-slate-50 font-medium text-slate-800 focus:outline-none focus:ring-1 focus:ring-forest-900"
+                    placeholder="Novis Herbal Naturals"
+                  />
+                  <p className="text-[10px] text-slate-400 mt-1">Official registered legal business name printed on GST invoices.</p>
+                </div>
+
+                {/* GSTIN Number */}
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">GSTIN / Tax ID Number *</label>
+                  <input
+                    type="text"
+                    required
+                    value={storeSettings.gstNumber}
+                    onChange={(e) => setStoreSettings({ ...storeSettings, gstNumber: e.target.value.toUpperCase() })}
+                    className="w-full px-4 py-2.5 border border-slate-200 rounded-xl bg-slate-50 font-mono font-bold text-slate-900 uppercase focus:outline-none focus:ring-1 focus:ring-forest-900"
+                    placeholder="27AAAAA0000A1Z5"
+                  />
+                  <p className="text-[10px] text-slate-400 mt-1">15-character GST Identification Number.</p>
+                </div>
+
+                {/* Seller State */}
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Seller Registered State *</label>
+                  <input
+                    type="text"
+                    required
+                    value={storeSettings.sellerState}
+                    onChange={(e) => setStoreSettings({ ...storeSettings, sellerState: e.target.value })}
+                    className="w-full px-4 py-2.5 border border-slate-200 rounded-xl bg-slate-50 font-medium text-slate-800 focus:outline-none focus:ring-1 focus:ring-forest-900"
+                    placeholder="Gujarat"
+                  />
+                  <p className="text-[10px] text-slate-400 mt-1">Used to calculate CGST + SGST (same state) vs IGST (inter-state).</p>
+                </div>
+
+                {/* GST Rate (%) Selector & Presets */}
+                <div className="md:col-span-2 p-4 bg-emerald-50/50 rounded-2xl border border-emerald-200/80 space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div>
+                      <label className="font-bold text-slate-800 text-xs flex items-center space-x-1.5">
+                        <Percent className="w-4 h-4 text-emerald-700" />
+                        <span>GST Tax Rate & Slabs Management *</span>
+                      </label>
+                      <p className="text-[11px] text-slate-500 mt-0.5">
+                        Select an applicable GST slab or enter custom rate. This dynamically determines CGST & SGST on all newly generated invoices.
+                      </p>
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="number"
+                        min="0"
+                        max="28"
+                        step="0.5"
+                        value={storeSettings.gstPercentage}
+                        onChange={(e) => setStoreSettings({ ...storeSettings, gstPercentage: parseFloat(e.target.value) || 0 })}
+                        className="w-20 px-3 py-1.5 bg-white border border-emerald-300 rounded-xl font-mono font-bold text-emerald-950 text-center text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                      />
+                      <span className="font-bold text-emerald-900 text-sm">%</span>
+                    </div>
+                  </div>
+
+                  {/* Preset Pills */}
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    {[
+                      { rate: 0, label: '0% (Exempt / Nil Rated)' },
+                      { rate: 5, label: '5% (Ayurvedic/Herbal: 2.5% CGST + 2.5% SGST)' },
+                      { rate: 12, label: '12% (FMCG: 6% CGST + 6% SGST)' },
+                      { rate: 18, label: '18% (Cosmetics: 9% CGST + 9% SGST)' }
+                    ].map(preset => (
+                      <button
+                        key={preset.rate}
+                        type="button"
+                        onClick={() => setStoreSettings({ ...storeSettings, gstPercentage: preset.rate })}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition border ${storeSettings.gstPercentage === preset.rate
+                          ? 'bg-emerald-700 text-white border-emerald-700 shadow-2xs'
+                          : 'bg-white text-slate-700 border-slate-200 hover:bg-emerald-50 hover:border-emerald-300'
+                          }`}
+                      >
+                        {preset.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Live Breakdown Preview Banner */}
+                  <div className="flex flex-wrap items-center gap-3 p-3 bg-white rounded-xl border border-emerald-100 text-[11px] text-slate-600">
+                    <span className="font-bold text-emerald-800">Invoice Tax Breakdown:</span>
+                    <span>
+                      🏛️ <strong>Intra-State ({storeSettings.sellerState || 'Local'}):</strong> CGST ({(storeSettings.gstPercentage / 2).toFixed(1)}%) + SGST ({(storeSettings.gstPercentage / 2).toFixed(1)}%) = {storeSettings.gstPercentage}%
+                    </span>
+                    <span className="text-slate-300">|</span>
+                    <span>
+                      🌐 <strong>Inter-State (Other States):</strong> IGST ({storeSettings.gstPercentage}%)
+                    </span>
+                  </div>
+                </div>
+
+                {/* Customer Support Email */}
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Customer Support Email *</label>
+                  <input
+                    type="email"
+                    required
+                    value={storeSettings.supportEmail}
+                    onChange={(e) => setStoreSettings({ ...storeSettings, supportEmail: e.target.value })}
+                    className="w-full px-4 py-2.5 border border-slate-200 rounded-xl bg-slate-50 font-medium text-slate-800 focus:outline-none focus:ring-1 focus:ring-forest-900"
+                  />
+                  <p className="text-[10px] text-slate-400 mt-1">Printed on invoice header and customer communications.</p>
+                </div>
+
+                {/* Calling Phone Number Field */}
+                <div>
+                  <div className="flex justify-between items-center mb-1">
+                    <label className="font-bold text-slate-700 flex items-center space-x-1.5">
+                      <PhoneCall className="w-3.5 h-3.5 text-forest-900" />
+                      <span>Customer Calling Phone Hotline *</span>
+                    </label>
+                    <span className="text-[10px] text-slate-400 font-mono">
+                      {storeSettings.supportPhone ? `${sanitizePhoneNumber(storeSettings.supportPhone).length}/10 digits` : '10 digits'}
+                    </span>
+                  </div>
+                  <div className="relative">
+                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs">+91</span>
+                    <input
+                      type="tel"
+                      required
+                      inputMode="numeric"
+                      maxLength={10}
+                      pattern="[6-9][0-9]{9}"
+                      placeholder="9876543210"
+                      value={sanitizePhoneNumber(storeSettings.supportPhone)}
+                      onChange={(e) => setStoreSettings({ ...storeSettings, supportPhone: sanitizePhoneNumber(e.target.value) })}
+                      onKeyDown={handlePhoneKeyDown}
+                      className="w-full pl-12 pr-4 py-2.5 border border-slate-200 rounded-xl bg-slate-50 font-mono font-medium text-slate-800 focus:outline-none focus:ring-1 focus:ring-forest-900"
+                    />
+                  </div>
+                  <p className="text-[10px] text-slate-400 mt-1">Printed on invoice helpline and dialed when clicked.</p>
+                </div>
+
+                {/* WhatsApp Support Number Field */}
+                <div>
+                  <div className="flex justify-between items-center mb-1">
+                    <label className="font-bold text-slate-700 flex items-center space-x-1.5">
+                      <MessageCircle className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>Direct WhatsApp Support Number *</span>
+                    </label>
+                    <span className="text-[10px] text-slate-400 font-mono">
+                      {storeSettings.supportWhatsApp ? `${sanitizePhoneNumber(storeSettings.supportWhatsApp).length}/10 digits` : '10 digits'}
+                    </span>
+                  </div>
+                  <div className="relative">
+                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs">+91</span>
+                    <input
+                      type="tel"
+                      required
+                      inputMode="numeric"
+                      maxLength={10}
+                      pattern="[6-9][0-9]{9}"
+                      placeholder="9876543210"
+                      value={sanitizePhoneNumber(storeSettings.supportWhatsApp)}
+                      onChange={(e) => setStoreSettings({ ...storeSettings, supportWhatsApp: sanitizePhoneNumber(e.target.value) })}
+                      onKeyDown={handlePhoneKeyDown}
+                      className="w-full pl-12 pr-4 py-2.5 border border-emerald-200/80 rounded-xl bg-emerald-50/20 font-mono font-medium text-slate-800 focus:outline-none focus:ring-1 focus:ring-emerald-600"
+                    />
+                  </div>
+                  <p className="text-[10px] text-slate-400 mt-1">Direct WhatsApp chat helpline.</p>
+                </div>
+
+                {/* Business Address */}
+                <div className="md:col-span-2">
+                  <label className="font-bold text-slate-700 block mb-1">Warehouse & Operating Business Address *</label>
+                  <textarea
+                    rows={2}
+                    required
+                    value={storeSettings.businessAddress}
+                    onChange={(e) => setStoreSettings({ ...storeSettings, businessAddress: e.target.value })}
+                    className="w-full px-4 py-2.5 border border-slate-200 rounded-xl bg-slate-50 font-medium text-slate-800 focus:outline-none focus:ring-1 focus:ring-forest-900"
+                    placeholder="Novis Herbal Naturals, Sidhpur, Gujarat, India, 384151"
+                  />
+                  <p className="text-[10px] text-slate-400 mt-1">Printed under store name on the top left of tax invoices.</p>
+                </div>
+
+                {/* Invoice Terms & Declaration */}
+                <div className="md:col-span-2">
+                  <label className="font-bold text-slate-700 block mb-1 flex items-center space-x-1.5">
+                    <FileText className="w-3.5 h-3.5 text-slate-500" />
+                    <span>Invoice Declaration, Terms & Conditions</span>
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={storeSettings.invoiceTerms}
+                    onChange={(e) => setStoreSettings({ ...storeSettings, invoiceTerms: e.target.value })}
+                    className="w-full px-4 py-2.5 border border-slate-200 rounded-xl bg-slate-50 font-medium text-slate-800 focus:outline-none focus:ring-1 focus:ring-forest-900 font-mono text-[11px]"
+                    placeholder="Terms printed at the bottom of the invoice..."
+                  />
+                  <p className="text-[10px] text-slate-400 mt-1">Custom terms printed at the footer of official tax invoices.</p>
+                </div>
+              </div>
+            </div>
           )}
-        </div>
-      );
+
+          {/* ================================================================
+             TAB 4: NOTIFICATIONS
+             ================================================================ */}
+          {activeTab === 'NOTIFICATIONS' && (
+            <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200/90 shadow-sm space-y-6">
+              <div className="flex items-center space-x-2.5 pb-3 border-b border-slate-100">
+                <Mail className="w-5 h-5 text-forest-900" />
+                <div>
+                  <h3 className="font-serif text-lg font-bold text-forest-950">
+                    Automated Transactional Emails & Alerts
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Control which transactional emails are dispatched to customers and administrators.
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-4 text-xs">
+                <div className="flex items-center justify-between p-4 rounded-2xl bg-slate-50 border border-slate-200/80">
+                  <div>
+                    <strong className="text-slate-900 font-bold block text-sm">Send Order Confirmation Emails</strong>
+                    <span className="text-slate-500">Dispatches invoice and order receipt to customer immediately upon placement.</span>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                    <input
+                      type="checkbox"
+                      checked={storeSettings.enableOrderEmails}
+                      onChange={(e) => setStoreSettings(prev => ({ ...prev, enableOrderEmails: e.target.checked }))}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-forest-900"></div>
+                  </label>
+                </div>
+
+                <div className="flex items-center justify-between p-4 rounded-2xl bg-slate-50 border border-slate-200/80">
+                  <div>
+                    <strong className="text-slate-900 font-bold block text-sm">Send Courier Dispatch Email with Tracking Details</strong>
+                    <span className="text-slate-500">Notifies customer only when owner dispatches order with courier name and tracking consignment details. (No emails sent on intermediate status changes).</span>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                    <input
+                      type="checkbox"
+                      checked={storeSettings.enableStatusUpdateEmails}
+                      onChange={(e) => setStoreSettings(prev => ({ ...prev, enableStatusUpdateEmails: e.target.checked }))}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-forest-900"></div>
+                  </label>
+                </div>
+
+                <div className="flex items-center justify-between p-4 rounded-2xl bg-slate-50 border border-slate-200/80">
+                  <div>
+                    <strong className="text-slate-900 font-bold block text-sm">Send Admin Order Alerts</strong>
+                    <span className="text-slate-500">Sends instant notification to store support team whenever a new order is received.</span>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                    <input
+                      type="checkbox"
+                      checked={storeSettings.enableAdminAlerts}
+                      onChange={(e) => setStoreSettings(prev => ({ ...prev, enableAdminAlerts: e.target.checked }))}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-forest-900"></div>
+                  </label>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Bottom Save Bar */}
+          <div className="flex items-center justify-end space-x-3 pt-2">
+            <button
+              type="submit"
+              disabled={isSaving}
+              className="px-6 py-3 bg-forest-900 hover:bg-forest-800 text-gold-400 font-bold text-xs rounded-xl shadow-lg transition flex items-center space-x-2"
+            >
+              {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+              <span>{isSaving ? 'Saving Changes...' : 'Save Changes'}</span>
+            </button>
+          </div>
+
+        </form>
+      )}
+    </div>
+  );
 };
 

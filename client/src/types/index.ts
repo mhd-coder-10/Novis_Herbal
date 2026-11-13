@@ -247,6 +247,21 @@ export interface Order {
   updatedAt?: string;
 }
 
+export interface NotificationItem {
+  _id: string;
+  recipientType: 'ADMIN' | 'USER' | 'BROADCAST';
+  user?: string;
+  userEmail?: string;
+  type: string;
+  title: string;
+  message: string;
+  priority?: 'NORMAL' | 'HIGH' | 'URGENT';
+  data?: Record<string, any>;
+  actionUrl?: string;
+  isRead: boolean;
+  createdAt: string;
+}
+
 export interface AddressItem extends ShippingAddress {
   _id?: string;
   isDefault?: boolean;
@@ -254,6 +269,7 @@ export interface AddressItem extends ShippingAddress {
 
 export interface User {
   id: string;
+  _id?: string;
   name: string;
   email: string;
   phone?: string;

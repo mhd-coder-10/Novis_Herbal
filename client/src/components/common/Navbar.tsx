@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { ShoppingBag, Search, User, Menu, X, Shield, Sparkles, MapPin, Phone, PhoneCall, MessageCircle, ArrowRight, Package, Info, CheckCircle2, Heart, Mail, LogOut, ChevronRight } from 'lucide-react';
+import { ShoppingBag, Search, User, Menu, X, Shield, Sparkles, MapPin, Phone, PhoneCall, MessageCircle, ArrowRight, Package, Info, CheckCircle2, Heart, Mail, LogOut, ChevronRight, Bell } from 'lucide-react';
 import { useCartStore } from '../../store/useCartStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useWishlistStore } from '../../store/useWishlistStore';
 import { useCMSStore } from '../../store/useCMSStore';
+import { useNotificationStore } from '../../store/useNotificationStore';
+import { PublicNotificationDropdown } from './PublicNotificationDropdown';
 import { appConfig } from '../../config/appConfig';
 import { getFullImageUrl } from '../../services/api';
 
@@ -19,6 +21,11 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage, pagePar
   const { items: wishlistItems } = useWishlistStore();
   const { user, isAuthenticated, logout } = useAuthStore();
   const { cms } = useCMSStore();
+  const { unreadCount: notificationUnreadCount, openDrawer: openNotificationDrawer, fetchUserNotifications } = useNotificationStore();
+
+  useEffect(() => {
+    fetchUserNotifications(user?.email);
+  }, [fetchUserNotifications, user?.email]);
 
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -241,10 +248,10 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage, pagePar
             <Search className="w-4.5 h-4.5" />
           </button>
 
-          {/* Wishlist Button with Dynamic Counter Badge (Desktop) */}
+          {/* Wishlist Button with Dynamic Counter Badge (Desktop Only - Mobile has it in Bottom Navigation) */}
           <button
             onClick={() => onNavigate('wishlist')}
-            className={`p-2 transition rounded-full hover:bg-black/5 relative shrink-0 ${currentPage === 'wishlist' ? 'text-rose-600' : 'text-forest-950 hover:text-rose-600'
+            className={`hidden sm:block p-2 transition rounded-full hover:bg-black/5 relative shrink-0 ${currentPage === 'wishlist' ? 'text-rose-600' : 'text-forest-950 hover:text-rose-600'
               }`}
             title="My Wishlist"
             aria-label="Wishlist"
@@ -257,6 +264,9 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage, pagePar
               </span>
             )}
           </button>
+
+          {/* In-App Customer Notifications Dropdown (Matching Admin Styling) */}
+          <PublicNotificationDropdown onNavigate={onNavigate} />
 
           {/* User Account Menu (Desktop with Hover & Click) */}
           <div
@@ -360,6 +370,24 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage, pagePar
                           </span>
                         )}
                       </button>
+
+                      <button
+                        onClick={() => {
+                          setIsUserMenuOpen(false);
+                          openNotificationDrawer();
+                        }}
+                        className="w-full text-left px-3 py-2 text-xs font-semibold text-stone-700 hover:text-forest-950 hover:bg-forest-900/5 flex items-center justify-between rounded-xl transition"
+                      >
+                        <div className="flex items-center space-x-2.5">
+                          <Bell className="w-4 h-4 text-forest-800" />
+                          <span>Notifications</span>
+                        </div>
+                        {notificationUnreadCount > 0 && (
+                          <span className="text-[10px] bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full font-bold">
+                            {notificationUnreadCount}
+                          </span>
+                        )}
+                      </button>
                     </div>
 
                     <div className="p-1.5 border-t border-stone-100 bg-stone-50/30">
@@ -453,6 +481,28 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage, pagePar
                       <button
                         onClick={() => {
                           setIsUserMenuOpen(false);
+                          openNotificationDrawer();
+                        }}
+                        className="w-full flex items-center justify-between p-2.5 rounded-xl hover:bg-forest-900/5 text-xs font-semibold text-stone-700 hover:text-forest-950 transition"
+                      >
+                        <div className="flex items-center space-x-2.5">
+                          <div className="w-7 h-7 rounded-lg bg-amber-50 flex items-center justify-center text-amber-700">
+                            <Bell className="w-3.5 h-3.5 text-amber-600" />
+                          </div>
+                          <span>Notifications</span>
+                        </div>
+                        {notificationUnreadCount > 0 ? (
+                          <span className="text-[10px] bg-amber-600 text-white font-extrabold px-2 py-0.5 rounded-full shadow-xs">
+                            {notificationUnreadCount}
+                          </span>
+                        ) : (
+                          <ChevronRight className="w-3.5 h-3.5 text-stone-400" />
+                        )}
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          setIsUserMenuOpen(false);
                           onNavigate('policy', 'aboutUs');
                         }}
                         className="w-full flex items-center justify-between p-2.5 rounded-xl hover:bg-amber-50/70 text-xs font-semibold text-stone-700 hover:text-amber-900 transition"
@@ -472,10 +522,10 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage, pagePar
             )}
           </div>
 
-          {/* Shopping Cart Button with Live Counter Badge */}
+          {/* Shopping Cart Button with Live Counter Badge (Desktop Only - Mobile has it in Bottom Navigation) */}
           <button
             onClick={openCart}
-            className="relative p-2 sm:p-2.5 bg-forest-950 text-white rounded-full hover:bg-forest-900 transition shadow-md shadow-forest-950/15 flex items-center justify-center group shrink-0"
+            className="hidden sm:flex relative p-2 sm:p-2.5 bg-forest-950 text-white rounded-full hover:bg-forest-900 transition shadow-md shadow-forest-950/15 items-center justify-center group shrink-0"
             aria-label="Open Shopping Bag"
           >
             <ShoppingBag className="w-4 h-4 sm:w-4.5 sm:h-4.5 text-gold-400 group-hover:scale-110 transition-transform" />
@@ -601,13 +651,13 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage, pagePar
                   onNavigate('product', 'novise-hair-oil-shampoo-combo');
                   setIsMobileMenuOpen(false);
                 }}
-                className="w-full text-left px-3.5 py-2.5 rounded-xl bg-amber-50 text-amber-900 border border-amber-200 font-bold flex items-center justify-between my-2 shadow-sm"
+                className="w-full text-left px-3.5 py-2.5 rounded-xl transition flex items-center justify-between hover:bg-slate-50"
               >
                 <div className="flex items-center space-x-2">
                   <Sparkles className="w-4 h-4 text-amber-600" />
-                  <span>Combo Kit (57% OFF)</span>
+                  <span>Combo Kit</span>
                 </div>
-                <span className="text-[10px] bg-amber-600 text-white font-extrabold px-2 py-0.5 rounded-full">Save ₹800</span>
+                <ArrowRight className="w-3.5 h-3.5 text-slate-400" />
               </button>
 
               <button
@@ -675,6 +725,23 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage, pagePar
                     </button>
                     <button
                       onClick={() => {
+                        openNotificationDrawer();
+                        setIsMobileMenuOpen(false);
+                      }}
+                      className="w-full text-left px-3 py-2 rounded-xl text-xs font-bold text-forest-950 hover:bg-slate-50 flex items-center justify-between"
+                    >
+                      <div className="flex items-center space-x-2">
+                        <Bell className="w-4 h-4 text-forest-800" />
+                        <span>Notifications</span>
+                      </div>
+                      {notificationUnreadCount > 0 && (
+                        <span className="text-[10px] bg-amber-600 text-white font-extrabold px-2 py-0.5 rounded-full">
+                          {notificationUnreadCount}
+                        </span>
+                      )}
+                    </button>
+                    <button
+                      onClick={() => {
                         onNavigate('my-orders');
                         setIsMobileMenuOpen(false);
                       }}
@@ -715,6 +782,23 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage, pagePar
                     >
                       <span>Customer Login</span>
                       <ArrowRight className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => {
+                        openNotificationDrawer();
+                        setIsMobileMenuOpen(false);
+                      }}
+                      className="w-full text-left px-3 py-2 rounded-xl text-xs font-bold text-forest-950 hover:bg-slate-50 flex items-center justify-between"
+                    >
+                      <div className="flex items-center space-x-2">
+                        <Bell className="w-4 h-4 text-forest-800" />
+                        <span>Notifications</span>
+                      </div>
+                      {notificationUnreadCount > 0 && (
+                        <span className="text-[10px] bg-amber-600 text-white font-extrabold px-2 py-0.5 rounded-full">
+                          {notificationUnreadCount}
+                        </span>
+                      )}
                     </button>
                   </>
                 )}
@@ -764,6 +848,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage, pagePar
         document.body
       )}
 
+      {/* End of Header Content */}
     </header>
   );
 };

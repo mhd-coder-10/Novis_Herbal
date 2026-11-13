@@ -13,7 +13,7 @@ export const createRazorpayOrder = async (amountInINR, receiptId) => {
         key_secret: keySecret
       });
       const options = {
-        amount: Math.round(amountInINR * 100), // amount in paise
+        amount: Math.round(amountInINR * 100), // amount in INR
         currency: 'INR',
         receipt: receiptId
       };

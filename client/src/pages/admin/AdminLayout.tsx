@@ -21,6 +21,7 @@ import {
   Settings
 } from 'lucide-react';
 import { useAuthStore } from '../../store/useAuthStore';
+import { AdminNotificationDropdown } from '../../components/admin/AdminNotificationDropdown';
 
 interface AdminLayoutProps {
   currentTab: string;
@@ -331,6 +332,9 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
               <span>View Store</span>
               <ExternalLink className="w-3.5 h-3.5 text-gold-300" />
             </button>
+
+            {/* Admin Notifications Dropdown (Visible on both desktop & mobile) */}
+            <AdminNotificationDropdown onSelectTab={onSelectTab} />
 
             {/* Brand Logo scaled to header size (w-10 h-10 on mobile, w-11 h-11 on desktop) */}
             <div className="flex items-center sm:pl-3 sm:border-l sm:border-slate-200">

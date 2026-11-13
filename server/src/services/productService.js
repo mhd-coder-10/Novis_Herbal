@@ -2,6 +2,7 @@ import Product from '../models/Product.js';
 import Order from '../models/Order.js';
 import Review from '../models/Review.js';
 import { CloudinaryService } from './cloudinaryService.js';
+import { NotificationService } from './notificationService.js';
 
 export class ProductService {
   static async listProducts({
@@ -121,11 +122,23 @@ export class ProductService {
       ? Number(productData.discountPercent)
       : (Number(mrp) > Number(sellingPrice) ? Math.round(((Number(mrp) - Number(sellingPrice)) / Number(mrp)) * 100) : 0);
 
-    return await Product.create({
+    const createdProduct = await Product.create({
       ...productData,
       discountPercent,
       slug
     });
+
+    // Broadcast new product arrival to all storefront visitors
+    NotificationService.notifyBroadcast({
+      type: 'PRODUCT_LAUNCH',
+      title: `New Launch: ${createdProduct.name}`,
+      message: `Explore our newest botanical creation: ${createdProduct.name} at ₹${createdProduct.sellingPrice}. Now available!`,
+      priority: 'NORMAL',
+      data: { productId: createdProduct._id, slug: createdProduct.slug, price: createdProduct.sellingPrice },
+      actionUrl: `/product/${createdProduct.slug}`
+    }).catch(err => console.error('[Notification Broadcast Error]:', err.message));
+
+    return createdProduct;
   }
 
   static async updateProduct(id, updateData) {
@@ -165,9 +178,54 @@ export class ProductService {
       }
     }
 
+    const previousStock = Number(product.stock) || 0;
     Object.assign(product, updateData);
-    return await product.save();
-  }
+    const updated = await product.save();
+    const newStock = Number(updated.stock) || 0;
+
+      // Check if stock changed (handles back in stock, stock increase/decrease, out of stock)
+      if (updateData.stock !== undefined && newStock !== previousStock) {
+        const isBackInStock = previousStock === 0 && newStock > 0;
+        const isOutOfStock = newStock === 0;
+
+        let title = `Stock Updated: ${updated.name}`;
+        let message = `Inventory updated for ${updated.name}: ${newStock} units available.`;
+
+        if (isBackInStock) {
+          title = `Back in Stock: ${updated.name}!`;
+          message = `Good news! ${updated.name} is now back in stock (${newStock} units available). Order now!`;
+        } else if (isOutOfStock) {
+          title = `Out of Stock: ${updated.name}`;
+          message = `${updated.name} has just sold out. Stay tuned for restock updates.`;
+        } else if (newStock > previousStock) {
+          title = `Fresh Stock Added: ${updated.name}`;
+          message = `New batch arrived for ${updated.name}! Total ${newStock} units now available.`;
+        }
+
+        NotificationService.notifyBroadcast({
+          type: 'STOCK_UPDATE',
+          title,
+          message,
+          priority: 'NORMAL',
+          data: { productId: updated._id, slug: updated.slug, stock: newStock, previousStock },
+          actionUrl: `/product/${updated.slug}`
+        }).catch(err => console.error('[Notification Broadcast Error]:', err.message));
+      }
+
+        // Check if low stock alert for admin
+        if (updated.stock !== undefined && newStock <= 5 && newStock > 0) {
+          NotificationService.notifyAdmin({
+            type: 'LOW_STOCK',
+            title: `Low Stock Alert: ${updated.name}`,
+            message: `Warehouse stock is low: only ${newStock} units remaining for ${updated.name}.`,
+            priority: 'HIGH',
+            data: { productId: updated._id, stock: newStock },
+            actionUrl: `/admin?tab=products`
+          }).catch(err => console.error('[Notification Admin Error]:', err.message));
+        }
+
+        return updated;
+      }
 
   static async deleteProduct(id) {
     const product = await Product.findById(id);

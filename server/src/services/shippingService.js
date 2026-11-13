@@ -1,6 +1,7 @@
 import Order from '../models/Order.js';
 import AuditLog from '../models/AuditLog.js';
 import { sendOrderDispatchedEmail } from './emailService.js';
+import { NotificationService } from './notificationService.js';
 
 export class ShippingService {
   /**
@@ -67,6 +68,23 @@ export class ShippingService {
 
     // Send Dispatched Email to Customer with Courier Partner & Tracking Details
     sendOrderDispatchedEmail(order).catch(err => console.error('[Dispatch Email Error]:', err.message));
+
+    // Send In-App Dispatched Notification to Customer
+    NotificationService.notifyUser({
+      userId: order.user,
+      userEmail: order.customerDetails?.email,
+      type: 'ORDER_DISPATCHED',
+      title: `Order #${order.orderId} Dispatched via ${finalCourier}!`,
+      message: `Your package has been dispatched via ${finalCourier} with Consignment Tracking No: ${cleanTrackingNo}.`,
+      priority: 'HIGH',
+      data: {
+        orderId: order.orderId,
+        courier: finalCourier,
+        trackingNumber: cleanTrackingNo,
+        trackingUrl: finalTrackingUrl
+      },
+      actionUrl: '/my-orders'
+    }).catch(err => console.error('[Dispatch Notification Error]:', err.message));
 
     await AuditLog.create({
       action: 'ORDER_DISPATCHED',

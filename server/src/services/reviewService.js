@@ -1,6 +1,7 @@
 import Review from '../models/Review.js';
 import Product from '../models/Product.js';
 import { CloudinaryService } from './cloudinaryService.js';
+import { NotificationService } from './notificationService.js';
 
 export class ReviewService {
   // Get approved reviews for a specific product
@@ -72,6 +73,16 @@ export class ReviewService {
 
     // Update Product average rating
     await this.recalculateProductRating(productId);
+
+    // Notify Admin of New Customer Review
+    NotificationService.notifyAdmin({
+      type: 'NEW_REVIEW',
+      title: `New Review (${numRating}★) from ${user.name}`,
+      message: `"${title ? title + ': ' : ''}${comment.substring(0, 75)}..."`,
+      priority: 'NORMAL',
+      data: { reviewId: review._id, rating: numRating, productId },
+      actionUrl: '/admin?tab=reviews'
+    }).catch(err => console.error('[Notification Admin Error]:', err.message));
 
     return review;
   }

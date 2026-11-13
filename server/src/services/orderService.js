@@ -10,6 +10,7 @@ import {
   sendAdminOrderNotificationEmail,
   sendOrderDispatchedEmail
 } from './emailService.js';
+import { NotificationService } from './notificationService.js';
 import { sanitizePhoneNumber, isValidIndianPhone } from '../utils/phoneValidation.js';
 
 export class OrderService {
@@ -242,6 +243,33 @@ export class OrderService {
     // 2. Send New Order Alert Email to Store Admin via Nodemailer
     sendAdminOrderNotificationEmail(newOrder).catch(err => console.error('[Admin Email Dispatch Error]:', err.message));
 
+    // 3. In-App Notification to Admin
+    NotificationService.notifyAdmin({
+      type: 'NEW_ORDER',
+      title: `New Order Placed: #${newOrder.orderId}`,
+      message: `${newOrder.customerDetails?.fullName || 'Customer'} placed an order worth ₹${newOrder.pricing.totalAmount} (${newOrder.paymentInfo.method}).`,
+      priority: 'HIGH',
+      data: {
+        orderId: newOrder.orderId,
+        amount: newOrder.pricing.totalAmount,
+        method: newOrder.paymentInfo.method,
+        customerName: newOrder.customerDetails?.fullName
+      },
+      actionUrl: `/admin?tab=orders&orderId=${newOrder.orderId}`
+    }).catch(err => console.error('[Admin Notification Error]:', err.message));
+
+    // 4. In-App Notification to Customer
+    NotificationService.notifyUser({
+      userId: newOrder.user,
+      userEmail: newOrder.customerDetails?.email,
+      type: 'ORDER_PLACED',
+      title: `Order Placed Successfully (#${newOrder.orderId})`,
+      message: `Thank you for ordering with Novis Herbal! Your order #${newOrder.orderId} for ₹${newOrder.pricing.totalAmount} has been placed.`,
+      priority: 'HIGH',
+      data: { orderId: newOrder.orderId, totalAmount: newOrder.pricing.totalAmount },
+      actionUrl: '/my-orders'
+    }).catch(err => console.error('[Customer Notification Error]:', err.message));
+
     return {
       orderId: newOrder.orderId,
       order: newOrder
@@ -292,6 +320,32 @@ export class OrderService {
 
     // 2. Send New Order Alert Email to Store Admin via Nodemailer
     sendAdminOrderNotificationEmail(order).catch(err => console.error('[Admin Email Dispatch Error]:', err.message));
+
+    // 3. In-App Notification to Admin
+    NotificationService.notifyAdmin({
+      type: 'NEW_ORDER',
+      title: `Prepaid Order Confirmed: #${order.orderId}`,
+      message: `${order.customerDetails?.fullName || 'Customer'} paid ₹${order.pricing?.totalAmount} via Razorpay Online.`,
+      priority: 'HIGH',
+      data: {
+        orderId: order.orderId,
+        amount: order.pricing?.totalAmount,
+        method: 'ONLINE_PREPAID'
+      },
+      actionUrl: `/admin?tab=orders&orderId=${order.orderId}`
+    }).catch(err => console.error('[Admin Notification Error]:', err.message));
+
+    // 4. In-App Notification to Customer
+    NotificationService.notifyUser({
+      userId: order.user,
+      userEmail: order.customerDetails?.email,
+      type: 'ORDER_PLACED',
+      title: `Payment Received & Order Confirmed (#${order.orderId})`,
+      message: `Your payment of ₹${order.pricing?.totalAmount} was successful. We are preparing your order!`,
+      priority: 'HIGH',
+      data: { orderId: order.orderId, totalAmount: order.pricing?.totalAmount },
+      actionUrl: '/my-orders'
+    }).catch(err => console.error('[Customer Notification Error]:', err.message));
 
     return {
       message: 'Payment verified successfully and order confirmed',
@@ -597,6 +651,32 @@ export class OrderService {
     // Send Courier Dispatch Email with tracking details to Customer via Nodemailer ONLY when DISPATCHED
     if (status === 'DISPATCHED') {
       sendOrderDispatchedEmail(order, note).catch(err => console.error('[Dispatch Email Error]:', err.message));
+      NotificationService.notifyUser({
+        userId: order.user,
+        userEmail: order.customerDetails?.email,
+        type: 'ORDER_DISPATCHED',
+        title: `Order #${order.orderId} Dispatched!`,
+        message: `Your package has been dispatched via ${order.shipment?.courierName || 'Courier Partner'}.${order.shipment?.awbCode || order.shipment?.trackingNumber ? ' Consignment No: ' + (order.shipment?.awbCode || order.shipment?.trackingNumber) : ''}`,
+        priority: 'HIGH',
+        data: {
+          orderId: order.orderId,
+          courier: order.shipment?.courierName,
+          trackingNumber: order.shipment?.awbCode || order.shipment?.trackingNumber,
+          trackingUrl: order.shipment?.trackingUrl
+        },
+        actionUrl: '/my-orders'
+      }).catch(err => console.error('[Customer Notification Error]:', err.message));
+    } else if (status === 'DELIVERED') {
+      NotificationService.notifyUser({
+        userId: order.user,
+        userEmail: order.customerDetails?.email,
+        type: 'ORDER_DELIVERED',
+        title: `Order #${order.orderId} Delivered!`,
+        message: `Your package has been successfully delivered. We hope you love your Novis Herbal products!`,
+        priority: 'NORMAL',
+        data: { orderId: order.orderId },
+        actionUrl: '/my-orders'
+      }).catch(err => console.error('[Customer Notification Error]:', err.message));
     }
 
     return order;
@@ -778,6 +858,28 @@ export class OrderService {
 
       await order.save();
 
+      // Notify Admin of Instant Cancellation
+      NotificationService.notifyAdmin({
+        type: 'ORDER_CANCELLED',
+        title: `Order Cancelled: #${order.orderId}`,
+        message: `Order #${order.orderId} was cancelled by ${user?.name || order.customerDetails?.fullName || 'Customer'}. Stock restored.`,
+        priority: 'NORMAL',
+        data: { orderId: order.orderId, reason },
+        actionUrl: `/admin?tab=orders&orderId=${order.orderId}`
+      }).catch(err => console.error('[Admin Notification Error]:', err.message));
+
+      // Notify Customer
+      NotificationService.notifyUser({
+        userId: order.user,
+        userEmail: order.customerDetails?.email,
+        type: 'ORDER_CANCELLED',
+        title: `Order #${order.orderId} Cancelled`,
+        message: `Your order #${order.orderId} has been successfully cancelled.${order.paymentInfo?.status === 'PAID' ? ' Refund has been initiated to your original payment method.' : ''}`,
+        priority: 'NORMAL',
+        data: { orderId: order.orderId },
+        actionUrl: '/my-orders'
+      }).catch(err => console.error('[Customer Notification Error]:', err.message));
+
       return {
         success: true,
         instant: true,
@@ -813,6 +915,28 @@ export class OrderService {
       });
 
       await order.save();
+
+      // Notify Admin of Cancellation Request
+      NotificationService.notifyAdmin({
+        type: 'CANCELLATION_REQUESTED',
+        title: `Cancellation Requested: #${order.orderId}`,
+        message: `${order.customerDetails?.fullName || 'Customer'} requested cancellation for #${order.orderId}. Reason: "${reason || 'Customer request'}".`,
+        priority: 'HIGH',
+        data: { orderId: order.orderId, reason },
+        actionUrl: `/admin?tab=orders&orderId=${order.orderId}`
+      }).catch(err => console.error('[Admin Notification Error]:', err.message));
+
+      // Notify Customer
+      NotificationService.notifyUser({
+        userId: order.user,
+        userEmail: order.customerDetails?.email,
+        type: 'CANCELLATION_REQUESTED',
+        title: `Cancellation Request Received (#${order.orderId})`,
+        message: `We received your cancellation request for order #${order.orderId}. Our fulfillment team will review it shortly.`,
+        priority: 'NORMAL',
+        data: { orderId: order.orderId },
+        actionUrl: '/my-orders'
+      }).catch(err => console.error('[Customer Notification Error]:', err.message));
 
       return {
         success: true,
@@ -928,6 +1052,18 @@ export class OrderService {
 
       await order.save();
 
+      // Notify Customer of Approval
+      NotificationService.notifyUser({
+        userId: order.user,
+        userEmail: order.customerDetails?.email,
+        type: 'CANCELLATION_APPROVED',
+        title: `Cancellation Request Approved (#${order.orderId})`,
+        message: `Your cancellation request for order #${order.orderId} was approved. Stock restored.${order.paymentInfo?.status === 'PAID' ? ' Refund will be credited within 3-5 business days.' : ''}`,
+        priority: 'HIGH',
+        data: { orderId: order.orderId },
+        actionUrl: '/my-orders'
+      }).catch(err => console.error('[Customer Notification Error]:', err.message));
+
       return { success: true, message: 'Cancellation approved. Order is now cancelled and stock restored.', order };
     }
 
@@ -949,6 +1085,18 @@ export class OrderService {
       });
 
       await order.save();
+
+      // Notify Customer of Rejection
+      NotificationService.notifyUser({
+        userId: order.user,
+        userEmail: order.customerDetails?.email,
+        type: 'CANCELLATION_REJECTED',
+        title: `Cancellation Request Rejected (#${order.orderId})`,
+        message: `Your cancellation request for order #${order.orderId} was rejected: ${order.cancellation.rejectionReason}`,
+        priority: 'HIGH',
+        data: { orderId: order.orderId, reason: order.cancellation.rejectionReason },
+        actionUrl: '/my-orders'
+      }).catch(err => console.error('[Customer Notification Error]:', err.message));
 
       return { success: true, message: 'Cancellation request rejected. Order reverted to active fulfillment.', order };
     }
@@ -1059,6 +1207,29 @@ export class OrderService {
 
     await order.save();
     realtimeService.broadcast('ORDER_UPDATED', { orderId: order.orderId, complaint: order.complaint });
+
+    // Notify Admin of Customer Damage Claim
+    NotificationService.notifyAdmin({
+      type: 'CUSTOMER_CLAIM',
+      title: `Damage Claim Reported: #${order.orderId}`,
+      message: `${order.customerDetails?.fullName || 'Customer'} reported an issue (${reason}) with uploaded video verification proof.`,
+      priority: 'URGENT',
+      data: { orderId: order.orderId, reason },
+      actionUrl: `/admin?tab=orders&orderId=${order.orderId}`
+    }).catch(err => console.error('[Admin Notification Error]:', err.message));
+
+    // Notify Customer that claim was received
+    NotificationService.notifyUser({
+      userId: order.user,
+      userEmail: order.customerDetails?.email,
+      type: 'CLAIM_SUBMITTED',
+      title: `Damage Claim Submitted (#${order.orderId})`,
+      message: `Your issue report with video proof for order #${order.orderId} was received and is under store review.`,
+      priority: 'NORMAL',
+      data: { orderId: order.orderId },
+      actionUrl: '/my-orders'
+    }).catch(err => console.error('[Customer Notification Error]:', err.message));
+
     return {
       success: true,
       message: 'Complaint submitted successfully with video proof. Our team will review your video and details within 24 hours.',
@@ -1169,6 +1340,27 @@ export class OrderService {
     });
 
     await order.save();
+
+    // Notify Customer of Complaint Resolution
+    if (['RESOLVED', 'REJECTED', 'UNDER_REVIEW'].includes(order.complaint.status)) {
+      const isResolved = order.complaint.status === 'RESOLVED';
+      const isRejected = order.complaint.status === 'REJECTED';
+      NotificationService.notifyUser({
+        userId: order.user,
+        userEmail: order.customerDetails?.email,
+        type: isResolved ? 'CLAIM_RESOLVED' : (isRejected ? 'CLAIM_REJECTED' : 'CLAIM_UPDATED'),
+        title: isResolved
+          ? `Damage Claim Resolved (#${order.orderId})`
+          : (isRejected ? `Damage Claim Update (#${order.orderId})` : `Claim Under Review (#${order.orderId})`),
+        message: isResolved
+          ? `Your claim for order #${order.orderId} was approved! Resolution: ${resolutionNotes || 'Refund/Replacement processed'}.`
+          : (isRejected ? `Your claim for order #${order.orderId} was not approved: ${rejectionReason || 'Policy criteria not met'}.` : `Your claim for order #${order.orderId} is being reviewed by our specialists.`),
+        priority: isResolved ? 'HIGH' : 'NORMAL',
+        data: { orderId: order.orderId, status: order.complaint.status },
+        actionUrl: '/my-orders'
+      }).catch(err => console.error('[Customer Notification Error]:', err.message));
+    }
+
     return { success: true, message: `Complaint updated to ${order.complaint.status}`, order };
   }
 

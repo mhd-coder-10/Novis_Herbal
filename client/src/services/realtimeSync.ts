@@ -1,11 +1,16 @@
 import { useCMSStore } from '../store/useCMSStore';
+import { useNotificationStore } from '../store/useNotificationStore';
+import { useAuthStore } from '../store/useAuthStore';
 
 export type LiveEventType =
   | 'CMS_UPDATED'
   | 'PRODUCT_UPDATED'
   | 'REVIEW_UPDATED'
   | 'ORDER_UPDATED'
-  | 'SETTINGS_UPDATED';
+  | 'SETTINGS_UPDATED'
+  | 'NOTIFICATION_ADMIN'
+  | 'NOTIFICATION_USER'
+  | 'NOTIFICATION_BROADCAST';
 
 export interface LiveSyncMessage {
   type: LiveEventType;
@@ -86,6 +91,39 @@ export const handleIncomingLiveEvent = (type: LiveEventType, payload?: any) => {
       break;
     }
 
+    case 'NOTIFICATION_ADMIN': {
+      if (payload) {
+        useNotificationStore.getState().handleIncomingAdminNotification(payload);
+      }
+      break;
+    }
+
+    case 'NOTIFICATION_BROADCAST': {
+      if (payload) {
+        useNotificationStore.getState().handleIncomingNotification(payload);
+      }
+      break;
+    }
+
+    case 'NOTIFICATION_USER': {
+      if (payload) {
+        const currentUser = useAuthStore.getState().user;
+        const currentEmail = currentUser?.email?.toLowerCase().trim();
+        const currentId = (currentUser?.id || currentUser?._id) ? String(currentUser.id || currentUser._id) : null;
+        const targetEmail = payload.targetEmail?.toLowerCase().trim();
+        const targetUserId = payload.targetUserId ? String(payload.targetUserId) : null;
+
+        // Verify notification is meant for this customer
+        if (
+          (currentEmail && targetEmail && currentEmail === targetEmail) ||
+          (currentId && targetUserId && currentId === targetUserId)
+        ) {
+          useNotificationStore.getState().handleIncomingNotification(payload);
+        }
+      }
+      break;
+    }
+
     default:
       useCMSStore.getState().fetchCMS();
       break;
@@ -100,7 +138,7 @@ export const handleIncomingLiveEvent = (type: LiveEventType, payload?: any) => {
  * 4. Visibilitychange & Focus listener (instant fresh state when user switches tabs)
  */
 export const initRealtimeSync = () => {
-  if (typeof window === 'undefined') return () => {};
+  if (typeof window === 'undefined') return () => { };
 
   // 1. Setup BroadcastChannel listener
   if (broadcastChannel) {
@@ -184,6 +222,33 @@ export const initRealtimeSync = () => {
           handleIncomingLiveEvent('ORDER_UPDATED', data);
         } catch {
           handleIncomingLiveEvent('ORDER_UPDATED');
+        }
+      });
+
+      eventSource.addEventListener('NOTIFICATION_ADMIN', (e: MessageEvent) => {
+        try {
+          const data = JSON.parse(e.data);
+          handleIncomingLiveEvent('NOTIFICATION_ADMIN', data);
+        } catch {
+          // ignore
+        }
+      });
+
+      eventSource.addEventListener('NOTIFICATION_USER', (e: MessageEvent) => {
+        try {
+          const data = JSON.parse(e.data);
+          handleIncomingLiveEvent('NOTIFICATION_USER', data);
+        } catch {
+          // ignore
+        }
+      });
+
+      eventSource.addEventListener('NOTIFICATION_BROADCAST', (e: MessageEvent) => {
+        try {
+          const data = JSON.parse(e.data);
+          handleIncomingLiveEvent('NOTIFICATION_BROADCAST', data);
+        } catch {
+          // ignore
         }
       });
 
