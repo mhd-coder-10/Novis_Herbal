@@ -578,24 +578,21 @@ export class FinanceService {
     const mfg = await ManufacturingExpense.findById(id);
     if (!mfg) throw new Error('Manufacturing procurement record not found');
 
+    // Record Ultra-Lightweight Deletion Log (Date, Category, Title/ID, Amount - 0 heavy snapshot)
     try {
+      const entityTitle = mfg.vendorName
+        ? `${mfg.productName} (${mfg.vendorName})`
+        : (mfg.productName || 'Manufacturing Batch');
+
       await AuditLog.create({
         action: 'DELETED',
         entityType: 'MANUFACTURING',
         entityId: mfg.batchNumber || mfg._id.toString(),
-        entityTitle: `${mfg.productName} - Batch ${mfg.batchNumber || 'N/A'} (${mfg.vendorName})`,
-        amount: mfg.totalCost || 0,
-        performedBy: {
-          userId: user?._id || user?.id,
-          name: user?.name || 'Administrator',
-          email: user?.email,
-          role: user?.role || 'admin'
-        },
-        reason: 'Deleted by administrator from Product Manufacturing & Sourcing.',
-        snapshot: mfg.toObject()
+        entityTitle: entityTitle,
+        amount: mfg.totalCost || 0
       });
     } catch (auditErr) {
-      console.error('Failed to log audit for mfg deletion:', auditErr);
+      console.error('Failed to log deletion for mfg:', auditErr);
     }
 
     await ManufacturingExpense.findByIdAndDelete(id);
@@ -633,7 +630,17 @@ export class FinanceService {
   }
 
   static async createOperatingExpense(data, user) {
+    const year = new Date().getFullYear();
+    const count = await OperatingExpense.countDocuments();
+    let candidateNum = count + 1;
+    let candidate = `OVH-${year}-${String(candidateNum).padStart(4, '0')}`;
+    while (await OperatingExpense.exists({ expenseId: candidate })) {
+      candidateNum++;
+      candidate = `OVH-${year}-${String(candidateNum).padStart(4, '0')}`;
+    }
+
     const entry = new OperatingExpense({
+      expenseId: candidate,
       category: data.category || 'MISCELLANEOUS',
       title: data.title ? data.title.trim() : 'Overhead Expense',
       amount: Math.max(0, Number(data.amount) || 0),
@@ -740,24 +747,23 @@ export class FinanceService {
     const op = await OperatingExpense.findById(id);
     if (!op) throw new Error('Operating expense record not found');
 
+    // Record Ultra-Lightweight Deletion Log (Date, Category, Title/ID, Amount - 0 heavy snapshot)
     try {
+      const year = new Date(op.expenseDate || op.createdAt || Date.now()).getFullYear();
+      const expenseId = op.expenseId || `OVH-${year}-${op._id.toString().slice(-4).toUpperCase()}`;
+      const entityTitle = op.title
+        ? `${op.category} - ${op.title}`
+        : op.category;
+
       await AuditLog.create({
         action: 'DELETED',
         entityType: 'OPERATING',
-        entityId: op._id.toString(),
-        entityTitle: `${op.category} - ${op.title}`,
-        amount: op.amount || 0,
-        performedBy: {
-          userId: user?._id || user?.id,
-          name: user?.name || 'Administrator',
-          email: user?.email,
-          role: user?.role || 'admin'
-        },
-        reason: `Deleted by administrator from Shop & Overhead Operational Expenses (${op.paidTo || 'N/A'}).`,
-        snapshot: op.toObject()
+        entityId: expenseId,
+        entityTitle: entityTitle,
+        amount: op.amount || 0
       });
     } catch (auditErr) {
-      console.error('Failed to log audit for operating expense deletion:', auditErr);
+      console.error('Failed to log deletion for operating expense:', auditErr);
     }
 
     await OperatingExpense.findByIdAndDelete(id);
@@ -1125,28 +1131,114 @@ export class FinanceService {
       realtimeService.broadcast('PRODUCT_UPDATED', { action: 'stock_restored' });
     }
 
-    // Record Deletion in AuditLog
+    // Record Ultra-Lightweight Deletion Log (Date, Category, Title/ID, Amount - 0 heavy snapshot)
     try {
       await AuditLog.create({
         action: 'DELETED',
         entityType: 'OFFLINE_SALE',
-        entityId: sale.saleId || sale._id.toString(),
-        entityTitle: `${sale.customerName} (Bill #${sale.billNumber || sale.saleId})`,
-        amount: sale.totalAmount || 0,
-        performedBy: {
-          userId: user?._id || user?.id,
-          name: user?.name || 'Administrator',
-          email: user?.email,
-          role: user?.role || 'admin'
-        },
-        reason: 'Deleted by administrator from Offline Retail Ledger. Inventory stock restored.',
-        snapshot: sale.toObject()
+        entityId: sale.saleId || sale.billNumber || sale._id.toString(),
+        entityTitle: sale.customerName || 'Offline Retail Customer',
+        amount: sale.totalAmount || 0
       });
     } catch (auditErr) {
-      console.error('Failed to log audit for offline sale deletion:', auditErr);
+      console.error('Failed to log deletion for offline sale:', auditErr);
     }
 
     await OfflineSale.findByIdAndDelete(id);
     return { success: true, message: 'Offline sale deleted and stock restored' };
   }
+
+  // ==========================================
+  // TAB 5: DELETION LOGS (Purged records from Offline Sales, Mfg, and Shop Overhead)
+  // ==========================================
+  static async getDeletionLogs({ period, startDate, endDate, entityType, search, page = 1, limit = 10 }) {
+    const pageNum = Math.max(1, parseInt(page, 10) || 1);
+    const limitNum = Math.max(1, parseInt(limit, 10) || 10);
+    const skip = (pageNum - 1) * limitNum;
+
+    const allowedEntities = ['OFFLINE_SALE', 'MANUFACTURING', 'OPERATING'];
+    const query = {
+      action: 'DELETED',
+      entityType: { $in: allowedEntities }
+    };
+
+    if (entityType && allowedEntities.includes(entityType.toUpperCase())) {
+      query.entityType = entityType.toUpperCase();
+    }
+
+    const dateQuery = this.getDateFilter(period, startDate, endDate);
+    if (dateQuery.$gte || dateQuery.$lte) {
+      query.createdAt = dateQuery;
+    }
+
+    if (search && search.trim()) {
+      const term = search.trim();
+      query.$or = [
+        { entityId: { $regex: term, $options: 'i' } },
+        { entityTitle: { $regex: term, $options: 'i' } },
+        { reason: { $regex: term, $options: 'i' } },
+        { 'performedBy.name': { $regex: term, $options: 'i' } },
+        { 'performedBy.email': { $regex: term, $options: 'i' } }
+      ];
+    }
+
+    const [totalItems, logs, offlineSalesDeleted, mfgBatchesDeleted, operatingExpensesDeleted, valueAgg] = await Promise.all([
+      AuditLog.countDocuments(query),
+      AuditLog.find(query).select('_id entityType entityId entityTitle amount createdAt').sort({ createdAt: -1 }).skip(skip).limit(limitNum).lean(),
+      AuditLog.countDocuments({ action: 'DELETED', entityType: 'OFFLINE_SALE' }),
+      AuditLog.countDocuments({ action: 'DELETED', entityType: 'MANUFACTURING' }),
+      AuditLog.countDocuments({ action: 'DELETED', entityType: 'OPERATING' }),
+      AuditLog.aggregate([
+        { $match: { action: 'DELETED', entityType: { $in: allowedEntities } } },
+        { $group: { _id: null, totalValue: { $sum: '$amount' } } }
+      ])
+    ]);
+
+    const totalDeletions = offlineSalesDeleted + mfgBatchesDeleted + operatingExpensesDeleted;
+    const totalDeletedValue = valueAgg[0]?.totalValue || 0;
+
+    const formattedLogs = logs.map(log => {
+      let title = log.entityTitle || 'Untitled Record';
+      let id = log.entityId;
+
+      // 1. Remove duplicate Bill / Sale ID from title in Offline Sales
+      // e.g. "AAkib (Bill #OFF-2026-0001)" -> "AAkib"
+      title = title.replace(/\s*\((?:Bill\s*#?|OFF-)[^)]+\)/gi, '').trim();
+
+      // 2. Remove duplicate Batch ID from title in Manufacturing
+      // e.g. "mmm - Batch BATCH-02 (mm)" -> "mmm (mm)"
+      title = title.replace(/\s*-\s*Batch\s+[^\s(]+/gi, '').trim();
+
+      // 3. Format Operating Expense ID if it's a raw 24-char MongoDB ObjectId
+      if (log.entityType === 'OPERATING' && id && /^[0-9a-fA-F]{24}$/.test(id)) {
+        const year = new Date(log.createdAt || Date.now()).getFullYear();
+        id = `OVH-${year}-${id.slice(-4).toUpperCase()}`;
+      }
+
+      return {
+        ...log,
+        entityTitle: title,
+        entityId: id
+      };
+    });
+
+    return {
+      success: true,
+      logs: formattedLogs,
+      metrics: {
+        totalDeletions,
+        offlineSalesDeleted,
+        mfgBatchesDeleted,
+        operatingExpensesDeleted,
+        totalDeletedValue
+      },
+      pagination: {
+        currentPage: pageNum,
+        totalPages: Math.ceil(totalItems / limitNum) || 1,
+        totalItems,
+        pageSize: limitNum
+      }
+    };
+  }
+
 }

@@ -16,7 +16,8 @@ import {
   createOfflineSale,
   updateOfflineSale,
   updateOfflineSalePayment,
-  deleteOfflineSale
+  deleteOfflineSale,
+  getDeletionLogs
 } from '../controllers/financeController.js';
 import { protect, authorize } from '../middleware/auth.js';
 
@@ -49,5 +50,10 @@ router.get('/operating', getOperatingExpenses);
 router.post('/operating', createOperatingExpense);
 router.put('/operating/:id', updateOperatingExpense);
 router.delete('/operating/:id', deleteOperatingExpense);
+
+
+// Tab 5: Deletion Logs (Purged records from Offline, Mfg, and Overhead)
+router.get('/deletion-logs', getDeletionLogs);
+router.get('/audit-logs', getDeletionLogs);
 
 export default router;

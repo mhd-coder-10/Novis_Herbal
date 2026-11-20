@@ -161,3 +161,12 @@ export const deleteOfflineSale = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
+export const getDeletionLogs = async (req, res) => {
+  try {
+    const data = await FinanceService.getDeletionLogs(req.query);
+    res.json(data);
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};

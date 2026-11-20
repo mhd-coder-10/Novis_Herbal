@@ -15,6 +15,7 @@ const changeLogSchema = new mongoose.Schema({
 }, { _id: true });
 
 const operatingExpenseSchema = new mongoose.Schema({
+  expenseId: { type: String, trim: true, index: true },
   category: {
     type: String,
     enum: [

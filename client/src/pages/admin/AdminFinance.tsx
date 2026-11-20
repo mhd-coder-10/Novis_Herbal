@@ -246,12 +246,11 @@ export const AdminFinance: React.FC = () => {
       pageSize: number;
     };
   } | null>(null);
-  const [auditFilter, setAuditFilter] = useState<'ALL' | 'OFFLINE_SALE' | 'ONLINE_ORDER' | 'MANUFACTURING' | 'OPERATING'>('ALL');
+  const [auditFilter, setAuditFilter] = useState<'ALL' | 'OFFLINE_SALE' | 'MANUFACTURING' | 'OPERATING'>('ALL');
   const [auditSearch, setAuditSearch] = useState('');
   const [auditPage, setAuditPage] = useState(1);
   const [auditPageSize, setAuditPageSize] = useState(10);
   const [isLoadingAudit, setIsLoadingAudit] = useState(false);
-  const [selectedSnapshotForView, setSelectedSnapshotForView] = useState<any>(null);
 
   // Active full-page action indicator
   const isAnyActionPageActive = Boolean(
@@ -266,8 +265,7 @@ export const AdminFinance: React.FC = () => {
     (isRecordReturnModalOpen && selectedMfgForReturn) ||
     editingOperating ||
     selectedOperatingForView ||
-    isAddOperatingModalOpen ||
-    selectedSnapshotForView
+    isAddOperatingModalOpen
   );
   // Automatically persist active tab, sub-tab and update browser URL without reloads
   useEffect(() => {
@@ -331,7 +329,6 @@ export const AdminFinance: React.FC = () => {
         if (editingMfg) setEditingMfg(null);
         if (selectedOperatingForView) setSelectedOperatingForView(null);
         if (editingOperating) setEditingOperating(null);
-        if (selectedSnapshotForView) setSelectedSnapshotForView(null);
         if (isAddMfgModalOpen) setIsAddMfgModalOpen(false);
         if (isRecordPaymentModalOpen) setIsRecordPaymentModalOpen(false);
         if (isRecordReturnModalOpen) setIsRecordReturnModalOpen(false);
@@ -349,7 +346,6 @@ export const AdminFinance: React.FC = () => {
     editingMfg,
     selectedOperatingForView,
     editingOperating,
-    selectedSnapshotForView,
     isAddMfgModalOpen,
     isRecordPaymentModalOpen,
     isRecordReturnModalOpen,
@@ -456,7 +452,7 @@ export const AdminFinance: React.FC = () => {
         params.startDate = customStartDate;
         params.endDate = customEndDate;
       }
-      const res = await api.get('/finance/audit-logs', { params });
+      const res = await api.get('/finance/deletion-logs', { params });
       if (res.data?.success) {
         setAuditData(res.data);
       }
@@ -1444,8 +1440,8 @@ export const AdminFinance: React.FC = () => {
                 : 'border-transparent text-slate-500 hover:text-slate-900'
                 }`}
             >
-              <ShieldAlert className="w-4 h-4 text-rose-600" />
-              <span>5. Audit & Deletion Logs</span>
+              <Trash2 className="w-4 h-4 text-rose-600" />
+              <span>5. Deletion Logs</span>
               {auditData?.metrics?.totalDeletions ? (
                 <span className="ml-1 px-2 py-0.5 rounded-full text-[10px] bg-rose-100 text-rose-800 font-mono font-bold">
                   {auditData.metrics.totalDeletions}
@@ -1976,13 +1972,12 @@ export const AdminFinance: React.FC = () => {
                               <th className="py-3 px-4">Payment Status</th>
                               <th className="py-3 px-4 text-right">Amount</th>
                               <th className="py-3 px-4 text-right">Due / Outstanding</th>
-                              <th className="py-3 px-4 text-right">Action</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100 font-medium">
                             {filteredConsolidated.length === 0 ? (
                               <tr>
-                                <td colSpan={8} className="py-10 text-center text-slate-400 italic">
+                                <td colSpan={7} className="py-10 text-center text-slate-400 italic">
                                   No sales transactions recorded during {getPeriodLabel().toLowerCase()}.
                                 </td>
                               </tr>
@@ -2035,19 +2030,6 @@ export const AdminFinance: React.FC = () => {
                                       <span className="text-rose-700">₹{item.due}</span>
                                     ) : (
                                       <span className="text-slate-400">₹0</span>
-                                    )}
-                                  </td>
-                                  <td className="py-3.5 px-4 text-right" onClick={(e) => e.stopPropagation()}>
-                                    {item.type === 'OFFLINE' ? (
-                                      <button
-                                        onClick={() => handleDeleteOfflineSale(item._id, item.id)}
-                                        className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer"
-                                        title="Delete offline sale record"
-                                      >
-                                        <Trash2 className="w-3.5 h-3.5" />
-                                      </button>
-                                    ) : (
-                                      <span className="text-[10px] text-slate-400 font-semibold px-2 py-0.5 bg-slate-100 rounded border border-slate-200">Order Locked</span>
                                     )}
                                   </td>
                                 </tr>
@@ -2910,15 +2892,15 @@ export const AdminFinance: React.FC = () => {
                   <div className="p-4 bg-white rounded-2xl border border-slate-200/90 shadow-2xs">
                     <div className="flex items-center justify-between">
                       <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono">
-                        Deleted Sales Records
+                        Deleted Offline Sales
                       </span>
                       <Store className="w-4 h-4 text-emerald-600" />
                     </div>
                     <span className="text-xl sm:text-2xl font-black text-emerald-700 font-mono mt-1 block">
-                      {(auditData?.metrics?.offlineSalesDeleted ?? 0) + (auditData?.metrics?.onlineOrdersDeleted ?? 0)}
+                      {auditData?.metrics?.offlineSalesDeleted ?? 0}
                     </span>
                     <span className="text-[10px] text-slate-500 font-mono">
-                      Offline: {auditData?.metrics?.offlineSalesDeleted ?? 0} • Online: {auditData?.metrics?.onlineOrdersDeleted ?? 0}
+                      Local retail & counter sales purged
                     </span>
                   </div>
 
@@ -2956,11 +2938,10 @@ export const AdminFinance: React.FC = () => {
                   <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
                     <div className="flex items-center space-x-1.5 overflow-x-auto pb-1 md:pb-0 scrollbar-none">
                       {[
-                        { key: 'ALL', label: 'All Purged Records' },
+                        { key: 'ALL', label: 'All Deleted Records' },
                         { key: 'OFFLINE_SALE', label: 'Offline Sales' },
-                        { key: 'ONLINE_ORDER', label: 'Online Orders' },
                         { key: 'MANUFACTURING', label: 'Manufacturing Batches' },
-                        { key: 'OPERATING', label: 'Operating Expenses' }
+                        { key: 'OPERATING', label: 'Shop & Overhead' }
                       ].map(tab => (
                         <button
                           key={tab.key}
@@ -2983,7 +2964,7 @@ export const AdminFinance: React.FC = () => {
                         <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                         <input
                           type="text"
-                          placeholder="Search logs by ID, title, admin..."
+                          placeholder="Search deleted records by ID, title, admin..."
                           value={auditSearch}
                           onChange={(e) => {
                             setAuditSearch(e.target.value);
@@ -3021,14 +3002,12 @@ export const AdminFinance: React.FC = () => {
                           <th className="py-3 px-4">Source Category</th>
                           <th className="py-3 px-4">Deleted Record Title / ID</th>
                           <th className="py-3 px-4 text-right">Financial Value</th>
-                          <th className="py-3 px-4">Audit Reason & Consequence</th>
-                          <th className="py-3 px-4 text-center">Snapshot</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
                         {isLoadingAudit ? (
                           <tr>
-                            <td colSpan={6} className="py-12 text-center text-slate-400">
+                            <td colSpan={4} className="py-12 text-center text-slate-400">
                               <div className="inline-flex items-center space-x-2">
                                 <RefreshCw className="w-4 h-4 animate-spin text-forest-900" />
                                 <span>Loading audit records...</span>
@@ -3037,10 +3016,10 @@ export const AdminFinance: React.FC = () => {
                           </tr>
                         ) : !auditData?.logs || auditData.logs.length === 0 ? (
                           <tr>
-                            <td colSpan={6} className="py-12 text-center text-slate-400">
+                            <td colSpan={4} className="py-12 text-center text-slate-400">
                               <Archive className="w-8 h-8 text-slate-300 mx-auto mb-2" />
                               <p className="font-medium text-slate-600">No deleted entries found in this view</p>
-                              <p className="text-[11px] text-slate-400 mt-0.5">Whenever an entry is deleted from any finance tab, its snapshot is permanently archived here.</p>
+                              <p className="text-[11px] text-slate-400 mt-0.5">Whenever an entry is deleted from Offline Selling, Manufacturing, or Shop & Overhead, its full snapshot is preserved here.</p>
                             </td>
                           </tr>
                         ) : (
@@ -3061,6 +3040,24 @@ export const AdminFinance: React.FC = () => {
                               }
                             };
 
+                            const getCleanTitle = () => {
+                              let title = log.entityTitle || 'Untitled Record';
+                              title = title.replace(/\s*\((?:Bill\s*#?|OFF-)[^)]+\)/gi, '');
+                              title = title.replace(/\s*-\s*Batch\s+[^\s(]+/gi, '');
+                              title = title.replace(/#OFF-[0-9-]+/gi, '');
+                              return title.trim() || log.entityTitle || 'Untitled Record';
+                            };
+
+                            const getFormattedId = () => {
+                              let id = log.entityId;
+                              if (!id) return 'N/A';
+                              if (log.entityType === 'OPERATING' && /^[0-9a-fA-F]{24}$/.test(id)) {
+                                const year = new Date(log.createdAt || Date.now()).getFullYear();
+                                return `OVH-${year}-${id.slice(-4).toUpperCase()}`;
+                              }
+                              return id;
+                            };
+
                             return (
                               <tr key={log._id} className="hover:bg-slate-50/80 transition">
                                 <td className="py-3 px-4 font-mono text-[11px] text-slate-600 whitespace-nowrap">
@@ -3071,25 +3068,13 @@ export const AdminFinance: React.FC = () => {
                                   {getCategoryBadge(log.entityType)}
                                 </td>
                                 <td className="py-3 px-4 font-medium text-slate-800">
-                                  <span className="block font-bold text-forest-950">{log.entityTitle || 'Untitled Record'}</span>
-                                  <span className="block text-[10px] text-slate-400 font-mono">ID: {log.entityId}</span>
+                                  <span className="block font-bold text-forest-950">{getCleanTitle()}</span>
+                                  <span className="block text-[10px] text-slate-400 font-mono">ID: {getFormattedId()}</span>
                                 </td>
                                 <td className="py-3 px-4 text-right font-mono font-bold text-xs text-rose-600 whitespace-nowrap">
                                   ₹{Number(log.amount || 0).toLocaleString('en-IN')}
                                 </td>
-                                <td className="py-3 px-4 text-[11px] text-slate-600 max-w-xs">
-                                  <p className="line-clamp-2">{log.reason || 'Record deleted from system'}</p>
-                                </td>
-                                <td className="py-3 px-4 text-center whitespace-nowrap">
-                                  <button
-                                    onClick={() => setSelectedSnapshotForView(log)}
-                                    className="inline-flex items-center space-x-1 px-2.5 py-1.5 rounded-lg bg-forest-50 hover:bg-forest-100 text-forest-900 font-bold text-[11px] transition cursor-pointer"
-                                    title="Inspect saved snapshot"
-                                  >
-                                    <Eye className="w-3.5 h-3.5" />
-                                    <span>Snapshot</span>
-                                  </button>
-                                </td>
+
                               </tr>
                             );
                           })
@@ -4988,7 +4973,7 @@ export const AdminFinance: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="flex items-center space-x-1.5 sm:space-x-2 shrink-0">
+                <div className=" pl-12 flex items-center space-x-1.5 sm:space-x-2 shrink-0">
                   <button
                     type="button"
                     onClick={() => {
@@ -6027,559 +6012,17 @@ export const AdminFinance: React.FC = () => {
         )
       }
 
-      {/* ====================================================================
-          MODAL 13: VIEW DELETED RECORD AUDIT SNAPSHOT (TAB 5)
-          ==================================================================== */}
-      {
-        selectedSnapshotForView && (
-          <div className="space-y-6 w-full animate-fadeIn pb-12">
-            {/* Top Action Nav Bar with Back Button */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-4 sm:p-6 rounded-3xl border border-slate-200/90 shadow-xs">
-              <div className="flex items-center space-x-3 sm:space-x-4">
-                <button
-                  type="button"
-                  onClick={() => setSelectedSnapshotForView(null)}
-                  className="inline-flex items-center space-x-2 px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-xl bg-slate-100 hover:bg-forest-900 hover:text-gold-400 text-slate-700 font-bold text-xs sm:text-sm transition cursor-pointer shadow-xs group"
-                >
-                  <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-                  <span>Back<span className="hidden sm:inline"> to Audit & Deletion Logs</span></span>
-                </button>
-                <div className="h-6 w-px bg-slate-200 hidden sm:block" />
-                <div>
-                  <div className="flex items-center space-x-2">
-                    <span className="p-1.5 bg-forest-900/10 text-forest-900 rounded-lg">
-                      <Archive className="w-5 h-5 text-forest-900" />
-                    </span>
-                    <h2 className="font-serif text-lg sm:text-2xl font-black text-forest-950">
-                      {'Purged Financial Record Snapshot'}
-                    </h2>
-                  </div>
-                  <p className="text-xs text-slate-500 mt-0.5">{selectedSnapshotForView ? `Archived Record ID: ${selectedSnapshotForView._id} • Type: ${selectedSnapshotForView.entityType}` : ''}</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Main Full-Page Content Card */}
-            <div className="bg-[#FDFBF7] rounded-3xl w-full shadow-xs border border-amber-900/15 overflow-hidden">
-              {/* STICKY LUXURY HEADER */}
-              <div className="px-6 py-6 bg-gradient-to-r from-forest-950 via-[#0B2316] to-forest-900 text-white flex items-center justify-between shrink-0 border-b border-gold-400/20 shadow-md">
-                <div className="flex items-center space-x-3.5">
-                  <div className="w-11 h-11 rounded-2xl bg-rose-400/10 border border-rose-400/30 text-rose-300 flex items-center justify-center font-bold shadow-xs shrink-0">
-                    <Archive className="w-5 h-5 text-rose-300" />
-                  </div>
-                  <div>
-                    <div className="flex items-center space-x-2.5 flex-wrap">
-                      <h3 className="font-serif text-lg sm:text-xl font-bold tracking-wide text-white">
-                        Purged Financial Record Snapshot
-                      </h3>
-                      <span className="px-2.5 py-0.5 rounded-full bg-rose-500/20 text-rose-200 border border-rose-400/30 font-bold text-[10px] uppercase tracking-wider">
-                        {selectedSnapshotForView.entityType}
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-slate-300 font-sans mt-0.5 flex items-center space-x-2">
-                      <span>Deleted on {new Date(selectedSnapshotForView.createdAt).toLocaleString('en-IN', {
-                        day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
-                      })}</span>
-                      <span>•</span>
-                      <span>Audit ID: {selectedSnapshotForView._id}</span>
-                    </p>
-                  </div>
-                </div>
-
-                <button
-                  onClick={() => setSelectedSnapshotForView(null)}
-                  className="p-2 text-slate-300 hover:text-white rounded-xl hover:bg-white/10 transition cursor-pointer"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              {/* SCROLLABLE BODY */}
-              <div className="space-y-6 p-5 sm:p-7 space-y-6 bg-[#FCFBF8]">
-
-                {/* 1. TOP PURGE SUMMARY BANNER */}
-                <div className="p-5 bg-rose-50/50 border border-rose-200 rounded-2xl space-y-3">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block font-sans">
-                        Purged Record Title
-                      </span>
-                      <span className="font-bold text-slate-900 text-sm mt-1 block">
-                        {selectedSnapshotForView.entityTitle || 'Untitled Record'}
-                      </span>
-                    </div>
-
-                    <div>
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block font-sans">
-                        Financial Impact Value
-                      </span>
-                      <span className="font-mono font-black text-rose-700 text-xl mt-1 block">
-                        ₹{Number(selectedSnapshotForView.amount || 0).toLocaleString('en-IN')}
-                      </span>
-                    </div>
-                  </div>
-
-                  {selectedSnapshotForView.reason && (
-                    <div className="pt-3 border-t border-rose-200/60 text-xs text-rose-950">
-                      <strong>Audit Consequence:</strong> {selectedSnapshotForView.reason}
-                    </div>
-                  )}
-                </div>
-
-                {/* 2. STRUCTURED SNAPSHOT ATTRIBUTES */}
-                {selectedSnapshotForView.snapshot && (
-                  <div className="space-y-3">
-                    <h4 className="font-serif font-bold text-xs uppercase tracking-wider text-forest-950 flex items-center space-x-2">
-                      <FileText className="w-4 h-4 text-forest-900" />
-                      <span>Preserved Snapshot Attributes & State at Deletion</span>
-                    </h4>
-
-                    <div className="p-5 bg-white rounded-2xl border border-slate-200/90 shadow-xs">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-                        {Object.entries(selectedSnapshotForView.snapshot)
-                          .filter(([k, v]) => !['_id', '__v', 'changeLogs'].includes(k) && typeof v !== 'object')
-                          .map(([key, val]) => (
-                            <div key={key} className="space-y-0.5">
-                              <span className="text-slate-400 font-mono text-[10.5px] block capitalize">
-                                {key.replace(/([A-Z])/g, ' $1')}:
-                              </span>
-                              <span className="font-semibold text-slate-800 break-all">
-                                {String(val)}
-                              </span>
-                            </div>
-                          ))}
-                      </div>
-                    </div>
-
-                    {/* Collapsible Full Raw JSON Technical Inspector */}
-                    <details className="p-4 bg-white rounded-2xl border border-slate-200/90 text-xs group shadow-xs">
-                      <summary className="font-bold text-slate-700 cursor-pointer flex items-center justify-between">
-                        <span>View Technical Raw JSON Payload</span>
-                        <span className="text-[10px] text-slate-400 group-open:rotate-90 transition font-mono">▶</span>
-                      </summary>
-                      <pre className="mt-3 p-4 bg-slate-950 text-emerald-400 rounded-xl font-mono text-[11px] overflow-x-auto max-h-64 leading-relaxed">
-                        {JSON.stringify(selectedSnapshotForView.snapshot, null, 2)}
-                      </pre>
-                    </details>
-                  </div>
-                )}
-
-              </div>
-
-              {/* STICKY LUXURY FOOTER */}
-              <div className="px-6 py-4 bg-white border-t border-slate-200/80 flex items-center justify-between shrink-0">
-                <p className="text-[11px] text-slate-400 font-sans">
-                  Novise Herbal Immutable Audit Vault • Read-Only Preserved Snapshot
-                </p>
-                <button
-                  onClick={() => setSelectedSnapshotForView(null)}
-                  className="px-6 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl cursor-pointer transition text-xs"
-                >
-                  Close Snapshot
-                </button>
-              </div>
-            </div>
-          </div>
-        )
-      }
-
-      {/* ====================================================================
-          1. PRINTABLE REPORT CONTAINER (Direct Print Engine)
-          Hidden on screen, rendered exclusively during window.print()
-          ==================================================================== */}
-      <div className="hidden print:block w-full max-w-5xl mx-auto p-4 sm:p-8 bg-white text-slate-900 font-serif space-y-6 printable-report">
-        {/* Document Header */}
-        <div className="border-b-2 border-forest-950 pb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div>
-            <div className="flex items-center space-x-2">
-              <span className="font-serif text-2xl font-black text-forest-950 tracking-wider">NOVIS HERBAL</span>
-              <span className="text-xs bg-forest-950 text-gold-400 px-2 py-0.5 rounded font-mono font-bold">
-                PVT. LTD.
-              </span>
-            </div>
-            <p className="text-xs text-slate-500 font-sans mt-0.5">
-              Official Merchant Financial & Management Accounting Statement
-            </p>
-          </div>
-
-          <div className="text-right font-sans text-xs space-y-0.5">
-            <p className="font-bold text-forest-950">
-              Statement Scope: <span className="uppercase text-forest-900 font-black">{activeTab}</span>
-            </p>
-            <p className="text-slate-500">Period: <strong className="text-slate-800">{getPeriodLabel()}</strong></p>
-            <p className="text-slate-400 text-[11px] font-mono">Generated: {new Date().toLocaleString('en-IN')}</p>
-          </div>
-        </div>
-
-        {/* Scope-specific Report View */}
-
-        {/* 1. All Tabs Overview Report */}
-        {activeTab === 'overview' && (
-          <div className="space-y-6 font-sans text-xs">
-            {/* Executive KPI Summary */}
-            <div className="grid grid-cols-4 gap-3 text-center">
-              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
-                <span className="text-[10px] uppercase font-bold text-slate-500 block">Total Sales Inflow</span>
-                <span className="font-mono font-bold text-base text-emerald-700 block mt-1">
-                  {formatCurrency(overviewData?.summary?.netSalesInflow)}
-                </span>
-              </div>
-
-              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
-                <span className="text-[10px] uppercase font-bold text-slate-500 block">Manufacturing COGS</span>
-                <span className="font-mono font-bold text-base text-slate-900 block mt-1">
-                  {formatCurrency(overviewData?.summary?.manufacturingSummary?.netManufacturingExpense)}
-                </span>
-              </div>
-
-              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
-                <span className="text-[10px] uppercase font-bold text-slate-500 block">Operating Overhead</span>
-                <span className="font-mono font-bold text-base text-slate-900 block mt-1">
-                  {formatCurrency(overviewData?.summary?.operatingSummary?.totalOperatingExpense)}
-                </span>
-              </div>
-
-              <div className="p-3 bg-forest-900 text-white rounded-xl">
-                <span className="text-[10px] uppercase font-bold text-gold-300 block">Net Business Profit</span>
-                <span className="font-mono font-bold text-base text-gold-400 block mt-1">
-                  {formatCurrency(overviewData?.summary?.netProfit)}
-                </span>
-              </div>
-            </div>
-
-            {/* Summary Ledger Table */}
-            <div>
-              <h4 className="font-serif font-bold text-sm text-forest-950 mb-2">1. Profit & Loss Summary</h4>
-              <table className="w-full text-left border border-slate-200 divide-y divide-slate-200">
-                <thead className="bg-slate-100 font-bold uppercase text-[10px]">
-                  <tr>
-                    <th className="p-2">Component</th>
-                    <th className="p-2 text-right">Inflow (Cr)</th>
-                    <th className="p-2 text-right">Outflow (Dr)</th>
-                    <th className="p-2 text-right">Net</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 font-mono">
-                  <tr>
-                    <td className="p-2 font-sans">Customer Sales (Online Orders + Offline Retail)</td>
-                    <td className="p-2 text-right text-emerald-700 font-bold">₹{overviewData?.summary?.netSalesInflow || 0}</td>
-                    <td className="p-2 text-right text-slate-400">-</td>
-                    <td className="p-2 text-right font-bold text-emerald-700">₹{overviewData?.summary?.netSalesInflow || 0}</td>
-                  </tr>
-                  <tr>
-                    <td className="p-2 font-sans">Product Sourcing & Manufacturing (COGS)</td>
-                    <td className="p-2 text-right text-slate-400">-</td>
-                    <td className="p-2 text-right text-rose-700 font-bold">₹{overviewData?.summary?.manufacturingSummary?.netManufacturingExpense || 0}</td>
-                    <td className="p-2 text-right font-bold text-rose-700">-₹{overviewData?.summary?.manufacturingSummary?.netManufacturingExpense || 0}</td>
-                  </tr>
-                  <tr>
-                    <td className="p-2 font-sans">Shop & Office Overhead (Rent, Light, Staff, Tea)</td>
-                    <td className="p-2 text-right text-slate-400">-</td>
-                    <td className="p-2 text-right text-rose-700 font-bold">₹{overviewData?.summary?.operatingSummary?.totalOperatingExpense || 0}</td>
-                    <td className="p-2 text-right font-bold text-rose-700">-₹{overviewData?.summary?.operatingSummary?.totalOperatingExpense || 0}</td>
-                  </tr>
-                  <tr className="bg-slate-100 font-bold font-sans">
-                    <td className="p-2.5">Consolidated Net Profit (Operating Margin {overviewData?.summary?.netProfitMargin || 0}%)</td>
-                    <td className="p-2.5 text-right font-mono">₹{overviewData?.summary?.netSalesInflow || 0}</td>
-                    <td className="p-2.5 text-right font-mono text-rose-700">₹{overviewData?.summary?.totalOutflow || 0}</td>
-                    <td className="p-2.5 text-right font-mono text-forest-950 text-sm font-black">₹{overviewData?.summary?.netProfit || 0}</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-
-            {/* Pending Positions */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="p-3 border border-slate-200 rounded-xl">
-                <span className="font-bold text-slate-800 block mb-1">Accounts Receivable</span>
-                <p className="text-slate-500 text-[11px]">Pending COD collections in courier transit: <strong className="font-mono text-forest-950 font-bold">₹{overviewData?.summary?.pendingReceivables || 0}</strong></p>
-              </div>
-              <div className="p-3 border border-slate-200 rounded-xl">
-                <span className="font-bold text-slate-800 block mb-1">Accounts Payable</span>
-                <p className="text-slate-500 text-[11px]">Outstanding balance due to suppliers: <strong className="font-mono text-rose-700 font-bold">₹{overviewData?.summary?.outstandingPayables || 0}</strong></p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* 2. Sales Tab Report */}
-        {activeTab === 'sales' && (
-          <div className="space-y-4 font-sans text-xs">
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
-              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
-                <span className="text-[10px] uppercase font-bold text-slate-500">Combined Gross</span>
-                <span className="font-mono font-bold text-base text-forest-950 block mt-1">
-                  ₹{salesData?.overall?.combinedGross ?? salesData?.metrics?.grossSales ?? 0}
-                </span>
-              </div>
-              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
-                <span className="text-[10px] uppercase font-bold text-slate-500">Realized Cashflow</span>
-                <span className="font-mono font-bold text-base text-emerald-700 block mt-1">
-                  ₹{salesData?.overall?.combinedRealized ?? salesData?.metrics?.realizedEarning ?? 0}
-                </span>
-              </div>
-              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
-                <span className="text-[10px] uppercase font-bold text-slate-500">Pending Receivables</span>
-                <span className="font-mono font-bold text-base text-amber-700 block mt-1">
-                  ₹{salesData?.overall?.combinedPendingDue ?? salesData?.metrics?.pendingDue ?? 0}
-                </span>
-              </div>
-              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
-                <span className="text-[10px] uppercase font-bold text-slate-500">Channel Share</span>
-                <span className="font-mono font-bold text-xs text-forest-950 block mt-1">
-                  Web: {salesData?.overall?.onlineSharePercent ?? 0}% • Retail: {salesData?.overall?.offlineSharePercent ?? 0}%
-                </span>
-              </div>
-            </div>
-
-            <div className="border-t border-slate-200 pt-2">
-              <h4 className="font-bold text-xs uppercase text-slate-700 mb-2">
-                {sellingSubTab === 'overall' && `Consolidated Sales Ledger (${consolidatedLedger.length} Records)`}
-                {sellingSubTab === 'online' && `Online E-Commerce Orders (${salesData?.online?.orders?.length || salesData?.orders?.length || 0} Orders)`}
-                {sellingSubTab === 'offline' && `Offline Local Retail Ledger (${salesData?.offline?.sales?.length || salesData?.offlineSales?.length || 0} Invoices)`}
-              </h4>
-
-              <table className="w-full text-left border border-slate-200 divide-y divide-slate-200">
-                <thead className="bg-slate-100 font-bold uppercase text-[10px]">
-                  <tr>
-                    <th className="p-2">ID & Date</th>
-                    <th className="p-2">Channel / Type</th>
-                    <th className="p-2">Customer & Area</th>
-                    <th className="p-2">Payment Mode</th>
-                    <th className="p-2">Status</th>
-                    <th className="p-2 text-right">Amount</th>
-                    <th className="p-2 text-right">Due</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 font-mono">
-                  {sellingSubTab === 'overall' && (
-                    consolidatedLedger.length === 0 ? (
-                      <tr>
-                        <td colSpan={7} className="p-4 text-center text-slate-400 italic font-sans">
-                          No customer sales logged for this period.
-                        </td>
-                      </tr>
-                    ) : (
-                      consolidatedLedger.map((tx: any) => (
-                        <tr key={tx._id}>
-                          <td className="p-2 font-bold text-forest-950">
-                            {tx.displayId}
-                            <span className="block text-[9.5px] text-slate-400 font-sans">{formatDate(tx.date)}</span>
-                          </td>
-                          <td className="p-2 font-sans">
-                            <span className={`px-1.5 py-0.5 rounded text-[9.5px] font-bold ${tx.channel === 'online' ? 'bg-sky-50 text-sky-700 border border-sky-200' : 'bg-emerald-50 text-emerald-800 border border-emerald-200'
-                              }`}>
-                              {tx.channel === 'online' ? 'ONLINE WEB' : 'OFFLINE RETAIL'}
-                            </span>
-                          </td>
-                          <td className="p-2 font-sans font-medium">
-                            {tx.customerName}
-                            {tx.location && <span className="block text-[9.5px] text-slate-400">{tx.location}</span>}
-                          </td>
-                          <td className="p-2">{tx.paymentMethod}</td>
-                          <td className="p-2 font-sans font-bold">{tx.paymentStatus}</td>
-                          <td className="p-2 text-right font-bold text-slate-900">₹{tx.amount || 0}</td>
-                          <td className="p-2 text-right font-bold text-rose-700">{tx.amountDue > 0 ? `₹${tx.amountDue}` : '₹0'}</td>
-                        </tr>
-                      ))
-                    )
-                  )}
-
-                  {sellingSubTab === 'online' && (
-                    (!salesData?.orders || salesData.orders.length === 0) ? (
-                      <tr>
-                        <td colSpan={7} className="p-4 text-center text-slate-400 italic font-sans">
-                          No online store orders logged for this period.
-                        </td>
-                      </tr>
-                    ) : (
-                      salesData.orders.map((o: any) => (
-                        <tr key={o._id}>
-                          <td className="p-2 font-bold text-forest-950">
-                            {o.orderReferenceId || o.orderId}
-                            <span className="block text-[9.5px] text-slate-400 font-sans">{formatDate(o.createdAt)}</span>
-                          </td>
-                          <td className="p-2 font-sans font-bold text-[10px]">ONLINE</td>
-                          <td className="p-2 font-sans font-medium">
-                            {o.shippingAddress?.fullName || 'Online Guest'}
-                            <span className="block text-[9.5px] text-slate-400">{o.shippingAddress?.city}</span>
-                          </td>
-                          <td className="p-2">{o.paymentMethod}</td>
-                          <td className="p-2 font-sans font-bold">{o.paymentStatus}</td>
-                          <td className="p-2 text-right font-bold text-slate-900">₹{o.totalAmount || 0}</td>
-                          <td className="p-2 text-right font-bold text-rose-700">{o.paymentStatus !== 'PAID' ? `₹${o.totalAmount}` : '₹0'}</td>
-                        </tr>
-                      ))
-                    )
-                  )}
-
-                  {sellingSubTab === 'offline' && (
-                    (!salesData?.offline?.sales || salesData.offline.sales.length === 0) ? (
-                      <tr>
-                        <td colSpan={7} className="p-4 text-center text-slate-400 italic font-sans">
-                          No offline retail sales logged for this period.
-                        </td>
-                      </tr>
-                    ) : (
-                      salesData.offline.sales.map((s: any) => (
-                        <tr key={s._id}>
-                          <td className="p-2 font-bold text-forest-950">
-                            {s.saleId}
-                            {s.billNumber && <span className="block text-[9.5px] text-slate-400 font-sans">#{s.billNumber}</span>}
-                          </td>
-                          <td className="p-2 font-sans font-bold text-[10px]">OFFLINE</td>
-                          <td className="p-2 font-sans font-medium">
-                            {s.customerName}
-                            {s.locationArea && <span className="block text-[9.5px] text-slate-400">{s.locationArea}</span>}
-                          </td>
-                          <td className="p-2">{s.paymentMode}</td>
-                          <td className="p-2 font-sans font-bold">{s.paymentStatus}</td>
-                          <td className="p-2 text-right font-bold text-slate-900">₹{s.totalAmount || 0}</td>
-                          <td className="p-2 text-right font-bold text-rose-700">{s.amountDue > 0 ? `₹${s.amountDue}` : '₹0'}</td>
-                        </tr>
-                      ))
-                    )
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {/* 3. Manufacturing Tab Report */}
-        {/* 3. Manufacturing Tab Report */}
-        {
-          activeTab === 'manufacturing' && (
-            <div className="space-y-4 font-sans text-xs">
-              <div className="grid grid-cols-3 gap-3 text-center">
-                <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
-                  <span className="text-[10px] uppercase font-bold text-slate-500">Total Sourcing Cost</span>
-                  <span className="font-mono font-bold text-base text-slate-900 block mt-1">₹{mfgData?.metrics?.totalCost || 0}</span>
-                </div>
-                <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
-                  <span className="text-[10px] uppercase font-bold text-slate-500">Total Paid</span>
-                  <span className="font-mono font-bold text-base text-emerald-700 block mt-1">₹{mfgData?.metrics?.totalPaid || 0}</span>
-                </div>
-                <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
-                  <span className="text-[10px] uppercase font-bold text-slate-500">Outstanding Due</span>
-                  <span className="font-mono font-bold text-base text-rose-700 block mt-1">₹{mfgData?.metrics?.totalDue || 0}</span>
-                </div>
-              </div>
-
-              <table className="w-full text-left border border-slate-200 divide-y divide-slate-200">
-                <thead className="bg-slate-100 font-bold uppercase text-[10px]">
-                  <tr>
-                    <th className="p-2">Batch #</th>
-                    <th className="p-2">Product Name</th>
-                    <th className="p-2">Vendor</th>
-                    <th className="p-2">Qty</th>
-                    <th className="p-2">Total Cost</th>
-                    <th className="p-2">Paid</th>
-                    <th className="p-2">Due</th>
-                    <th className="p-2">Returns</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 font-mono">
-                  {(!mfgData?.entries || mfgData.entries.length === 0) ? (
-                    <tr>
-                      <td colSpan={8} className="p-4 text-center text-slate-400 italic font-sans">
-                        No manufacturing procurement batches logged for this period.
-                      </td>
-                    </tr>
-                  ) : (
-                    mfgData.entries.map((e: any) => (
-                      <tr key={e._id}>
-                        <td className="p-2 font-bold text-forest-950">{e.batchNumber}</td>
-                        <td className="p-2 font-sans font-medium">{e.productName}</td>
-                        <td className="p-2 font-sans">{e.vendorName}</td>
-                        <td className="p-2">{e.quantity}</td>
-                        <td className="p-2 font-bold">₹{e.totalCost}</td>
-                        <td className="p-2 text-emerald-700">₹{e.amountPaid}</td>
-                        <td className="p-2 text-rose-700 font-bold">₹{e.amountDue}</td>
-                        <td className="p-2 text-purple-700">₹{e.totalRefundedFromReturns || 0}</td>
-                      </tr>
-                    ))
-                  )
-                  }
-                </tbody >
-              </table >
-            </div >
-          )}
-
-        {/* 4. Operating Tab Report */}
-        {
-          activeTab === 'operating' && (
-            <div className="space-y-4 font-sans text-xs">
-              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between">
-                <span className="font-bold text-slate-700">Total Overhead Vouchers Logged:</span>
-                <span className="font-mono font-black text-lg text-forest-950">₹{operatingData?.metrics?.totalOperatingExpense || 0}</span>
-              </div>
-
-              <table className="w-full text-left border border-slate-200 divide-y divide-slate-200">
-                <thead className="bg-slate-100 font-bold uppercase text-[10px]">
-                  <tr>
-                    <th className="p-2">Date</th>
-                    <th className="p-2">Category</th>
-                    <th className="p-2">Title</th>
-                    <th className="p-2">Paid To</th>
-                    <th className="p-2">Mode</th>
-                    <th className="p-2 text-right">Amount</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 font-mono">
-                  {(!operatingData?.entries || operatingData.entries.length === 0) ? (
-                    <tr>
-                      <td colSpan={6} className="p-4 text-center text-slate-400 italic font-sans">
-                        No operating overhead expenses logged for this period.
-                      </td>
-                    </tr>
-                  ) : (
-                    operatingData.entries.map((e: any) => (
-                      <tr key={e._id}>
-                        <td className="p-2 text-slate-500 text-[10.5px]">{new Date(e.expenseDate).toLocaleDateString('en-IN')}</td>
-                        <td className="p-2 font-sans font-bold">{e.category}</td>
-                        <td className="p-2 font-sans">{e.title}</td>
-                        <td className="p-2 font-sans">{e.paidTo || 'N/A'}</td>
-                        <td className="p-2">{e.paymentMode}</td>
-                        <td className="p-2 text-right font-bold text-slate-900">₹{e.amount}</td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-        {/* Verification & Sign-off Footer */}
-        <div className="pt-8 border-t border-slate-200 font-sans text-xs flex justify-between items-end">
-          <div>
-            <p className="font-bold text-forest-950">Novise Herbal Finance & Accounting Cell</p>
-            <p className="text-[11px] text-slate-400">Computer generated audit voucher • Valid without physical signature</p>
-          </div>
-          <div className="text-right">
-            <div className="border-b border-slate-400 w-44 pb-1 mb-1"></div>
-            <p className="font-bold text-slate-800">Authorized Signatory</p>
-            <p className="text-[10px] text-slate-400 font-mono">{user?.name || 'Administrator'} ({user?.role || 'Admin'})</p>
-          </div>
-        </div>
-
-
-      </div>
-
+      {/* Global Confirmation Modal for Deletion of Offline Sales, Mfg, and Overhead */}
       <AdminConfirmModal
-        isOpen={!!deleteConfirmation}
-        title={deleteConfirmation?.title || 'Confirm Deletion'}
-        itemBadge={deleteConfirmation?.itemBadge}
+        isOpen={Boolean(deleteConfirmation)}
+        title={deleteConfirmation?.title}
+        message={deleteConfirmation?.message || 'Are you sure you want to delete this record?'}
         itemName={deleteConfirmation?.itemName}
-        message={deleteConfirmation?.message || 'Are you sure you want to permanently delete this record?'}
-        confirmLabel="Yes, Delete Record"
-        cancelLabel="Cancel"
-        variant="danger"
+        itemBadge={deleteConfirmation?.itemBadge}
         isLoading={isDeletingFinanceItem}
-        onClose={() => setDeleteConfirmation(null)}
         onConfirm={handleConfirmDeleteFinanceItem}
+        onClose={() => !isDeletingFinanceItem && setDeleteConfirmation(null)}
       />
-
-    </div >
+    </div>
   );
 };
