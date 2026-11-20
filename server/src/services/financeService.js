@@ -21,12 +21,17 @@ export class FinanceService {
       start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
       end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
     } else if (period === 'week') {
-      start = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      const dayOfWeek = now.getDay();
+      start = new Date(now);
+      start.setDate(now.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
       start.setHours(0, 0, 0, 0);
+      end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
     } else if (period === 'month') {
       start = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+      end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
     } else if (period === 'year') {
       start = new Date(now.getFullYear(), 0, 1, 0, 0, 0, 0);
+      end = new Date(now.getFullYear(), 11, 31, 23, 59, 59, 999);
     } else if (period === 'custom') {
       if (startDate) {
         const parsedStart = new Date(startDate);
@@ -45,19 +50,20 @@ export class FinanceService {
       return {};
     }
 
-    if (start && end) {
-      return { $gte: start, $lte: end };
-    }
-    return {};
+    const filter = {};
+    if (start) filter.$gte = start;
+    if (end) filter.$lte = end;
+    return Object.keys(filter).length > 0 ? filter : {};
   }
 
   // 1. Overall Executive Finance & Consolidated P&L Overview (Tab 1)
   static async getOverview({ period, startDate, endDate }) {
     const dateQuery = this.getDateFilter(period, startDate, endDate);
-    const orderQuery = dateQuery.$gte ? { createdAt: dateQuery } : {};
-    const offlineQuery = dateQuery.$gte ? { saleDate: dateQuery } : {};
-    const mfgQuery = dateQuery.$gte ? { expenseDate: dateQuery } : {};
-    const opQuery = dateQuery.$gte ? { expenseDate: dateQuery } : {};
+    const hasDate = Boolean(dateQuery.$gte || dateQuery.$lte);
+    const orderQuery = hasDate ? { createdAt: dateQuery } : {};
+    const offlineQuery = hasDate ? { saleDate: dateQuery } : {};
+    const mfgQuery = hasDate ? { expenseDate: dateQuery } : {};
+    const opQuery = hasDate ? { expenseDate: dateQuery } : {};
 
     // 1. Sales Data from Online Orders & Offline Retail
     const [orders, offlineSales] = await Promise.all([
@@ -79,7 +85,7 @@ export class FinanceService {
     const offlineRealizedRevenue = offlineSales.reduce((sum, s) => sum + (Number(s.amountPaid) || 0), 0);
     const offlinePendingDue = offlineSales.reduce((sum, s) => sum + (Number(s.amountDue) || 0), 0);
 
-    // Outstanding Receivables: Online COD in-transit + Offline Udhaar/Credit
+    // Outstanding Receivables: Online COD in-transit + Offline Credit/Due
     const onlinePendingReceivables = orders
       .filter(o => o.paymentInfo?.method === 'COD' && o.orderStatus !== 'CANCELLED' && o.orderStatus !== 'DELIVERED' && o.orderStatus !== 'RETURNED')
       .reduce((sum, o) => sum + (Number(o.pricing?.totalAmount) || 0), 0);
@@ -174,8 +180,9 @@ export class FinanceService {
   // 2. Selling Finance (Tab 2)
   static async getSalesFinance({ period, startDate, endDate }) {
     const dateQuery = this.getDateFilter(period, startDate, endDate);
-    const orderQuery = dateQuery.$gte ? { createdAt: dateQuery } : {};
-    const offlineQuery = dateQuery.$gte ? { saleDate: dateQuery } : {};
+    const hasDate = Boolean(dateQuery.$gte || dateQuery.$lte);
+    const orderQuery = hasDate ? { createdAt: dateQuery } : {};
+    const offlineQuery = hasDate ? { saleDate: dateQuery } : {};
 
     const [orders, offlineSales] = await Promise.all([
       Order.find(orderQuery).sort({ createdAt: -1 }),
@@ -197,6 +204,22 @@ export class FinanceService {
 
     const returnedOrders = orders.filter(o => o.orderStatus === 'RETURNED' || o.paymentInfo?.status === 'REFUNDED');
     const onlineReturned = returnedOrders.reduce((sum, o) => sum + (Number(o.pricing?.totalAmount) || 0), 0);
+
+    // Breakdown for Cancelled and Refunded orders
+    const refundedOrdersList = returnedOrders;
+    const refundedValue = onlineReturned;
+    const refundedCount = refundedOrdersList.length;
+
+    const cancelledOrders = orders.filter(o =>
+      ['CANCELLED', 'CANCELLATION_REQUESTED', 'RTO_COMPLETED', 'RETURNED_TO_SELLER'].includes(o.orderStatus) &&
+      o.paymentInfo?.status !== 'REFUNDED' &&
+      o.orderStatus !== 'RETURNED'
+    );
+    const cancelledValue = cancelledOrders.reduce((sum, o) => sum + (Number(o.pricing?.totalAmount) || 0), 0);
+    const cancelledCount = cancelledOrders.length;
+
+    const cancelledAndRefundedValue = refundedValue + cancelledValue;
+    const cancelledAndRefundedCount = refundedCount + cancelledCount;
 
     const onlineShipping = orders.reduce((sum, o) => sum + (Number(o.pricing?.shippingFee) || 0), 0);
 
@@ -246,6 +269,12 @@ export class FinanceService {
           realizedEarning: onlineRealized,
           pendingDue: onlinePendingDue,
           returnedValue: onlineReturned,
+          refundedValue,
+          refundedCount,
+          cancelledValue,
+          cancelledCount,
+          cancelledAndRefundedValue,
+          cancelledAndRefundedCount,
           shippingCollected: onlineShipping,
           netSalesRevenue: onlineRealized
         },
@@ -270,6 +299,12 @@ export class FinanceService {
         realizedEarning: onlineRealized,
         pendingDue: onlinePendingDue,
         returnedValue: onlineReturned,
+        refundedValue,
+        refundedCount,
+        cancelledValue,
+        cancelledCount,
+        cancelledAndRefundedValue,
+        cancelledAndRefundedCount,
         shippingCollected: onlineShipping,
         netSalesRevenue: onlineRealized
       },
@@ -281,7 +316,8 @@ export class FinanceService {
   // 3. Manufacturing & Sourcing (Tab 3)
   static async getManufacturingFinance({ period, startDate, endDate }) {
     const dateQuery = this.getDateFilter(period, startDate, endDate);
-    const mfgQuery = dateQuery.$gte ? { expenseDate: dateQuery } : {};
+    const hasDate = Boolean(dateQuery.$gte || dateQuery.$lte);
+    const mfgQuery = hasDate ? { expenseDate: dateQuery } : {};
 
     const entries = await ManufacturingExpense.find(mfgQuery).sort({ expenseDate: -1 });
 
@@ -312,7 +348,7 @@ export class FinanceService {
   static async createManufacturingExpense(data, user) {
     const qty = Math.max(1, Number(data.quantity) || 1);
     const unitCost = Math.max(0, Number(data.unitCost) || 0);
-    const totalCost = qty * unitCost;
+    const totalCost = (data.totalCost !== undefined && Number(data.totalCost) >= 0) ? Number(data.totalCost) : (qty * unitCost);
     const amountPaid = Math.max(0, Number(data.amountPaid) || 0);
     const amountDue = Math.max(0, totalCost - amountPaid);
 
@@ -320,10 +356,22 @@ export class FinanceService {
     if (amountPaid >= totalCost) paymentStatus = 'PAID';
     else if (amountPaid > 0) paymentStatus = 'PARTIAL';
 
+    let batchNumber = data.batchNumber?.trim();
+    if (!batchNumber) {
+      const count = await ManufacturingExpense.countDocuments();
+      let candidateNum = count + 1;
+      let candidate = `BATCH-${String(candidateNum).padStart(2, '0')}`;
+      while (await ManufacturingExpense.exists({ batchNumber: candidate })) {
+        candidateNum++;
+        candidate = `BATCH-${String(candidateNum).padStart(2, '0')}`;
+      }
+      batchNumber = candidate;
+    }
+
     const entry = new ManufacturingExpense({
       productName: data.productName || 'Herbal Product Batch',
       productId: (data.productId && mongoose.Types.ObjectId.isValid(data.productId)) ? data.productId : undefined,
-      batchNumber: data.batchNumber || `BATCH-${Date.now().toString().slice(-6)}`,
+      batchNumber,
       vendorName: data.vendorName || 'Manufacturing Vendor',
       vendorContact: data.vendorContact || '',
       quantity: qty,
@@ -446,7 +494,7 @@ export class FinanceService {
     const oldQty = entry.quantity;
     const newQty = data.quantity !== undefined ? Math.max(1, Number(data.quantity) || 1) : entry.quantity;
     const newUnitCost = data.unitCost !== undefined ? Math.max(0, Number(data.unitCost) || 0) : entry.unitCost;
-    const calculatedTotal = newQty * newUnitCost;
+    const calculatedTotal = (data.totalCost !== undefined && Number(data.totalCost) >= 0) ? Number(data.totalCost) : (newQty * newUnitCost);
 
     if (newQty !== oldQty) {
       track('quantity', 'Batch Quantity', newQty, (o, n) => `Changed Batch Quantity from ${o} units to ${n} units`);
@@ -557,7 +605,8 @@ export class FinanceService {
   // 4. Operating Overhead Expenses (Tab 4)
   static async getOperatingExpenses({ period, startDate, endDate }) {
     const dateQuery = this.getDateFilter(period, startDate, endDate);
-    const opQuery = dateQuery.$gte ? { expenseDate: dateQuery } : {};
+    const hasDate = Boolean(dateQuery.$gte || dateQuery.$lte);
+    const opQuery = hasDate ? { expenseDate: dateQuery } : {};
 
     const entries = await OperatingExpense.find(opQuery).sort({ expenseDate: -1 });
     const totalOperatingExpense = entries.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
@@ -720,7 +769,8 @@ export class FinanceService {
   // ==========================================
   static async getOfflineSales({ period, startDate, endDate, search }) {
     const dateQuery = this.getDateFilter(period, startDate, endDate);
-    const query = dateQuery.$gte ? { saleDate: dateQuery } : {};
+    const hasDate = Boolean(dateQuery.$gte || dateQuery.$lte);
+    const query = hasDate ? { saleDate: dateQuery } : {};
 
     if (search) {
       query.$or = [
@@ -820,20 +870,68 @@ export class FinanceService {
     return offlineSale;
   }
 
-  static async updateOfflineSalePayment(id, { amountPaid, paymentMode, notes }) {
+  static async updateOfflineSalePayment(id, { paymentAmount, amountPaid, paymentMode, notes }, user) {
     if (!id || !mongoose.Types.ObjectId.isValid(id)) throw new Error('Invalid record ID');
     const sale = await OfflineSale.findById(id);
     if (!sale) throw new Error('Offline sale record not found');
 
-    const newPaid = Math.max(0, Math.min(sale.totalAmount, Number(amountPaid) || 0));
+    let addedPayment = 0;
+    let newPaid = Number(sale.amountPaid) || 0;
+
+    if (paymentAmount !== undefined && paymentAmount !== null && Number(paymentAmount) > 0) {
+      addedPayment = Number(paymentAmount);
+      newPaid = Math.max(0, Math.min(sale.totalAmount, (Number(sale.amountPaid) || 0) + addedPayment));
+    } else if (amountPaid !== undefined && amountPaid !== null && Number(amountPaid) > 0) {
+      const targetPaid = Math.max(0, Math.min(sale.totalAmount, Number(amountPaid)));
+      addedPayment = Math.max(0, targetPaid - (Number(sale.amountPaid) || 0));
+      newPaid = targetPaid;
+    } else {
+      throw new Error('Payment amount must be greater than 0');
+    }
+
+    const previousPaid = sale.amountPaid;
+    const previousDue = sale.amountDue;
+
     sale.amountPaid = newPaid;
     sale.amountDue = Math.max(0, sale.totalAmount - newPaid);
-    if (newPaid >= sale.totalAmount) sale.paymentStatus = 'PAID';
-    else if (newPaid > 0) sale.paymentStatus = 'PARTIAL';
-    else sale.paymentStatus = 'PENDING';
 
-    if (paymentMode) sale.paymentMode = paymentMode;
-    if (notes) sale.notes = (sale.notes ? sale.notes + ' | ' : '') + notes;
+    if (sale.amountDue <= 0) {
+      sale.paymentStatus = 'PAID';
+    } else if (sale.amountPaid > 0) {
+      sale.paymentStatus = 'PARTIAL';
+    } else {
+      sale.paymentStatus = 'PENDING';
+    }
+
+    if (paymentMode) {
+      if (sale.paymentMode === 'CREDIT_UDHAAR' || sale.paymentMode === 'CREDIT' || sale.paymentStatus === 'PAID') {
+        sale.paymentMode = paymentMode;
+      }
+    }
+
+    const noteText = notes ? notes.trim() : '';
+    const paymentLogText = `Collected ₹${addedPayment} via ${paymentMode || sale.paymentMode}${noteText ? ` (${noteText})` : ''} on ${new Date().toLocaleDateString('en-IN')}`;
+    sale.notes = (sale.notes ? sale.notes + ' | ' : '') + paymentLogText;
+
+    if (!Array.isArray(sale.changeLogs)) {
+      sale.changeLogs = [];
+    }
+
+    const adminInfo = {
+      userId: user?._id || user?.id,
+      name: user?.name || 'Administrator',
+      email: user?.email
+    };
+
+    sale.changeLogs.push({
+      field: 'amountPaid',
+      label: 'Payment Collected',
+      oldValue: `₹${previousPaid}`,
+      newValue: `₹${sale.amountPaid}`,
+      description: `Collected payment of ₹${addedPayment} via ${paymentMode || sale.paymentMode}. Balance due is now ₹${sale.amountDue}.`,
+      changedBy: adminInfo,
+      changedAt: new Date()
+    });
 
     await sale.save();
     return sale;
@@ -1050,74 +1148,5 @@ export class FinanceService {
 
     await OfflineSale.findByIdAndDelete(id);
     return { success: true, message: 'Offline sale deleted and stock restored' };
-  }
-
-  // ==========================================
-  // TAB 5: AUDIT & DELETION LOGS
-  // ==========================================
-  static async getFinanceAuditLogs({ page = 1, limit = 10, entityType = 'ALL', search = '', period = 'all', startDate, endDate }) {
-    const pageNum = Math.max(1, parseInt(page) || 1);
-    const pageSize = Math.max(1, parseInt(limit) || 10);
-    const dateQuery = this.getDateFilter(period, startDate, endDate);
-
-    const query = { action: 'DELETED' };
-
-    if (entityType && entityType !== 'ALL') {
-      if (entityType === 'ONLINE_ORDER') {
-        query.entityType = { $in: ['ONLINE_ORDER', 'ORDER'] };
-      } else {
-        query.entityType = entityType;
-      }
-    } else {
-      query.entityType = { $in: ['OFFLINE_SALE', 'ONLINE_ORDER', 'MANUFACTURING', 'OPERATING', 'ORDER'] };
-    }
-
-    if (dateQuery.$gte) {
-      query.createdAt = dateQuery;
-    }
-
-    if (search && search.trim()) {
-      const s = search.trim();
-      query.$or = [
-        { entityId: { $regex: s, $options: 'i' } },
-        { entityTitle: { $regex: s, $options: 'i' } },
-        { 'performedBy.name': { $regex: s, $options: 'i' } },
-        { 'performedBy.email': { $regex: s, $options: 'i' } },
-        { reason: { $regex: s, $options: 'i' } }
-      ];
-    }
-
-    const totalLogs = await AuditLog.countDocuments(query);
-    const logs = await AuditLog.find(query)
-      .sort({ createdAt: -1 })
-      .skip((pageNum - 1) * pageSize)
-      .limit(pageSize);
-
-    // Summary Metrics across all deleted finance records
-    const allDeleted = await AuditLog.find({
-      action: 'DELETED',
-      entityType: { $in: ['OFFLINE_SALE', 'ONLINE_ORDER', 'MANUFACTURING', 'OPERATING', 'ORDER'] }
-    });
-
-    const metrics = {
-      totalDeletions: allDeleted.length,
-      offlineSalesDeleted: allDeleted.filter(d => d.entityType === 'OFFLINE_SALE').length,
-      onlineOrdersDeleted: allDeleted.filter(d => d.entityType === 'ONLINE_ORDER' || d.entityType === 'ORDER').length,
-      mfgBatchesDeleted: allDeleted.filter(d => d.entityType === 'MANUFACTURING').length,
-      operatingExpensesDeleted: allDeleted.filter(d => d.entityType === 'OPERATING').length,
-      totalDeletedValue: allDeleted.reduce((sum, d) => sum + (Number(d.amount) || 0), 0)
-    };
-
-    return {
-      success: true,
-      metrics,
-      logs,
-      pagination: {
-        currentPage: pageNum,
-        totalPages: Math.ceil(totalLogs / pageSize) || 1,
-        totalItems: totalLogs,
-        pageSize
-      }
-    };
   }
 }

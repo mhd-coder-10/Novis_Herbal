@@ -2,6 +2,7 @@ import Order from '../models/Order.js';
 import AuditLog from '../models/AuditLog.js';
 import { sendOrderDispatchedEmail } from './emailService.js';
 import { NotificationService } from './notificationService.js';
+import { realtimeService } from './realtimeService.js';
 
 export class ShippingService {
   /**
@@ -30,8 +31,8 @@ export class ShippingService {
 
     const assignedCourier = (courierName || 'India Post').trim();
     const cleanTrackingNo = trackingNumber.trim();
-    const finalTrackingUrl = (trackingUrl && trackingUrl.trim()) 
-      ? trackingUrl.trim() 
+    const finalTrackingUrl = (trackingUrl && trackingUrl.trim())
+      ? trackingUrl.trim()
       : (process.env.DEFAULT_TRACKING_PORTAL || 'https://www.indiapost.gov.in/');
     const dispatchTime = dispatchedAt ? new Date(dispatchedAt) : new Date();
 
@@ -66,6 +67,13 @@ export class ShippingService {
 
     await order.save();
 
+    // Broadcast live order update to all open client storefronts and admin screens
+    realtimeService.broadcast('ORDER_UPDATED', {
+      orderId: order.orderId,
+      mongoId: order._id,
+      order
+    });
+
     // Send Dispatched Email to Customer with Courier Partner & Tracking Details
     sendOrderDispatchedEmail(order).catch(err => console.error('[Dispatch Email Error]:', err.message));
 
@@ -74,12 +82,12 @@ export class ShippingService {
       userId: order.user,
       userEmail: order.customerDetails?.email,
       type: 'ORDER_DISPATCHED',
-      title: `Order #${order.orderId} Dispatched via ${finalCourier}!`,
-      message: `Your package has been dispatched via ${finalCourier} with Consignment Tracking No: ${cleanTrackingNo}.`,
+      title: `Order #${order.orderId} Dispatched via ${assignedCourier}!`,
+      message: `Your package has been dispatched via ${assignedCourier} with Consignment Tracking No: ${cleanTrackingNo}.`,
       priority: 'HIGH',
       data: {
         orderId: order.orderId,
-        courier: finalCourier,
+        courier: assignedCourier,
         trackingNumber: cleanTrackingNo,
         trackingUrl: finalTrackingUrl
       },
@@ -95,9 +103,9 @@ export class ShippingService {
         email: adminUser?.email,
         role: adminUser?.role
       },
-      details: { 
-        trackingNumber: cleanTrackingNo, 
-        courier: assignedCourier, 
+      details: {
+        trackingNumber: cleanTrackingNo,
+        courier: assignedCourier,
         trackingUrl: finalTrackingUrl,
         dispatchedAt: dispatchTime
       }
@@ -158,6 +166,13 @@ export class ShippingService {
     }
 
     await order.save();
+
+    // Broadcast live order update to all open client storefronts and admin screens
+    realtimeService.broadcast('ORDER_UPDATED', {
+      orderId: order.orderId,
+      mongoId: order._id,
+      order
+    });
 
     if (status === 'DISPATCHED') {
       sendOrderDispatchedEmail(order).catch(err => console.error('[Dispatch Email Error]:', err.message));

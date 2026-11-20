@@ -2,6 +2,17 @@ import { ReviewService } from '../services/reviewService.js';
 import { CloudinaryService } from '../services/cloudinaryService.js';
 import { realtimeService } from '../services/realtimeService.js';
 
+// Get top rated reviews across all products for Home Page
+export const getFeaturedTopReviews = async (req, res) => {
+  try {
+    const limit = req.query.limit || 6;
+    const reviews = await ReviewService.getFeaturedTopReviews(limit);
+    res.json({ success: true, count: reviews.length, reviews });
+  } catch (error) {
+    res.status(error.statusCode || 500).json({ success: false, message: error.message });
+  }
+};
+
 // Get reviews for a product
 export const getProductReviews = async (req, res) => {
   try {

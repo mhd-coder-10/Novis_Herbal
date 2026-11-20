@@ -1,20 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  ShieldCheck, 
-  UserPlus, 
-  KeyRound, 
-  RefreshCw, 
-  Edit3, 
-  Trash2, 
-  Eye, 
-  EyeOff, 
-  Lock, 
-  Mail, 
-  Phone, 
-  User as UserIcon, 
-  CheckCircle2, 
-  AlertCircle, 
-  Check, 
+import {
+  ShieldCheck,
+  UserPlus,
+  KeyRound,
+  RefreshCw,
+  Edit3,
+  Trash2,
+  Eye,
+  EyeOff,
+  Lock,
+  Mail,
+  Phone,
+  User as UserIcon,
+  CheckCircle2,
+  AlertCircle,
+  Check,
   X,
   Shield,
   RotateCcw,
@@ -356,20 +356,18 @@ export const AdminCredentials: React.FC = () => {
                             {admin.phone || '—'}
                           </td>
                           <td className="py-3 px-4">
-                            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase font-mono ${
-                              admin.role === 'admin' 
-                                ? 'bg-amber-100 text-amber-900 border border-amber-300' 
+                            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase font-mono ${admin.role === 'admin'
+                                ? 'bg-amber-100 text-amber-900 border border-amber-300'
                                 : 'bg-emerald-100 text-emerald-900 border border-emerald-300'
-                            }`}>
+                              }`}>
                               {admin.role === 'admin' ? 'Super Admin' : 'Staff'}
                             </span>
                           </td>
                           <td className="py-3 px-4">
-                            <span className={`inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[10px] font-semibold ${
-                              admin.isActive 
-                                ? 'bg-emerald-50 text-emerald-700' 
+                            <span className={`inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[10px] font-semibold ${admin.isActive
+                                ? 'bg-emerald-50 text-emerald-700'
                                 : 'bg-rose-50 text-rose-700'
-                            }`}>
+                              }`}>
                               <span className={`w-1.5 h-1.5 rounded-full ${admin.isActive ? 'bg-emerald-500' : 'bg-rose-500'}`} />
                               <span>{admin.isActive ? 'Active' : 'Disabled'}</span>
                             </span>
@@ -411,484 +409,473 @@ export const AdminCredentials: React.FC = () => {
            ==================================================================== */
         <div className="space-y-6 w-full animate-fadeIn pb-12">
           {/* Top Action Nav Bar with 1-Step Back Button */}
-          <div className="bg-white p-5 sm:p-6 rounded-3xl border border-slate-200/90 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="flex items-center space-x-3.5 sm:space-x-4">
-              <button
-                type="button"
-                onClick={() => setIsCreateModalOpen(false)}
-                className="inline-flex items-center space-x-2 px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-xl bg-slate-100 hover:bg-forest-900 hover:text-gold-400 text-slate-700 font-bold text-xs sm:text-sm transition cursor-pointer shadow-xs group"
-                title="Return to administrator accounts list"
-              >
-                <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-                <span>Back to Administrator Accounts</span>
-              </button>
-              <div className="h-6 w-px bg-slate-200 hidden sm:block" />
-              <div>
-                <div className="flex items-center space-x-2">
-                  <div className="w-9 h-9 rounded-xl bg-forest-900/10 text-forest-900 flex items-center justify-center font-serif text-sm font-bold">
-                    <UserPlus className="w-4 h-4 text-forest-900" />
-                  </div>
-                  <h2 className="font-serif text-xl sm:text-2xl font-black text-forest-950">
-                    Add Administrator / Staff Credential
-                  </h2>
-                </div>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Assign role privileges, system access permissions, and authentication credentials for team members.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center space-x-3">
-              <span className="px-3 py-1 rounded-full text-xs font-bold border uppercase tracking-wider bg-amber-50 text-amber-800 border-amber-200">
-                + New Account
-              </span>
-              <button
-                type="button"
-                onClick={() => setIsCreateModalOpen(false)}
-                className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition cursor-pointer"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-
-          {/* Main Full-Page Form Card */}
-          <div className="bg-white rounded-3xl border border-slate-200/90 p-6 sm:p-8 shadow-xs">
-            <form onSubmit={handleCreateSubmit} className="space-y-6">
-              {/* Role Explainer Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div 
-                  onClick={() => setCreateForm({ ...createForm, role: 'admin' })}
-                  className={`p-4 rounded-2xl border-2 transition cursor-pointer flex items-start space-x-3.5 ${
-                    createForm.role === 'admin' 
-                      ? 'border-forest-900 bg-forest-950/5 ring-1 ring-forest-900/20' 
-                      : 'border-slate-200 bg-slate-50/60 hover:border-slate-300'
-                  }`}
-                >
-                  <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
-                    createForm.role === 'admin' ? 'bg-forest-900 text-gold-400' : 'bg-slate-200 text-slate-600'
-                  }`}>
-                    <ShieldCheck className="w-4 h-4" />
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between">
-                      <h4 className="font-bold text-sm text-forest-950">Super Administrator</h4>
-                      {createForm.role === 'admin' && (
-                        <span className="text-[10px] font-bold bg-forest-900 text-gold-400 px-2 py-0.5 rounded-full uppercase">Selected</span>
-                      )}
-                    </div>
-                    <p className="text-xs text-slate-500 mt-1">
-                      Unrestricted access to all modules: Orders, Products, Finance, Analytics, CMS banners, Customer details, and Security settings.
-                    </p>
-                  </div>
-                </div>
-
-                <div 
-                  onClick={() => setCreateForm({ ...createForm, role: 'staff' })}
-                  className={`p-4 rounded-2xl border-2 transition cursor-pointer flex items-start space-x-3.5 ${
-                    createForm.role === 'staff' 
-                      ? 'border-forest-900 bg-forest-950/5 ring-1 ring-forest-900/20' 
-                      : 'border-slate-200 bg-slate-50/60 hover:border-slate-300'
-                  }`}
-                >
-                  <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
-                    createForm.role === 'staff' ? 'bg-forest-900 text-gold-400' : 'bg-slate-200 text-slate-600'
-                  }`}>
-                    <UserCheck className="w-4 h-4" />
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between">
-                      <h4 className="font-bold text-sm text-forest-950">Store Staff Member</h4>
-                      {createForm.role === 'staff' && (
-                        <span className="text-[10px] font-bold bg-forest-900 text-gold-400 px-2 py-0.5 rounded-full uppercase">Selected</span>
-                      )}
-                    </div>
-                    <p className="text-xs text-slate-500 mt-1">
-                      Operational access for warehouse and order fulfillment teams to update tracking, customer reviews, and order delivery status.
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Form Input Fields Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5 pt-2">
-                <div>
-                  <label className="block text-slate-700 font-bold text-xs uppercase tracking-wider mb-2">
-                    Full Name <span className="text-rose-500">*</span>
-                  </label>
-                  <div className="relative">
-                    <UserIcon className="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
-                    <input
-                      type="text"
-                      required
-                      placeholder="e.g. Rahul Sharma"
-                      value={createForm.name}
-                      onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })}
-                      className="w-full pl-11 pr-4 py-3 border border-slate-200 rounded-2xl bg-white text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-forest-900/20 focus:border-forest-900 transition"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-slate-700 font-bold text-xs uppercase tracking-wider mb-2">
-                    Email Address (Login ID) <span className="text-rose-500">*</span>
-                  </label>
-                  <div className="relative">
-                    <Mail className="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
-                    <input
-                      type="email"
-                      required
-                      placeholder="staff@novise.in"
-                      value={createForm.email}
-                      onChange={(e) => setCreateForm({ ...createForm, email: e.target.value })}
-                      className="w-full pl-11 pr-4 py-3 border border-slate-200 rounded-2xl bg-white text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-forest-900/20 focus:border-forest-900 transition font-mono"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-slate-700 font-bold text-xs uppercase tracking-wider mb-2">
-                    Mobile Number (10 Digits) <span className="text-rose-500">*</span>
-                  </label>
-                  <div className="relative">
-                    <Phone className="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
-                    <input
-                      type="tel"
-                      required
-                      inputMode="numeric"
-                      maxLength={10}
-                      pattern="[6-9][0-9]{9}"
-                      placeholder="9876543210"
-                      value={createForm.phone}
-                      onChange={(e) => setCreateForm({ ...createForm, phone: sanitizePhoneNumber(e.target.value) })}
-                      onKeyDown={handlePhoneKeyDown}
-                      className="w-full pl-11 pr-4 py-3 border border-slate-200 rounded-2xl bg-white text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-forest-900/20 focus:border-forest-900 transition font-mono"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-slate-700 font-bold text-xs uppercase tracking-wider mb-2">
-                    Access Password <span className="text-rose-500">*</span>
-                  </label>
-                  <div className="relative">
-                    <Lock className="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
-                    <input
-                      type={showCreatePassword ? 'text' : 'password'}
-                      required
-                      minLength={6}
-                      placeholder="Minimum 6 characters"
-                      value={createForm.password}
-                      onChange={(e) => setCreateForm({ ...createForm, password: e.target.value })}
-                      className="w-full pl-11 pr-11 py-3 border border-slate-200 rounded-2xl bg-white text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-forest-900/20 focus:border-forest-900 transition"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowCreatePassword(!showCreatePassword)}
-                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
-                      title={showCreatePassword ? 'Hide password' : 'Show password'}
-                    >
-                      {showCreatePassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Action Buttons Bar */}
-              <div className="flex flex-col sm:flex-row items-center justify-end space-y-3 sm:space-y-0 sm:space-x-3 pt-6 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setIsCreateModalOpen(false)}
-                  className="w-full sm:w-auto px-6 py-3 rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 font-bold text-slate-700 text-sm transition cursor-pointer"
-                >
-                  Cancel & Go Back
-                </button>
-                <button
-                  type="submit"
-                  disabled={isCreating}
-                  className="w-full sm:w-auto px-8 py-3 rounded-2xl bg-forest-900 hover:bg-forest-950 text-gold-400 font-bold text-sm transition flex items-center justify-center space-x-2 shadow-lg shadow-forest-900/15 disabled:opacity-50 cursor-pointer"
-                >
-                  <UserPlus className="w-4 h-4 text-gold-400" />
-                  <span>{isCreating ? 'Creating Account...' : 'Create Administrator Account'}</span>
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      ) : isEditModalOpen && selectedAdmin ? (
-        /* ====================================================================
-           DEDICATED FULL-PAGE VIEW: EDIT ADMIN PRIVILEGES
-           ==================================================================== */
-        <div className="space-y-6 w-full animate-fadeIn pb-12">
-          {/* Top Action Nav Bar with 1-Step Back Button */}
-          <div className="bg-white p-5 sm:p-6 rounded-3xl border border-slate-200/90 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="flex items-center space-x-3.5 sm:space-x-4">
-              <button
-                type="button"
-                onClick={() => { setIsEditModalOpen(false); setSelectedAdmin(null); }}
-                className="inline-flex items-center space-x-2 px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-xl bg-slate-100 hover:bg-forest-900 hover:text-gold-400 text-slate-700 font-bold text-xs sm:text-sm transition cursor-pointer shadow-xs group"
-                title="Return to administrator accounts list"
-              >
-                <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-                <span>Back to Administrator Accounts</span>
-              </button>
-              <div className="h-6 w-px bg-slate-200 hidden sm:block" />
-              <div>
-                <div className="flex items-center space-x-2">
-                  <div className="w-9 h-9 rounded-xl bg-forest-900/10 text-forest-900 flex items-center justify-center font-serif text-sm font-bold">
-                    <Edit3 className="w-4 h-4 text-forest-900" />
-                  </div>
-                  <h2 className="font-serif text-xl sm:text-2xl font-black text-forest-950">
-                    Edit Admin Privileges: {selectedAdmin.name}
-                  </h2>
-                </div>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  {selectedAdmin.email} • {selectedAdmin.role === 'admin' ? 'Super Administrator' : 'Staff Member'}
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center space-x-3">
-              <span className={`px-3 py-1 rounded-full text-xs font-bold border uppercase tracking-wider ${
-                editForm.isActive ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-rose-50 text-rose-800 border-rose-200'
-              }`}>
-                {editForm.isActive ? '● Account Active' : '○ Account Disabled'}
-              </span>
-              <button
-                type="button"
-                onClick={() => { setIsEditModalOpen(false); setSelectedAdmin(null); }}
-                className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition cursor-pointer"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-
-          {/* Main Full-Page Form Card */}
-          <div className="bg-white rounded-3xl border border-slate-200/90 p-6 sm:p-8 shadow-xs">
-            <form onSubmit={handleEditSubmit} className="space-y-6">
-              {/* Role Toggle Selector */}
-              <div>
-                <label className="block text-slate-700 font-bold text-xs uppercase tracking-wider mb-2">
-                  System Role & Privileges
-                </label>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div 
-                    onClick={() => setEditForm({ ...editForm, role: 'admin' })}
-                    className={`p-4 rounded-2xl border-2 transition cursor-pointer flex items-start space-x-3.5 ${
-                      editForm.role === 'admin' 
-                        ? 'border-forest-900 bg-forest-950/5 ring-1 ring-forest-900/20' 
-                        : 'border-slate-200 bg-slate-50/60 hover:border-slate-300'
-                    }`}
-                  >
-                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
-                      editForm.role === 'admin' ? 'bg-forest-900 text-gold-400' : 'bg-slate-200 text-slate-600'
-                    }`}>
-                      <ShieldCheck className="w-4 h-4" />
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-center justify-between">
-                        <h4 className="font-bold text-sm text-forest-950">Super Administrator</h4>
-                        {editForm.role === 'admin' && (
-                          <span className="text-[10px] font-bold bg-forest-900 text-gold-400 px-2 py-0.5 rounded-full uppercase">Selected</span>
-                        )}
-                      </div>
-                      <p className="text-xs text-slate-500 mt-1">
-                        Full access to products, finance ledger, order management, settings, and database audits.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div 
-                    onClick={() => setEditForm({ ...editForm, role: 'staff' })}
-                    className={`p-4 rounded-2xl border-2 transition cursor-pointer flex items-start space-x-3.5 ${
-                      editForm.role === 'staff' 
-                        ? 'border-forest-900 bg-forest-950/5 ring-1 ring-forest-900/20' 
-                        : 'border-slate-200 bg-slate-50/60 hover:border-slate-300'
-                    }`}
-                  >
-                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
-                      editForm.role === 'staff' ? 'bg-forest-900 text-gold-400' : 'bg-slate-200 text-slate-600'
-                    }`}>
-                      <UserCheck className="w-4 h-4" />
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-center justify-between">
-                        <h4 className="font-bold text-sm text-forest-950">Store Staff Member</h4>
-                        {editForm.role === 'staff' && (
-                          <span className="text-[10px] font-bold bg-forest-900 text-gold-400 px-2 py-0.5 rounded-full uppercase">Selected</span>
-                        )}
-                      </div>
-                      <p className="text-xs text-slate-500 mt-1">
-                        Access to fulfill orders, inspect return packages, and moderate customer product reviews.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Form Input Fields Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <div>
-                  <label className="block text-slate-700 font-bold text-xs uppercase tracking-wider mb-2">
-                    Full Name <span className="text-rose-500">*</span>
-                  </label>
-                  <div className="relative">
-                    <UserIcon className="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
-                    <input
-                      type="text"
-                      required
-                      value={editForm.name}
-                      onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                      className="w-full pl-11 pr-4 py-3 border border-slate-200 rounded-2xl bg-white text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-forest-900/20 focus:border-forest-900 transition"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-slate-700 font-bold text-xs uppercase tracking-wider mb-2">
-                    Email Address (Login ID) <span className="text-rose-500">*</span>
-                  </label>
-                  <div className="relative">
-                    <Mail className="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
-                    <input
-                      type="email"
-                      required
-                      value={editForm.email}
-                      onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
-                      className="w-full pl-11 pr-4 py-3 border border-slate-200 rounded-2xl bg-white text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-forest-900/20 focus:border-forest-900 transition font-mono"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-slate-700 font-bold text-xs uppercase tracking-wider mb-2">
-                    Mobile Number (10 Digits)
-                  </label>
-                  <div className="relative">
-                    <Phone className="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
-                    <input
-                      type="tel"
-                      inputMode="numeric"
-                      maxLength={10}
-                      pattern="[6-9][0-9]{9}"
-                      placeholder="9876543210"
-                      value={editForm.phone}
-                      onChange={(e) => setEditForm({ ...editForm, phone: sanitizePhoneNumber(e.target.value) })}
-                      onKeyDown={handlePhoneKeyDown}
-                      className="w-full pl-11 pr-4 py-3 border border-slate-200 rounded-2xl bg-white text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-forest-900/20 focus:border-forest-900 transition font-mono"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-slate-700 font-bold text-xs uppercase tracking-wider mb-2">
-                    Account Status
-                  </label>
-                  <div 
-                    onClick={() => setEditForm({ ...editForm, isActive: !editForm.isActive })}
-                    className={`flex items-center space-x-3 p-3 rounded-2xl border cursor-pointer transition ${
-                      editForm.isActive ? 'bg-emerald-50/70 border-emerald-200 text-emerald-900' : 'bg-rose-50/70 border-rose-200 text-rose-900'
-                    }`}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={editForm.isActive}
-                      onChange={(e) => setEditForm({ ...editForm, isActive: e.target.checked })}
-                      className="w-5 h-5 rounded text-forest-900 focus:ring-forest-900 cursor-pointer"
-                    />
-                    <div>
-                      <p className="font-bold text-xs">
-                        {editForm.isActive ? 'Account Active & Permitted to Sign In' : 'Account Disabled (Access Blocked)'}
-                      </p>
-                      <p className="text-[11px] opacity-75">
-                        {editForm.isActive ? 'User can authenticate with their login credentials.' : 'User will be rejected on the login page.'}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Password Reset Section */}
-              <div className="p-5 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-3">
-                <div>
-                  <h4 className="font-serif font-bold text-sm text-forest-950">Change Access Password</h4>
-                  <p className="text-xs text-slate-500">
-                    Leave this blank if you do not want to alter the existing account password.
-                  </p>
-                </div>
-                <div className="relative max-w-md">
-                  <Lock className="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
-                  <input
-                    type={showEditPassword ? 'text' : 'password'}
-                    minLength={6}
-                    placeholder="Enter new password (optional)"
-                    value={editForm.password}
-                    onChange={(e) => setEditForm({ ...editForm, password: e.target.value })}
-                    className="w-full pl-11 pr-11 py-3 border border-slate-200 rounded-2xl bg-white text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-forest-900/20 focus:border-forest-900 transition"
-                  />
+              <div className="bg-white p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-slate-200/90 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 min-w-0">
                   <button
                     type="button"
-                    onClick={() => setShowEditPassword(!showEditPassword)}
-                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
-                    title={showEditPassword ? 'Hide password' : 'Show password'}
+                    onClick={() => setIsCreateModalOpen(false)}
+                    className="inline-flex items-center space-x-2 px-3 py-2 sm:px-4 sm:py-2.5 rounded-xl bg-slate-100 hover:bg-forest-900 hover:text-gold-400 text-slate-700 font-bold text-xs sm:text-sm transition cursor-pointer shadow-xs group w-fit shrink-0"
+                    title="Return to administrator accounts list"
                   >
-                    {showEditPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+                    <span>Back to Admin Accounts</span>
                   </button>
-                </div>
-              </div>
+                    <div className="h-6 w-px bg-slate-200 hidden sm:block shrink-0" />
+                    <div className="min-w-0">
+                      <div className="flex items-center space-x-2">
+                          <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-forest-900/10 text-forest-900 flex items-center justify-center font-serif text-sm font-bold shrink-0">
+                            <UserPlus className="w-4 h-4 text-forest-900" />
+                          </div>
+                            <h2 className="font-serif text-lg sm:text-2xl font-black text-forest-950 truncate">
+                              Add Administrator / Staff
+                            </h2>
+                        </div>
+                          <p className="text-xs text-slate-500 mt-0.5 line-clamp-1 sm:line-clamp-none">
+                            Assign role privileges, system access permissions, and authentication credentials.
+                          </p>
+                      </div>
+                    </div>
 
-              {/* Action Buttons Bar */}
-              <div className="flex flex-col sm:flex-row items-center justify-end space-y-3 sm:space-y-0 sm:space-x-3 pt-6 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => { setIsEditModalOpen(false); setSelectedAdmin(null); }}
-                  className="w-full sm:w-auto px-6 py-3 rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 font-bold text-slate-700 text-sm transition cursor-pointer"
-                >
-                  Cancel & Go Back
-                </button>
-                <button
-                  type="submit"
-                  disabled={isUpdating}
-                  className="w-full sm:w-auto px-8 py-3 rounded-2xl bg-forest-900 hover:bg-forest-950 text-gold-400 font-bold text-sm transition flex items-center justify-center space-x-2 shadow-lg shadow-forest-900/15 disabled:opacity-50 cursor-pointer"
-                >
-                  <Edit3 className="w-4 h-4 text-gold-400" />
-                  <span>{isUpdating ? 'Saving Changes...' : 'Save Privileges & Updates'}</span>
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+                      <div className="flex items-center space-x-3 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100 justify-end">
+                        <span className="px-3 py-1 rounded-full text-xs font-bold border uppercase tracking-wider bg-amber-50 text-amber-800 border-amber-200">
+                          + New Account
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setIsCreateModalOpen(false)}
+                          className="px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Main Full-Page Form Card */}
+                    <div className="bg-white rounded-3xl border border-slate-200/90 p-6 sm:p-8 shadow-xs">
+                      <form onSubmit={handleCreateSubmit} className="space-y-6">
+                        {/* Role Explainer Cards */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div
+                            onClick={() => setCreateForm({ ...createForm, role: 'admin' })}
+                            className={`p-4 rounded-2xl border-2 transition cursor-pointer flex items-start space-x-3.5 ${createForm.role === 'admin'
+                                ? 'border-forest-900 bg-forest-950/5 ring-1 ring-forest-900/20'
+                                : 'border-slate-200 bg-slate-50/60 hover:border-slate-300'
+                              }`}
+                          >
+                            <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${createForm.role === 'admin' ? 'bg-forest-900 text-gold-400' : 'bg-slate-200 text-slate-600'
+                              }`}>
+                              <ShieldCheck className="w-4 h-4" />
+                            </div>
+                            <div className="flex-1">
+                              <div className="flex items-center justify-between">
+                                <h4 className="font-bold text-sm text-forest-950">Super Administrator</h4>
+                                {createForm.role === 'admin' && (
+                                  <span className="text-[10px] font-bold bg-forest-900 text-gold-400 px-2 py-0.5 rounded-full uppercase">Selected</span>
+                                )}
+                              </div>
+                              <p className="text-xs text-slate-500 mt-1">
+                                Unrestricted access to all modules: Orders, Products, Finance, Analytics, CMS banners, Customer details, and Security settings.
+                              </p>
+                            </div>
+                          </div>
+
+                          <div
+                            onClick={() => setCreateForm({ ...createForm, role: 'staff' })}
+                            className={`p-4 rounded-2xl border-2 transition cursor-pointer flex items-start space-x-3.5 ${createForm.role === 'staff'
+                                ? 'border-forest-900 bg-forest-950/5 ring-1 ring-forest-900/20'
+                                : 'border-slate-200 bg-slate-50/60 hover:border-slate-300'
+                              }`}
+                          >
+                            <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${createForm.role === 'staff' ? 'bg-forest-900 text-gold-400' : 'bg-slate-200 text-slate-600'
+                              }`}>
+                              <UserCheck className="w-4 h-4" />
+                            </div>
+                            <div className="flex-1">
+                              <div className="flex items-center justify-between">
+                                <h4 className="font-bold text-sm text-forest-950">Store Staff Member</h4>
+                                {createForm.role === 'staff' && (
+                                  <span className="text-[10px] font-bold bg-forest-900 text-gold-400 px-2 py-0.5 rounded-full uppercase">Selected</span>
+                                )}
+                              </div>
+                              <p className="text-xs text-slate-500 mt-1">
+                                Operational access for warehouse and order fulfillment teams to update tracking, customer reviews, and order delivery status.
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Form Input Fields Grid */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5 pt-2">
+                          <div>
+                            <label className="block text-slate-700 font-bold text-xs uppercase tracking-wider mb-2">
+                              Full Name <span className="text-rose-500">*</span>
+                            </label>
+                            <div className="relative">
+                              <UserIcon className="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
+                              <input
+                                type="text"
+                                required
+                                placeholder="e.g. Rahul Sharma"
+                                value={createForm.name}
+                                onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })}
+                                className="w-full pl-11 pr-4 py-3 border border-slate-200 rounded-2xl bg-white text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-forest-900/20 focus:border-forest-900 transition"
+                              />
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="block text-slate-700 font-bold text-xs uppercase tracking-wider mb-2">
+                              Email Address (Login ID) <span className="text-rose-500">*</span>
+                            </label>
+                            <div className="relative">
+                              <Mail className="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
+                              <input
+                                type="email"
+                                required
+                                placeholder="staff@novise.in"
+                                value={createForm.email}
+                                onChange={(e) => setCreateForm({ ...createForm, email: e.target.value })}
+                                className="w-full pl-11 pr-4 py-3 border border-slate-200 rounded-2xl bg-white text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-forest-900/20 focus:border-forest-900 transition font-mono"
+                              />
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="block text-slate-700 font-bold text-xs uppercase tracking-wider mb-2">
+                              Mobile Number (10 Digits) <span className="text-rose-500">*</span>
+                            </label>
+                            <div className="relative">
+                              <Phone className="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
+                              <input
+                                type="tel"
+                                required
+                                inputMode="numeric"
+                                maxLength={10}
+                                pattern="[6-9][0-9]{9}"
+                                placeholder="9876543210"
+                                value={createForm.phone}
+                                onChange={(e) => setCreateForm({ ...createForm, phone: sanitizePhoneNumber(e.target.value) })}
+                                onKeyDown={handlePhoneKeyDown}
+                                className="w-full pl-11 pr-4 py-3 border border-slate-200 rounded-2xl bg-white text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-forest-900/20 focus:border-forest-900 transition font-mono"
+                              />
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="block text-slate-700 font-bold text-xs uppercase tracking-wider mb-2">
+                              Access Password <span className="text-rose-500">*</span>
+                            </label>
+                            <div className="relative">
+                              <Lock className="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
+                              <input
+                                type={showCreatePassword ? 'text' : 'password'}
+                                required
+                                minLength={6}
+                                placeholder="Minimum 6 characters"
+                                value={createForm.password}
+                                onChange={(e) => setCreateForm({ ...createForm, password: e.target.value })}
+                                className="w-full pl-11 pr-11 py-3 border border-slate-200 rounded-2xl bg-white text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-forest-900/20 focus:border-forest-900 transition"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setShowCreatePassword(!showCreatePassword)}
+                                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
+                                title={showCreatePassword ? 'Hide password' : 'Show password'}
+                              >
+                                {showCreatePassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Action Buttons Bar */}
+                        <div className="flex flex-col sm:flex-row items-center justify-end space-y-3 sm:space-y-0 sm:space-x-3 pt-6 border-t border-slate-100">
+                          <button
+                            type="button"
+                            onClick={() => setIsCreateModalOpen(false)}
+                            className="w-full sm:w-auto px-6 py-3 rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 font-bold text-slate-700 text-sm transition cursor-pointer"
+                          >
+                            Cancel & Go Back
+                          </button>
+                          <button
+                            type="submit"
+                            disabled={isCreating}
+                            className="w-full sm:w-auto px-8 py-3 rounded-2xl bg-forest-900 hover:bg-forest-950 text-gold-400 font-bold text-sm transition flex items-center justify-center space-x-2 shadow-lg shadow-forest-900/15 disabled:opacity-50 cursor-pointer"
+                          >
+                            <UserPlus className="w-4 h-4 text-gold-400" />
+                            <span>{isCreating ? 'Creating Account...' : 'Create Administrator Account'}</span>
+                          </button>
+                        </div>
+                      </form>
+                    </div>
+                  </div>
+                  ) : isEditModalOpen && selectedAdmin ? (
+                  /* ====================================================================
+                     DEDICATED FULL-PAGE VIEW: EDIT ADMIN PRIVILEGES
+                     ==================================================================== */
+                  <div className="space-y-6 w-full animate-fadeIn pb-12">
+                    {/* Top Action Nav Bar with 1-Step Back Button */}
+                    <div className="bg-white p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-slate-200/90 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 min-w-0">
+                        <button
+                          type="button"
+                          onClick={() => { setIsEditModalOpen(false); setSelectedAdmin(null); }}
+                          className="inline-flex items-center space-x-2 px-3 py-2 sm:px-4 sm:py-2.5 rounded-xl bg-slate-100 hover:bg-forest-900 hover:text-gold-400 text-slate-700 font-bold text-xs sm:text-sm transition cursor-pointer shadow-xs group w-fit shrink-0"
+                          title="Return to administrator accounts list"
+                        >
+                          <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+                          <span>Back to Admin Accounts</span>
+                        </button>
+                        <div className="h-6 w-px bg-slate-200 hidden sm:block shrink-0" />
+                        <div className="min-w-0">
+                          <div className="flex items-center space-x-2">
+                            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-forest-900/10 text-forest-900 flex items-center justify-center font-serif text-sm font-bold shrink-0">
+                              <Edit3 className="w-4 h-4 text-forest-900" />
+                            </div>
+                            <h2 className="font-serif text-lg sm:text-2xl font-black text-forest-950 truncate">
+                              Edit Privileges: {selectedAdmin.name}
+                            </h2>
+                          </div>
+                          <p className="text-xs text-slate-500 mt-0.5 truncate">
+                            {selectedAdmin.email} • {selectedAdmin.role === 'admin' ? 'Super Administrator' : 'Staff Member'}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center space-x-3 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100 justify-end">
+                        <span className={`px-2.5 py-1 rounded-full text-xs font-bold border uppercase tracking-wider ${editForm.isActive ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-rose-50 text-rose-800 border-rose-200'}`}>
+                          {editForm.isActive ? '● Active' : '○ Disabled'}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => { setIsEditModalOpen(false); setSelectedAdmin(null); }}
+                          className="px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+
+                              {/* Main Full-Page Form Card */}
+                              <div className="bg-white rounded-3xl border border-slate-200/90 p-6 sm:p-8 shadow-xs">
+                                <form onSubmit={handleEditSubmit} className="space-y-6">
+                                  {/* Role Toggle Selector */}
+                                  <div>
+                                    <label className="block text-slate-700 font-bold text-xs uppercase tracking-wider mb-2">
+                                      System Role & Privileges
+                                    </label>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                      <div
+                                        onClick={() => setEditForm({ ...editForm, role: 'admin' })}
+                                        className={`p-4 rounded-2xl border-2 transition cursor-pointer flex items-start space-x-3.5 ${editForm.role === 'admin'
+                                            ? 'border-forest-900 bg-forest-950/5 ring-1 ring-forest-900/20'
+                                            : 'border-slate-200 bg-slate-50/60 hover:border-slate-300'
+                                          }`}
+                                      >
+                                        <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${editForm.role === 'admin' ? 'bg-forest-900 text-gold-400' : 'bg-slate-200 text-slate-600'
+                                          }`}>
+                                          <ShieldCheck className="w-4 h-4" />
+                                        </div>
+                                        <div className="flex-1">
+                                          <div className="flex items-center justify-between">
+                                            <h4 className="font-bold text-sm text-forest-950">Super Administrator</h4>
+                                            {editForm.role === 'admin' && (
+                                              <span className="text-[10px] font-bold bg-forest-900 text-gold-400 px-2 py-0.5 rounded-full uppercase">Selected</span>
+                                            )}
+                                          </div>
+                                          <p className="text-xs text-slate-500 mt-1">
+                                            Full access to products, finance ledger, order management, settings, and database audits.
+                                          </p>
+                                        </div>
+                                      </div>
+
+                                      <div
+                                        onClick={() => setEditForm({ ...editForm, role: 'staff' })}
+                                        className={`p-4 rounded-2xl border-2 transition cursor-pointer flex items-start space-x-3.5 ${editForm.role === 'staff'
+                                            ? 'border-forest-900 bg-forest-950/5 ring-1 ring-forest-900/20'
+                                            : 'border-slate-200 bg-slate-50/60 hover:border-slate-300'
+                                          }`}
+                                      >
+                                        <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${editForm.role === 'staff' ? 'bg-forest-900 text-gold-400' : 'bg-slate-200 text-slate-600'
+                                          }`}>
+                                          <UserCheck className="w-4 h-4" />
+                                        </div>
+                                        <div className="flex-1">
+                                          <div className="flex items-center justify-between">
+                                            <h4 className="font-bold text-sm text-forest-950">Store Staff Member</h4>
+                                            {editForm.role === 'staff' && (
+                                              <span className="text-[10px] font-bold bg-forest-900 text-gold-400 px-2 py-0.5 rounded-full uppercase">Selected</span>
+                                            )}
+                                          </div>
+                                          <p className="text-xs text-slate-500 mt-1">
+                                            Access to fulfill orders, inspect return packages, and moderate customer product reviews.
+                                          </p>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  {/* Form Input Fields Grid */}
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                    <div>
+                                      <label className="block text-slate-700 font-bold text-xs uppercase tracking-wider mb-2">
+                                        Full Name <span className="text-rose-500">*</span>
+                                      </label>
+                                      <div className="relative">
+                                        <UserIcon className="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
+                                        <input
+                                          type="text"
+                                          required
+                                          value={editForm.name}
+                                          onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                                          className="w-full pl-11 pr-4 py-3 border border-slate-200 rounded-2xl bg-white text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-forest-900/20 focus:border-forest-900 transition"
+                                        />
+                                      </div>
+                                    </div>
+
+                                    <div>
+                                      <label className="block text-slate-700 font-bold text-xs uppercase tracking-wider mb-2">
+                                        Email Address (Login ID) <span className="text-rose-500">*</span>
+                                      </label>
+                                      <div className="relative">
+                                        <Mail className="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
+                                        <input
+                                          type="email"
+                                          required
+                                          value={editForm.email}
+                                          onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                                          className="w-full pl-11 pr-4 py-3 border border-slate-200 rounded-2xl bg-white text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-forest-900/20 focus:border-forest-900 transition font-mono"
+                                        />
+                                      </div>
+                                    </div>
+
+                                    <div>
+                                      <label className="block text-slate-700 font-bold text-xs uppercase tracking-wider mb-2">
+                                        Mobile Number (10 Digits)
+                                      </label>
+                                      <div className="relative">
+                                        <Phone className="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
+                                        <input
+                                          type="tel"
+                                          inputMode="numeric"
+                                          maxLength={10}
+                                          pattern="[6-9][0-9]{9}"
+                                          placeholder="9876543210"
+                                          value={editForm.phone}
+                                          onChange={(e) => setEditForm({ ...editForm, phone: sanitizePhoneNumber(e.target.value) })}
+                                          onKeyDown={handlePhoneKeyDown}
+                                          className="w-full pl-11 pr-4 py-3 border border-slate-200 rounded-2xl bg-white text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-forest-900/20 focus:border-forest-900 transition font-mono"
+                                        />
+                                      </div>
+                                    </div>
+
+                                    <div>
+                                      <label className="block text-slate-700 font-bold text-xs uppercase tracking-wider mb-2">
+                                        Account Status
+                                      </label>
+                                      <div
+                                        onClick={() => setEditForm({ ...editForm, isActive: !editForm.isActive })}
+                                        className={`flex items-center space-x-3 p-3 rounded-2xl border cursor-pointer transition ${editForm.isActive ? 'bg-emerald-50/70 border-emerald-200 text-emerald-900' : 'bg-rose-50/70 border-rose-200 text-rose-900'
+                                          }`}
+                                      >
+                                        <input
+                                          type="checkbox"
+                                          checked={editForm.isActive}
+                                          onChange={(e) => setEditForm({ ...editForm, isActive: e.target.checked })}
+                                          className="w-5 h-5 rounded text-forest-900 focus:ring-forest-900 cursor-pointer"
+                                        />
+                                        <div>
+                                          <p className="font-bold text-xs">
+                                            {editForm.isActive ? 'Account Active & Permitted to Sign In' : 'Account Disabled (Access Blocked)'}
+                                          </p>
+                                          <p className="text-[11px] opacity-75">
+                                            {editForm.isActive ? 'User can authenticate with their login credentials.' : 'User will be rejected on the login page.'}
+                                          </p>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  {/* Password Reset Section */}
+                                  <div className="p-5 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-3">
+                                    <div>
+                                      <h4 className="font-serif font-bold text-sm text-forest-950">Change Access Password</h4>
+                                      <p className="text-xs text-slate-500">
+                                        Leave this blank if you do not want to alter the existing account password.
+                                      </p>
+                                    </div>
+                                    <div className="relative max-w-md">
+                                      <Lock className="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
+                                      <input
+                                        type={showEditPassword ? 'text' : 'password'}
+                                        minLength={6}
+                                        placeholder="Enter new password (optional)"
+                                        value={editForm.password}
+                                        onChange={(e) => setEditForm({ ...editForm, password: e.target.value })}
+                                        className="w-full pl-11 pr-11 py-3 border border-slate-200 rounded-2xl bg-white text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-forest-900/20 focus:border-forest-900 transition"
+                                      />
+                                      <button
+                                        type="button"
+                                        onClick={() => setShowEditPassword(!showEditPassword)}
+                                        className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
+                                        title={showEditPassword ? 'Hide password' : 'Show password'}
+                                      >
+                                        {showEditPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                      </button>
+                                    </div>
+                                  </div>
+
+                                  {/* Action Buttons Bar */}
+                                  <div className="flex flex-col sm:flex-row items-center justify-end space-y-3 sm:space-y-0 sm:space-x-3 pt-6 border-t border-slate-100">
+                                    <button
+                                      type="button"
+                                      onClick={() => { setIsEditModalOpen(false); setSelectedAdmin(null); }}
+                                      className="w-full sm:w-auto px-6 py-3 rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 font-bold text-slate-700 text-sm transition cursor-pointer"
+                                    >
+                                      Cancel & Go Back
+                                    </button>
+                                    <button
+                                      type="submit"
+                                      disabled={isUpdating}
+                                      className="w-full sm:w-auto px-8 py-3 rounded-2xl bg-forest-900 hover:bg-forest-950 text-gold-400 font-bold text-sm transition flex items-center justify-center space-x-2 shadow-lg shadow-forest-900/15 disabled:opacity-50 cursor-pointer"
+                                    >
+                                      <Edit3 className="w-4 h-4 text-gold-400" />
+                                      <span>{isUpdating ? 'Saving Changes...' : 'Save Privileges & Updates'}</span>
+                                    </button>
+                                  </div>
+                                </form>
+                              </div>
+                            </div>
       ) : null}
 
-      {/* Delete Admin Privileges Modal */}
-      <AdminConfirmModal
-        isOpen={!!adminToDelete}
-        title="Revoke Admin Privileges"
-        itemBadge={adminToDelete?.email}
-        itemName={adminToDelete?.name}
-        message="Are you sure you want to remove admin access for this user? They will no longer be able to log into the management console."
-        confirmLabel="Yes, Remove Privileges"
-        cancelLabel="Cancel"
-        variant="danger"
-        isLoading={isDeletingAdmin}
-        onClose={() => setAdminToDelete(null)}
-        onConfirm={handleConfirmDeleteAdmin}
-      />
+                            {/* Delete Admin Privileges Modal */}
+                            <AdminConfirmModal
+                              isOpen={!!adminToDelete}
+                              title="Revoke Admin Privileges"
+                              itemBadge={adminToDelete?.email}
+                              itemName={adminToDelete?.name}
+                              message="Are you sure you want to remove admin access for this user? They will no longer be able to log into the management console."
+                              confirmLabel="Yes, Remove Privileges"
+                              cancelLabel="Cancel"
+                              variant="danger"
+                              isLoading={isDeletingAdmin}
+                              onClose={() => setAdminToDelete(null)}
+                              onConfirm={handleConfirmDeleteAdmin}
+                            />
 
-      {/* Restore Factory Default Admin Modal */}
-      <AdminConfirmModal
-        isOpen={showRestoreModal}
-        title="Restore Factory Super Admin"
-        itemBadge="admin@novise.in"
-        message="Are you sure you want to restore the factory default Super Admin account (admin@novise.in)? If the account password was changed or missing, it will be reset to default."
-        confirmLabel="Restore Super Admin"
-        cancelLabel="Cancel"
-        variant="warning"
-        isLoading={isRestoring}
-        onClose={() => setShowRestoreModal(false)}
-        onConfirm={handleConfirmRestoreDefaultAdmin}
-      />
-    </div>
-  );
+                            {/* Restore Factory Default Admin Modal */}
+                            <AdminConfirmModal
+                              isOpen={showRestoreModal}
+                              title="Restore Factory Super Admin"
+                              itemBadge="admin@novise.in"
+                              message="Are you sure you want to restore the factory default Super Admin account (admin@novise.in)? If the account password was changed or missing, it will be reset to default."
+                              confirmLabel="Restore Super Admin"
+                              cancelLabel="Cancel"
+                              variant="warning"
+                              isLoading={isRestoring}
+                              onClose={() => setShowRestoreModal(false)}
+                              onConfirm={handleConfirmRestoreDefaultAdmin}
+                            />
+                          </div>
+                          );
 };

@@ -49,7 +49,6 @@ export const AdminCMS: React.FC = () => {
     productSlug: '',
     title: '',
     subtitle: '',
-    badge: '',
     buttonText: 'CLAIM OFFER (ADD TO BAG)',
     buttonLink: '/shop',
     imageUrl: '',
@@ -81,8 +80,8 @@ export const AdminCMS: React.FC = () => {
       }
     }
 
-    // 4. By keywords in title, subtitle, badge
-    const text = `${slide.title || ''} ${slide.subtitle || ''} ${slide.badge || ''} ${slide.buttonLink || ''}`.toLowerCase();
+    // 4. By keywords in title, subtitle
+    const text = `${slide.title || ''} ${slide.subtitle || ''} ${slide.buttonLink || ''}`.toLowerCase();
     if (text.includes('combo')) {
       return products.find(p => p.isCombo || p.slug.includes('combo') || p.name.toLowerCase().includes('combo'));
     }
@@ -237,7 +236,6 @@ export const AdminCMS: React.FC = () => {
       productSlug: '',
       title: '',
       subtitle: '',
-      badge: '',
       buttonText: 'CLAIM OFFER (ADD TO BAG)',
       buttonLink: '/shop',
       imageUrl: '',
@@ -263,7 +261,6 @@ export const AdminCMS: React.FC = () => {
       productSlug: '',
       title: '',
       subtitle: '',
-      badge: '',
       buttonText: 'CLAIM OFFER (ADD TO BAG)',
       buttonLink: '/shop',
       imageUrl: '',
@@ -274,7 +271,6 @@ export const AdminCMS: React.FC = () => {
   const handleNewSlideProductChange = (prodId: string) => {
     const p = products.find(x => String(x._id) === String(prodId));
     if (p) {
-      const disc = p.mrp > p.sellingPrice ? Math.round(((p.mrp - p.sellingPrice) / p.mrp) * 100) : 0;
       setNewSlideFile(null);
       setNewSlideForm({
         ...newSlideForm,
@@ -282,7 +278,6 @@ export const AdminCMS: React.FC = () => {
         productSlug: p.slug,
         title: p.name,
         subtitle: p.shortDescription || newSlideForm.subtitle,
-        badge: disc > 0 ? `Flat ${disc}% OFF` : (p.isBestSeller ? 'Bestseller' : 'Pure Botanical Ayurveda'),
         buttonText: newSlideForm.buttonText || 'CLAIM OFFER (ADD TO BAG)',
         buttonLink: `/product/${p.slug}`,
         imageUrl: (p.images && p.images[0]) ? p.images[0] : newSlideForm.imageUrl
@@ -295,7 +290,6 @@ export const AdminCMS: React.FC = () => {
         productSlug: '',
         title: '',
         subtitle: '',
-        badge: '',
         buttonLink: '/shop',
         imageUrl: ''
       });
@@ -359,9 +353,6 @@ export const AdminCMS: React.FC = () => {
       if (!updated[idx].subtitle) {
         updated[idx].subtitle = p.shortDescription || '';
       }
-      if (!updated[idx].badge && disc > 0) {
-        updated[idx].badge = `Flat ${disc}% OFF`;
-      }
       if (!updated[idx].imageUrl || DEFAULT_SLIDE_IMAGES.includes(updated[idx].imageUrl)) {
         if (p.images && p.images[0]) {
           updated[idx].imageUrl = p.images[0];
@@ -382,9 +373,6 @@ export const AdminCMS: React.FC = () => {
     updated[idx].title = p.name;
     if (p.shortDescription) {
       updated[idx].subtitle = p.shortDescription;
-    }
-    if (disc > 0) {
-      updated[idx].badge = `Flat ${disc}% OFF`;
     }
     updated[idx].buttonLink = `/product/${p.slug}`;
     if (p.images && p.images[0]) {
@@ -545,7 +533,7 @@ export const AdminCMS: React.FC = () => {
                 Homepage Hero Carousel Banners
               </h3>
               <p className="text-xs text-slate-500">
-                Customize headline titles, subtitles, promo badges, button links, and banner images for your homepage slider.
+                Customize headline titles, subtitles, button links, and banner images for your homepage slider.
               </p>
             </div>
 
@@ -582,7 +570,7 @@ export const AdminCMS: React.FC = () => {
                   {/* Card Header Bar */}
                   <div className="p-4 sm:p-5 bg-slate-50/70 border-b border-slate-100 flex items-center justify-between">
                     <div className="flex items-center space-x-3">
-                      <div className="w-8 h-8 rounded-xl bg-forest-900 text-gold-400 font-bold text-xs flex items-center justify-center font-mono">
+                      <div className="w-8 h-8 rounded-xl bg-forest-900 text-gold-400 font-bold text-xs flex items-center justify-center font-mono shrink-0 aspect-square">
                         #{idx + 1}
                       </div>
                       <div>
@@ -595,7 +583,7 @@ export const AdminCMS: React.FC = () => {
                           </span>
                         </div>
                         <span className="text-[10px] text-slate-400 font-mono">
-                          Badge: {slide.badge || 'None'} &bull; Target: {slide.buttonLink || '/shop'}
+                          Target: {slide.buttonLink || '/shop'}
                         </span>
                       </div>
                     </div>
@@ -706,24 +694,7 @@ export const AdminCMS: React.FC = () => {
                           />
                         </div>
 
-                        <div>
-                          <label className="block text-slate-700 font-bold mb-1.5">
-                            Highlight Badge Tag
-                          </label>
-                          <input
-                            type="text"
-                            value={slide.badge || ''}
-                            placeholder="e.g. Special Offer, Bestseller"
-                            onChange={(e) => {
-                              const updated = [...formData.heroSlides];
-                              updated[idx].badge = e.target.value;
-                              setFormData({ ...formData, heroSlides: updated });
-                            }}
-                            className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl bg-slate-50/50 focus:bg-white text-slate-900 focus:outline-none focus:ring-1 focus:ring-forest-900"
-                          />
-                        </div>
-
-                        <div>
+                        <div className="sm:col-span-2">
                           <label className="block text-slate-700 font-bold mb-1.5">
                             Button Action Text
                           </label>
@@ -868,11 +839,6 @@ export const AdminCMS: React.FC = () => {
 
                         {/* Slide Content Overlay */}
                         <div className="relative p-4 sm:p-5 text-white space-y-1.5 w-full">
-                          {slide.badge && (
-                            <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-gold-400 text-forest-950 font-mono">
-                              {slide.badge}
-                            </span>
-                          )}
                           <h4 className="font-serif font-black text-base sm:text-lg text-white leading-tight line-clamp-2">
                             {slide.title || 'Slide Title'}
                           </h4>
@@ -1003,20 +969,8 @@ export const AdminCMS: React.FC = () => {
                         />
                       </div>
 
-                      {/* Highlight Badge */}
-                      <div>
-                        <label className="block text-slate-700 font-bold mb-1.5">Highlight Badge Tag</label>
-                        <input
-                          type="text"
-                          value={newSlideForm.badge}
-                          onChange={(e) => setNewSlideForm({ ...newSlideForm, badge: e.target.value })}
-                          placeholder="e.g. Flat 57% OFF, Bestseller"
-                          className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl bg-slate-50/50 focus:bg-white text-slate-900 focus:outline-none focus:ring-1 focus:ring-forest-900"
-                        />
-                      </div>
-
                       {/* Button Action Text */}
-                      <div>
+                      <div className="sm:col-span-2">
                         <label className="block text-slate-700 font-bold mb-1.5">Button Action Text</label>
                         <input
                           type="text"
@@ -1140,11 +1094,6 @@ export const AdminCMS: React.FC = () => {
                       <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/40 to-transparent pointer-events-none" />
 
                       <div className="relative p-4 sm:p-5 text-white space-y-1.5 w-full">
-                        {newSlideForm.badge && (
-                          <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-gold-400 text-forest-950 font-mono">
-                            {newSlideForm.badge}
-                          </span>
-                        )}
                         <h4 className="font-serif font-black text-base sm:text-lg text-white leading-tight line-clamp-2">
                           {newSlideForm.title || 'Headline Title Preview'}
                         </h4>
@@ -1227,7 +1176,8 @@ export const AdminCMS: React.FC = () => {
             )}
           </div>
         </div>
-      )}
+      )
+      }
 
       {/* ====================================================================
           TAB 2: TOP ANNOUNCEMENT BAR

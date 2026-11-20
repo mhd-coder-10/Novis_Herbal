@@ -1,6 +1,7 @@
 import React from 'react';
-import { ShieldCheck, Truck, RotateCcw, Heart, Mail, Phone, PhoneCall, MessageCircle, MapPin } from 'lucide-react';
+import { ShieldCheck, Truck, RotateCcw, Heart, Mail, Phone, PhoneCall, MessageCircle, MapPin, ExternalLink } from 'lucide-react';
 import { useCMSStore } from '../../store/useCMSStore';
+import { useProductStore } from '../../store/useProductStore';
 import { appConfig } from '../../config/appConfig';
 
 interface FooterProps {
@@ -9,6 +10,7 @@ interface FooterProps {
 
 export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
   const { cms } = useCMSStore();
+  const { comboDiscount } = useProductStore();
   const contact = cms?.policies?.contactUs;
 
   return (
@@ -101,7 +103,10 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
                 <button onClick={() => onNavigate('shop')} className="hover:text-white transition">All Products</button>
               </li>
               <li>
-                <button onClick={() => onNavigate('product', 'novise-hair-oil-shampoo-combo')} className="hover:text-white transition text-gold-400 font-semibold">Combo Super Saver Pack (57% OFF)</button>
+                <button onClick={() => onNavigate('marketplaces')} className="hover:text-white transition text-gold-400 font-semibold">Our Marketplaces</button>
+              </li>
+              <li>
+                <button onClick={() => onNavigate('product', 'novise-hair-oil-shampoo-combo')} className="hover:text-white transition text-gold-400 font-semibold">Combo Super Saver Pack ({comboDiscount}% OFF)</button>
               </li>
               <li>
                 <button onClick={() => onNavigate('wishlist')} className="hover:text-white transition">My Wishlist</button>
@@ -181,8 +186,36 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
 
         </div>
 
+        {/* Official Marketplaces Strip */}
+        <div className="pt-8 mt-8 border-t border-forest-900/60 flex flex-col md:flex-row items-center justify-between gap-4 text-xs">
+          <div className="flex items-center space-x-2 text-slate-400 text-center md:text-left">
+            <span className="font-bold text-gold-400">Official Marketplaces:</span>
+            <span>Shop authentic Novis Herbal formulations on your preferred shopping app</span>
+          </div>
+          <div className="flex items-center space-x-3">
+            <a
+              href="https://amzn.in/d/0chVnDi4"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-3.5 py-1.5 rounded-xl bg-forest-900/80 hover:bg-forest-900 text-gold-400 font-bold text-xs border border-gold-500/30 transition flex items-center space-x-1.5 shadow-2xs hover:scale-105"
+            >
+              <span>Amazon India</span>
+              <ExternalLink className="w-3 h-3 text-gold-400" />
+            </a>
+            <a
+              href="https://www.meesho.com/s/p/j3o1hl?utm_source=share_65abc4a8e45f0340a572b9872970274ee3b2eb8dca75c0c37609cd61da6d5498"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-3.5 py-1.5 rounded-xl bg-forest-900/80 hover:bg-forest-900 text-pink-300 font-bold text-xs border border-pink-500/30 transition flex items-center space-x-1.5 shadow-2xs hover:scale-105"
+            >
+              <span>Meesho</span>
+              <ExternalLink className="w-3 h-3 text-pink-400" />
+            </a>
+          </div>
+        </div>
+
         {/* Bottom copyright */}
-        <div className="pt-12 mt-12 border-t border-forest-900/60 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 space-y-4 sm:space-y-0">
+        <div className="pt-6 mt-6 border-t border-forest-900/40 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 space-y-4 sm:space-y-0">
           <p>© {new Date().getFullYear()} NOVIS HERBAL. All Rights Reserved.</p>
           <div className="flex items-center space-x-4">
             <span className="text-slate-400">100% Encrypted SSL Checkout</span>

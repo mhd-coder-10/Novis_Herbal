@@ -10,7 +10,8 @@ export type LiveEventType =
   | 'SETTINGS_UPDATED'
   | 'NOTIFICATION_ADMIN'
   | 'NOTIFICATION_USER'
-  | 'NOTIFICATION_BROADCAST';
+  | 'NOTIFICATION_BROADCAST'
+  | 'NOTIFICATION_DELETED';
 
 export interface LiveSyncMessage {
   type: LiveEventType;
@@ -100,6 +101,15 @@ export const handleIncomingLiveEvent = (type: LiveEventType, payload?: any) => {
 
     case 'NOTIFICATION_BROADCAST': {
       if (payload) {
+        const currentUser = useAuthStore.getState().user;
+        if (currentUser?.createdAt && payload.createdAt) {
+          const userJoined = new Date(currentUser.createdAt).getTime() - 5000;
+          const notifTime = new Date(payload.createdAt).getTime();
+          if (notifTime < userJoined) {
+            // Drop broadcast notifications created before customer registered
+            break;
+          }
+        }
         useNotificationStore.getState().handleIncomingNotification(payload);
       }
       break;
@@ -120,6 +130,16 @@ export const handleIncomingLiveEvent = (type: LiveEventType, payload?: any) => {
         ) {
           useNotificationStore.getState().handleIncomingNotification(payload);
         }
+      }
+      break;
+    }
+
+    case 'NOTIFICATION_DELETED': {
+      if (payload?.clearAll) {
+        useNotificationStore.setState({ notifications: [], unreadCount: 0 });
+      } else if (payload?.id) {
+        useNotificationStore.getState().handleNotificationDeleted(payload.id);
+        window.dispatchEvent(new CustomEvent('novise:notification-deleted', { detail: payload }));
       }
       break;
     }
@@ -247,6 +267,15 @@ export const initRealtimeSync = () => {
         try {
           const data = JSON.parse(e.data);
           handleIncomingLiveEvent('NOTIFICATION_BROADCAST', data);
+        } catch {
+          // ignore
+        }
+      });
+
+      eventSource.addEventListener('NOTIFICATION_DELETED', (e: MessageEvent) => {
+        try {
+          const data = JSON.parse(e.data);
+          handleIncomingLiveEvent('NOTIFICATION_DELETED', data);
         } catch {
           // ignore
         }

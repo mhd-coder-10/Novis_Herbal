@@ -22,7 +22,6 @@ const cmsSchema = new mongoose.Schema({
     buttonText: { type: String, default: 'Shop Now' },
     buttonLink: { type: String, default: '/shop' },
     imageUrl: { type: String, required: true },
-    badge: { type: String },
     isActive: { type: Boolean, default: true },
     order: { type: Number, default: 0 }
   }],
@@ -111,7 +110,9 @@ const cmsSchema = new mongoose.Schema({
     estimatedDeliveryText: { type: String, default: '3-5 Business Days' },
     enableOrderEmails: { type: Boolean, default: true },
     enableStatusUpdateEmails: { type: Boolean, default: true },
-    enableAdminAlerts: { type: Boolean, default: true }
+    enableAdminAlerts: { type: Boolean, default: true },
+    autoNotificationCleanupEnabled: { type: Boolean, default: true },
+    autoNotificationCleanupDays: { type: Number, default: 5, min: 1, max: 90 }
   }
 }, { timestamps: true });
 

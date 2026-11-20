@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { Star, CheckCircle2, ShoppingBag, ArrowRight, MapPin, Sparkles, MessageSquare, ShieldCheck, Truck, RefreshCw, Heart, Lock } from 'lucide-react';
+import { Star, CheckCircle2, ShoppingBag, ArrowRight, MapPin, Sparkles, MessageSquare, ShieldCheck, Truck, RefreshCw, Heart, Lock, Store, ExternalLink } from 'lucide-react';
 import type { Product, Review, ReviewMedia } from '../../types';
 import { useCartStore } from '../../store/useCartStore';
 import { useAuthStore } from '../../store/useAuthStore';
@@ -43,6 +43,7 @@ export const ProductDetailPage: React.FC<ProductDetailProps> = ({ slug, onNaviga
   const [isLoginPromptOpen, setIsLoginPromptOpen] = useState(false);
   const [editingReview, setEditingReview] = useState<Review | null>(null);
   const [lightboxMedia, setLightboxMedia] = useState<ReviewMedia | null>(null);
+  const [marketplaceLinks, setMarketplaceLinks] = useState<any[]>([]);
 
   const inWishlist = product ? isInWishlist(product._id) : false;
 
@@ -55,9 +56,16 @@ export const ProductDetailPage: React.FC<ProductDetailProps> = ({ slug, onNaviga
           setProduct(res.data.product);
           setSelectedImageIndex(0);
 
-          const revRes = await api.get(`/reviews/product/${res.data.product._id}`);
-          if (revRes.data?.success) {
-            setReviews(revRes.data.reviews);
+          const [revRes, mpRes] = await Promise.allSettled([
+            api.get(`/reviews/product/${res.data.product._id}`),
+            api.get(`/marketplaces/product/${res.data.product.slug}`)
+          ]);
+
+          if (revRes.status === 'fulfilled' && revRes.value.data?.success) {
+            setReviews(revRes.value.data.reviews);
+          }
+          if (mpRes.status === 'fulfilled' && mpRes.value.data?.success) {
+            setMarketplaceLinks(mpRes.value.data.links || []);
           }
         }
       } catch (err) {
@@ -89,7 +97,7 @@ export const ProductDetailPage: React.FC<ProductDetailProps> = ({ slug, onNaviga
       const formatted = estDate.toLocaleDateString('en-IN', { weekday: 'short', month: 'short', day: 'numeric' });
       const codNote = appConfig.codFee > 0 ? ` (+₹${appConfig.codFee} COD fee)` : ' (Free COD)';
       const deliveryText = appConfig.estimatedDeliveryText ? ` • ${appConfig.estimatedDeliveryText}` : '';
-      setPincodeStatus(`⚡ Available! Guaranteed delivery by ${formatted}${deliveryText}. Cash on Delivery supported${codNote}.`);
+      setPincodeStatus(`⚡ Available! Estimated delivery by ${formatted}${deliveryText}. Cash on Delivery supported${codNote}.`);
     } else {
       setPincodeStatus('Please enter a valid 6-digit Indian pincode.');
     }
@@ -113,6 +121,12 @@ export const ProductDetailPage: React.FC<ProductDetailProps> = ({ slug, onNaviga
   const handleBuyNow = () => {
     handleAddToCart();
     onDirectCheckout();
+  };
+
+  const handleMarketplaceClick = (marketplaceId: string, linkId?: string) => {
+    if (marketplaceId && linkId) {
+      api.post(`/marketplaces/${marketplaceId}/links/${linkId}/click`).catch(() => { });
+    }
   };
 
   // Find if currently logged in user has already reviewed this product
@@ -373,6 +387,76 @@ export const ProductDetailPage: React.FC<ProductDetailProps> = ({ slug, onNaviga
                 </p>
               )}
             </div>
+
+            {/* Also Available on Marketplaces (Amazon, Meesho, etc.) */}
+            {marketplaceLinks.length > 0 && (
+              <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-amber-50/60 via-white to-amber-50/30 border border-gold-500/35 shadow-xs space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-1.5">
+                    <Store className="w-4 h-4 text-forest-900" />
+                    <span className="text-xs font-black uppercase tracking-wider text-forest-950">
+                      Also Available On Marketplaces
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-bold text-emerald-800 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                    Official Listings
+                  </span>
+                </div>
+
+                <p className="text-[11px] text-slate-500 leading-relaxed">
+                  Prefer ordering via your favorite app? Buy directly from our verified store listings:
+                </p>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-0.5">
+                  {marketplaceLinks.map((mp) => (
+                    <a
+                      key={mp.linkId || mp.marketplaceCode}
+                      href={mp.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={() => handleMarketplaceClick(mp.marketplaceId, mp.linkId)}
+                      className="p-3 rounded-xl border border-slate-200 hover:border-forest-900/40 bg-white hover:bg-amber-50/20 transition-all flex items-center justify-between group shadow-2xs hover:shadow-xs cursor-pointer"
+                    >
+                      <div className="flex items-center space-x-2.5 min-w-0">
+                        <div
+                          className="w-8 h-8 rounded-lg flex items-center justify-center font-black text-xs shrink-0 shadow-2xs overflow-hidden"
+                          style={{
+                            backgroundColor: mp.brandColor || '#FF9900',
+                            color: mp.textColor || '#FFFFFF'
+                          }}
+                        >
+                          {mp.logoUrl ? (
+                            <img
+                              src={mp.logoUrl}
+                              alt={mp.marketplaceName}
+                              className="w-full h-full object-contain p-1"
+                            />
+                          ) : mp.marketplaceCode === 'amazon' ? (
+                            'a'
+                          ) : mp.marketplaceCode === 'meesho' ? (
+                            'M'
+                          ) : (
+                            mp.marketplaceName.charAt(0)
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <span className="font-bold text-xs text-forest-950 block truncate group-hover:text-amber-900 transition">
+                            Buy on {mp.marketplaceName}
+                          </span>
+                          <span className="text-[10px] text-slate-400 block truncate">
+                            {mp.badgeText || 'Verified Partner'}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center text-slate-400 group-hover:text-forest-950 transition pl-2">
+                        <ExternalLink className="w-3.5 h-3.5 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+                      </div>
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Key Clinical Benefits */}
             {product.benefits && product.benefits.length > 0 && (

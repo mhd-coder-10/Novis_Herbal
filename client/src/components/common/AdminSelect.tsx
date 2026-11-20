@@ -193,19 +193,17 @@ export const AdminSelect: React.FC<AdminSelectProps> = ({
         disabled={disabled}
         aria-haspopup="listbox"
         aria-expanded={isOpen}
-        className={`w-full flex items-center justify-between gap-2 bg-[#FAF8F5] hover:bg-white border text-left font-semibold transition cursor-pointer select-none shadow-2xs ${
-          isOpen
+        className={`w-full flex items-center justify-between gap-2 bg-[#FAF8F5] hover:bg-white border text-left font-semibold transition cursor-pointer select-none shadow-2xs ${isOpen
             ? 'border-forest-900 ring-2 ring-forest-900/15 bg-white text-forest-950'
             : 'border-slate-300/80 hover:border-forest-900/50 text-slate-800'
-        } ${disabled ? 'opacity-60 cursor-not-allowed bg-slate-100' : ''} ${sizeClasses}`}
+          } ${disabled ? 'opacity-60 cursor-not-allowed bg-slate-100' : ''} ${sizeClasses}`}
       >
         <span className="flex items-center space-x-2 truncate">
-          {LeadingIcon && (
-            <LeadingIcon className="w-3.5 h-3.5 text-forest-800 shrink-0" />
-          )}
-          {selectedOption?.icon && (
-            <selectedOption.icon className="w-3.5 h-3.5 text-forest-800 shrink-0" />
-          )}
+            { selectedOption?.icon ? (
+              <selectedOption.icon className="w-3.5 h-3.5 text-forest-800 shrink-0" />
+            ) : LeadingIcon ? (
+              <LeadingIcon className="w-3.5 h-3.5 text-forest-800 shrink-0" />
+          ) : null}
           <span className="truncate">
             {selectedOption ? selectedOption.label : placeholder}
           </span>
@@ -218,9 +216,8 @@ export const AdminSelect: React.FC<AdminSelectProps> = ({
             </span>
           )}
           <ChevronDown
-            className={`w-3.5 h-3.5 text-slate-500 transition-transform duration-200 ${
-              isOpen ? 'rotate-180 text-forest-900' : ''
-            }`}
+            className={`w-3.5 h-3.5 text-slate-500 transition-transform duration-200 ${isOpen ? 'rotate-180 text-forest-900' : ''
+              }`}
           />
         </span>
       </button>
@@ -296,18 +293,16 @@ export const AdminSelect: React.FC<AdminSelectProps> = ({
                       role="option"
                       aria-selected={isSelected}
                       onClick={() => handleSelectOption(opt.value)}
-                      className={`w-full flex items-center justify-between px-3 py-2 text-xs rounded-xl text-left transition cursor-pointer select-none group ${
-                        isSelected
+                      className={`w-full flex items-center justify-between px-3 py-2 text-xs rounded-xl text-left transition cursor-pointer select-none group ${isSelected
                           ? 'bg-forest-900/10 text-forest-950 font-bold'
                           : 'text-slate-700 hover:bg-[#FAF8F5] hover:text-forest-950 font-medium'
-                      }`}
+                        }`}
                     >
                       <div className="flex items-center space-x-2 truncate">
                         {OptionIcon && (
                           <OptionIcon
-                            className={`w-3.5 h-3.5 shrink-0 ${
-                              isSelected ? 'text-forest-900' : 'text-slate-400 group-hover:text-forest-800'
-                            }`}
+                            className={`w-3.5 h-3.5 shrink-0 ${isSelected ? 'text-forest-900' : 'text-slate-400 group-hover:text-forest-800'
+                              }`}
                           />
                         )}
                         <div className="truncate">
@@ -323,11 +318,10 @@ export const AdminSelect: React.FC<AdminSelectProps> = ({
                       <div className="flex items-center space-x-1.5 shrink-0 pl-2">
                         {opt.badge && (
                           <span
-                            className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${
-                              isSelected
+                            className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${isSelected
                                 ? 'bg-forest-900 text-gold-300 font-bold'
                                 : 'bg-slate-100 text-slate-500'
-                            }`}
+                              }`}
                           >
                             {opt.badge}
                           </span>

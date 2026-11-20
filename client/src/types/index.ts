@@ -179,30 +179,30 @@ export interface Order {
   };
   paymentMethod?: 'COD' | 'ONLINE' | 'UPI' | 'NET_BANKING';
   paymentStatus?: 'PENDING' | 'PAID' | 'FAILED' | 'REFUNDED' | 'NOT_APPLICABLE' | 'CANCELLED';
-  orderStatus: 
-    | 'PLACED'
-    | 'CONFIRMED'
-    | 'PROCESSING'
-    | 'PACKED'
-    | 'SHIPMENT_BOOKED'
-    | 'PICKED_UP'
-    | 'IN_TRANSIT'
-    | 'OUT_FOR_DELIVERY'
-    | 'DELIVERED'
-    | 'DELIVERY_FAILED'
-    | 'CANCELLED'
-    | 'CANCELLATION_REQUESTED'
-    | 'RTO_INITIATED'
-    | 'IN_TRANSIT_TO_SELLER'
-    | 'RTO_IN_TRANSIT'
-    | 'RETURNED_TO_SELLER'
-    | 'RTO_COMPLETED'
-    | 'RTO'
-    | 'REFUND_PENDING'
-    | 'REFUND_INITIATED'
-    | 'REFUND_PROCESSING'
-    | 'REFUNDED'
-    | 'REFUND_FAILED';
+  orderStatus:
+  | 'PLACED'
+  | 'CONFIRMED'
+  | 'PROCESSING'
+  | 'PACKED'
+  | 'SHIPMENT_BOOKED'
+  | 'PICKED_UP'
+  | 'IN_TRANSIT'
+  | 'OUT_FOR_DELIVERY'
+  | 'DELIVERED'
+  | 'DELIVERY_FAILED'
+  | 'CANCELLED'
+  | 'CANCELLATION_REQUESTED'
+  | 'RTO_INITIATED'
+  | 'IN_TRANSIT_TO_SELLER'
+  | 'RTO_IN_TRANSIT'
+  | 'RETURNED_TO_SELLER'
+  | 'RTO_COMPLETED'
+  | 'RTO'
+  | 'REFUND_PENDING'
+  | 'REFUND_INITIATED'
+  | 'REFUND_PROCESSING'
+  | 'REFUNDED'
+  | 'REFUND_FAILED';
   isNonReturnable?: boolean;
   cancellation?: OrderCancellation;
   complaint?: OrderComplaint;
@@ -259,6 +259,8 @@ export interface NotificationItem {
   data?: Record<string, any>;
   actionUrl?: string;
   isRead: boolean;
+  readAt?: string;
+  isDismissed?: boolean;
   createdAt: string;
 }
 
@@ -277,6 +279,7 @@ export interface User {
   avatar?: string;
   addresses?: AddressItem[];
   wishlist?: string[];
+  createdAt?: string;
 }
 
 export interface CMSData {
@@ -296,7 +299,6 @@ export interface CMSData {
     buttonText: string;
     buttonLink: string;
     imageUrl: string;
-    badge?: string;
     isActive: boolean;
     order: number;
   }[];
@@ -396,3 +398,41 @@ export interface Review {
   createdAt: string;
   updatedAt?: string;
 }
+
+export interface MarketplaceProductLink {
+  _id?: string;
+  product: string | { _id: string; name: string; slug: string; sku?: string; images?: string[]; sellingPrice?: number; mrp?: number };
+  productName: string;
+  productSlug: string;
+  productSku?: string;
+  imageUrl?: string;
+  url: string;
+  badgeText?: string;
+  priceNote?: string;
+  inStock: boolean;
+  isActive: boolean;
+  clicks?: number;
+  lastClickedAt?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface Marketplace {
+  _id: string;
+  name: string;
+  code: string;
+  tagline?: string;
+  brandColor: string;
+  textColor?: string;
+  bgColor?: string;
+  iconType: string;
+  logoUrl?: string;
+  storeUrl?: string;
+  badgeText?: string;
+  displayOrder: number;
+  isActive: boolean;
+  products: MarketplaceProductLink[];
+  createdAt?: string;
+  updatedAt?: string;
+}
+

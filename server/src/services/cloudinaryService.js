@@ -154,18 +154,17 @@ export class CloudinaryService {
   }
 
   /**
-   * 5. Upload Order Complaint / Damage Report Video to 'Order_Report_Videos'
-   * Cloudinary folder: Order_Report_Videos
+   * 5. Upload Order Complaint / Damage Report Video to 'NOVISE_HERBAL/Order_Report_Videos'
+   * Cloudinary folder: NOVISE_HERBAL/Order_Report_Videos
    */
   static async uploadReportVideo(buffer, originalname = 'report_video.mp4', orderId = '') {
     const parsed = path.parse(originalname);
     const cleanName = parsed.name.replace(/[^a-zA-Z0-9_-]/g, '_').toLowerCase();
     const cleanOrder = (orderId || '').replace(/[^a-zA-Z0-9_-]/g, '_');
     const publicId = `report_${cleanOrder ? cleanOrder + '_' : ''}${cleanName}_${Date.now()}`;
-    const folderName = `${process.env.CLOUDINARY_FOLDER || 'NOVISE_HERBAL'}/Order_Report_Videos`;
 
     const result = await uploadStream(buffer, {
-      folder: folderName,
+      folder: 'NOVISE_HERBAL/Order_Report_Videos',
       public_id: publicId,
       resource_type: 'video',
       overwrite: false

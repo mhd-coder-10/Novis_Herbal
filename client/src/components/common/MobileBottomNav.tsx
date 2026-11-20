@@ -9,7 +9,7 @@ interface MobileBottomNavProps {
 }
 
 export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ currentPage, onNavigate }) => {
-  const { items, openCart } = useCartStore();
+  const { items } = useCartStore();
   const { items: wishlistItems } = useWishlistStore();
   const totalQuantity = items.reduce((sum, i) => sum + i.quantity, 0);
 
@@ -52,14 +52,14 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ currentPage, o
       id: 'cart',
       label: 'Bag',
       icon: ShoppingCart,
-      action: openCart,
+      action: () => onNavigate('cart'),
       badgeCount: totalQuantity,
-      isActive: false
+      isActive: currentPage === 'cart'
     }
   ];
 
   return (
-    <nav 
+    <nav
       aria-label="Mobile Navigation"
       className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200/80 shadow-[0_-4px_20px_rgba(0,0,0,0.07)] lg:hidden"
     >
@@ -70,29 +70,26 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ currentPage, o
             <button
               key={tab.id}
               onClick={tab.action}
-              className={`relative flex flex-col items-center justify-center py-1 transition-all ${
-                tab.isActive
+              className={`relative flex flex-col items-center justify-center py-1 transition-all ${tab.isActive
                   ? 'text-forest-900 font-extrabold'
                   : 'text-slate-500 font-medium hover:text-forest-900'
-              }`}
+                }`}
             >
               {/* Counter Badge */}
               {typeof tab.badgeCount === 'number' && tab.badgeCount > 0 && (
-                <span className={`absolute -top-1 right-2 sm:right-4 text-[9px] font-black w-4 h-4 rounded-full flex items-center justify-center shadow-md ${
-                  tab.id === 'wishlist' ? 'bg-rose-500 text-white' : 'bg-forest-900 text-gold-400 animate-bounce'
-                }`}>
+                <span className={`absolute -top-1 right-2 sm:right-4 text-[9px] font-black w-4 h-4 rounded-full flex items-center justify-center shadow-md ${tab.id === 'wishlist' ? 'bg-rose-500 text-white' : 'bg-forest-900 text-gold-400 animate-bounce'
+                  }`}>
                   {tab.badgeCount}
                 </span>
               )}
 
-              <Icon 
-                className={`w-5 h-5 transition-transform ${
-                  tab.isActive 
-                    ? 'scale-110 text-forest-900' 
-                    : tab.id === 'wishlist' && wishlistItems.length > 0 
-                    ? 'fill-rose-500 text-rose-500' 
-                    : 'text-slate-500'
-                }`} 
+              <Icon
+                className={`w-5 h-5 transition-transform ${tab.isActive
+                    ? 'scale-110 text-forest-900'
+                    : tab.id === 'wishlist' && wishlistItems.length > 0
+                      ? 'fill-rose-500 text-rose-500'
+                      : 'text-slate-500'
+                  }`}
               />
               <span className="text-[10px] mt-0.5 tracking-tight leading-none">
                 {tab.label}

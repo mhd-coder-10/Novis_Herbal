@@ -3,6 +3,7 @@ import User from '../models/User.js';
 import { sendOtpEmail, sendPasswordResetOtpEmail } from './emailService.js';
 import { CloudinaryService } from './cloudinaryService.js';
 import { sanitizePhoneNumber, isValidIndianPhone } from '../utils/phoneValidation.js';
+import { NotificationService } from './notificationService.js';
 
 export class AuthService {
   static generateToken(id) {
@@ -119,7 +120,8 @@ export class AuthService {
           phone: user.phone,
           role: user.role,
           addresses: user.addresses,
-          wishlist: user.wishlist
+          wishlist: user.wishlist,
+          createdAt: user.createdAt
         }
       };
     }
@@ -148,6 +150,27 @@ export class AuthService {
     user.otpExpires = undefined;
     await user.save();
 
+    // 1. Welcome In-App Notification to Customer
+    NotificationService.notifyUser({
+      userId: user._id,
+      userEmail: user.email,
+      type: 'WELCOME',
+      title: 'Welcome to Novis Herbal! 🌿',
+      message: `Welcome ${user.name}! Your account is now verified. Explore 100% pure Ayurvedic botanical remedies for healthy hair.`,
+      priority: 'NORMAL',
+      actionUrl: '/shop'
+    }).catch(err => console.error('[Welcome Notification Error]:', err.message));
+
+    // 2. Alert to Store Admin
+    NotificationService.notifyAdmin({
+      type: 'NEW_CUSTOMER',
+      title: `New Customer Signup: ${user.name}`,
+      message: `${user.name} (${user.email}) registered and verified their account.`,
+      priority: 'NORMAL',
+      data: { userId: user._id, email: user.email, name: user.name },
+      actionUrl: '/admin?tab=customers'
+    }).catch(err => console.error('[Admin Notification Error]:', err.message));
+
     const token = this.generateToken(user._id);
 
     return {
@@ -161,7 +184,8 @@ export class AuthService {
         role: user.role,
         addresses: user.addresses,
         wishlist: user.wishlist,
-        avatar: user.avatar || ''
+        avatar: user.avatar || '',
+        createdAt: user.createdAt
       }
     };
   }
@@ -257,7 +281,8 @@ export class AuthService {
         role: user.role,
         addresses: user.addresses,
         wishlist: user.wishlist,
-        avatar: user.avatar || ''
+        avatar: user.avatar || '',
+        createdAt: user.createdAt
       }
     };
   }
@@ -277,7 +302,8 @@ export class AuthService {
       role: user.role,
       avatar: user.avatar || '',
       addresses: (user.addresses || []).slice(0, 1),
-      wishlist: user.wishlist || []
+      wishlist: user.wishlist || [],
+      createdAt: user.createdAt
     };
   }
 

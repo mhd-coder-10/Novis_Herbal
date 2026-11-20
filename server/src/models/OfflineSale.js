@@ -34,7 +34,7 @@ const offlineSaleSchema = new mongoose.Schema({
   amountDue: { type: Number, required: true, min: 0, default: 0 },
   paymentMode: {
     type: String,
-    enum: ['CASH', 'UPI', 'BANK_TRANSFER', 'CREDIT_UDHAAR'],
+    enum: ['CASH', 'UPI', 'BANK_TRANSFER', 'CREDIT_UDHAAR', 'CREDIT'],
     default: 'CASH'
   },
   paymentStatus: {

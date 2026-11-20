@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { ShoppingBag, Search, User, Menu, X, Shield, Sparkles, MapPin, Phone, PhoneCall, MessageCircle, ArrowRight, Package, Info, CheckCircle2, Heart, Mail, LogOut, ChevronRight, Bell } from 'lucide-react';
+import { ShoppingBag, Search, User, Menu, X, Shield, Sparkles, MapPin, Phone, PhoneCall, MessageCircle, ArrowRight, Package, Info, CheckCircle2, Heart, Mail, LogOut, ChevronRight, Bell, Globe } from 'lucide-react';
 import { useCartStore } from '../../store/useCartStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useWishlistStore } from '../../store/useWishlistStore';
 import { useCMSStore } from '../../store/useCMSStore';
 import { useNotificationStore } from '../../store/useNotificationStore';
+import { useProductStore } from '../../store/useProductStore';
 import { PublicNotificationDropdown } from './PublicNotificationDropdown';
 import { appConfig } from '../../config/appConfig';
 import { getFullImageUrl } from '../../services/api';
@@ -17,10 +18,11 @@ interface NavbarProps {
 }
 
 export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage, pageParam }) => {
-  const { items, openCart } = useCartStore();
+  const { items } = useCartStore();
   const { items: wishlistItems } = useWishlistStore();
   const { user, isAuthenticated, logout } = useAuthStore();
   const { cms } = useCMSStore();
+  const { comboDiscount } = useProductStore();
   const { unreadCount: notificationUnreadCount, openDrawer: openNotificationDrawer, fetchUserNotifications } = useNotificationStore();
 
   useEffect(() => {
@@ -186,7 +188,21 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage, pagePar
             className="ml-1 text-amber-950 font-extrabold text-xs px-3.5 py-1.5 rounded-full bg-gradient-to-r from-amber-50 via-amber-100 to-amber-50 border border-amber-300/80 hover:border-amber-400 hover:shadow-xs transition-all flex items-center space-x-1.5 shadow-xs outline-none focus:outline-none"
           >
             <Sparkles className="w-3.5 h-3.5 text-amber-600 animate-pulse" />
-            <span>Combo Kit (57% OFF)</span>
+            <span>Combo Kit ({comboDiscount}% OFF)</span>
+          </button>
+
+          <button
+            onClick={() => onNavigate('marketplaces')}
+            className={`relative px-3.5 py-1.5 rounded-full text-xs font-bold tracking-wide transition-all duration-200 outline-none focus:outline-none flex items-center space-x-1.5 ${currentPage === 'marketplaces'
+              ? 'text-forest-950 bg-forest-900/8 shadow-xs'
+              : 'text-stone-600 hover:text-forest-950 hover:bg-forest-900/5'
+              }`}
+          >
+            <Globe className="w-3.5 h-3.5 text-emerald-700" />
+            <span>Marketplaces</span>
+            {currentPage === 'marketplaces' && (
+              <span className="absolute bottom-0 left-3 right-3 h-[2px] bg-forest-900 rounded-full" />
+            )}
           </button>
 
           <button
@@ -524,7 +540,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage, pagePar
 
           {/* Shopping Cart Button with Live Counter Badge (Desktop Only - Mobile has it in Bottom Navigation) */}
           <button
-            onClick={openCart}
+            onClick={() => onNavigate('cart')}
             className="hidden sm:flex relative p-2 sm:p-2.5 bg-forest-950 text-white rounded-full hover:bg-forest-900 transition shadow-md shadow-forest-950/15 items-center justify-center group shrink-0"
             aria-label="Open Shopping Bag"
           >
@@ -655,7 +671,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage, pagePar
               >
                 <div className="flex items-center space-x-2">
                   <Sparkles className="w-4 h-4 text-amber-600" />
-                  <span>Combo Kit</span>
+                  <span>Combo Kit ({comboDiscount}% OFF)</span>
                 </div>
                 <ArrowRight className="w-3.5 h-3.5 text-slate-400" />
               </button>
@@ -671,6 +687,21 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage, pagePar
                 <div className="flex items-center space-x-2">
                   <Heart className={`w-4 h-4 ${wishlistItems.length > 0 ? 'fill-rose-500 text-rose-500' : 'text-forest-800'}`} />
                   <span>My Wishlist ({wishlistItems.length})</span>
+                </div>
+                <ArrowRight className="w-3.5 h-3.5 text-slate-400" />
+              </button>
+
+              <button
+                onClick={() => {
+                  onNavigate('marketplaces');
+                  setIsMobileMenuOpen(false);
+                }}
+                className={`w-full text-left px-3.5 py-2.5 rounded-xl transition flex items-center justify-between ${currentPage === 'marketplaces' ? 'bg-forest-900/10 text-forest-950 font-bold' : 'hover:bg-slate-50'
+                  }`}
+              >
+                <div className="flex items-center space-x-2">
+                  <Globe className="w-4 h-4 text-emerald-700" />
+                  <span>Our Marketplaces</span>
                 </div>
                 <ArrowRight className="w-3.5 h-3.5 text-slate-400" />
               </button>

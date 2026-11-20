@@ -42,12 +42,10 @@ export const useCartStore = create<CartState>()(
                 ? { ...i, quantity: i.quantity + addQty }
                 : i
             ),
-            isOpen: true,
           });
         } else {
           set({
             items: [...items, { ...newItem, quantity: addQty }],
-            isOpen: true,
           });
         }
         toast.success(`${newItem.name} added to your bag`, 'Added to Bag');

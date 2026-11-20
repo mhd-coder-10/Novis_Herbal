@@ -1,5 +1,6 @@
 import express from 'express';
 import { 
+  getFeaturedTopReviews,
   getProductReviews,
   getMyReviews,
   submitReview,
@@ -15,6 +16,8 @@ import { uploadReviewMedia } from '../middleware/upload.js';
 const router = express.Router();
 
 // Public routes
+router.get('/featured', getFeaturedTopReviews);
+router.get('/top', getFeaturedTopReviews);
 router.get('/product/:productId', getProductReviews);
 
 // Customer protected routes

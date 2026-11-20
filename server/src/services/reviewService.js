@@ -1,9 +1,19 @@
 import Review from '../models/Review.js';
 import Product from '../models/Product.js';
+import User from '../models/User.js';
 import { CloudinaryService } from './cloudinaryService.js';
 import { NotificationService } from './notificationService.js';
 
 export class ReviewService {
+  // Get top rated approved reviews across all products for Home Page
+  static async getFeaturedTopReviews(limit = 6) {
+    return await Review.find({ isApproved: true })
+      .populate('product', 'name slug images sellingPrice volumeText')
+      .populate('user', 'name avatar')
+      .sort({ rating: -1, createdAt: -1 })
+      .limit(Number(limit) || 6);
+  }
+
   // Get approved reviews for a specific product
   static async getProductReviews(productId) {
     return await Review.find({
@@ -83,6 +93,17 @@ export class ReviewService {
       data: { reviewId: review._id, rating: numRating, productId },
       actionUrl: '/admin?tab=reviews'
     }).catch(err => console.error('[Notification Admin Error]:', err.message));
+
+    // Notify Customer that their review is published live
+    NotificationService.notifyUser({
+      userId: user._id || user.id,
+      userEmail: user.email,
+      type: 'REVIEW_POSTED',
+      title: 'Review Published Successfully! ⭐',
+      message: `Thank you for reviewing! Your feedback has been published and helps the botanical community.`,
+      priority: 'NORMAL',
+      actionUrl: `/shop`
+    }).catch(err => console.error('[Customer Notification Error]:', err.message));
 
     return review;
   }

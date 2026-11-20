@@ -146,7 +146,7 @@ export const updateOfflineSale = async (req, res) => {
 
 export const updateOfflineSalePayment = async (req, res) => {
   try {
-    const sale = await FinanceService.updateOfflineSalePayment(req.params.id, req.body);
+    const sale = await FinanceService.updateOfflineSalePayment(req.params.id, req.body, req.user);
     res.json({ success: true, sale, message: 'Payment status updated' });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -157,18 +157,6 @@ export const deleteOfflineSale = async (req, res) => {
   try {
     const result = await FinanceService.deleteOfflineSale(req.params.id, req.user);
     res.json(result);
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
-};
-
-// ==========================================
-// TAB 5: AUDIT & DELETION LOGS
-// ==========================================
-export const getFinanceAuditLogs = async (req, res) => {
-  try {
-    const data = await FinanceService.getFinanceAuditLogs(req.query);
-    res.json(data);
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

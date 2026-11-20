@@ -220,7 +220,7 @@ const orderSchema = new mongoose.Schema({
     rejectionReason: { type: String },
     resolutionType: {
       type: String,
-      enum: ['NONE', 'REFUND'],
+      enum: ['NONE', 'REFUND', 'REPLACEMENT'],
       default: 'NONE'
     },
     resolutionNotes: { type: String },

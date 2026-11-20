@@ -18,29 +18,31 @@ export class OrderService {
     const year = new Date().getFullYear();
     const prefix = `NOV-${year}-`;
 
-    // 1. Find the highest existing sequential orderId for the current year
-    const lastOrder = await Order.findOne(
+    // 1. Find all existing orders for the current year to accurately determine the highest number
+    const existingOrders = await Order.find(
       { orderId: new RegExp(`^${prefix}\\d+$`) },
-      { orderId: 1 },
-      { sort: { orderId: -1 } }
+      { orderId: 1 }
     ).lean();
 
-    let nextNumber = 1001;
-    if (lastOrder && lastOrder.orderId) {
-      const match = lastOrder.orderId.match(new RegExp(`^${prefix}(\\d+)$`));
-      if (match && match[1]) {
-        const lastNum = parseInt(match[1], 10);
-        if (!isNaN(lastNum)) {
-          nextNumber = Math.max(nextNumber, lastNum + 1);
+    let maxNum = 0;
+    for (const ord of existingOrders) {
+      if (ord.orderId) {
+        const match = ord.orderId.match(new RegExp(`^${prefix}(\\d+)$`));
+        if (match && match[1]) {
+          const num = parseInt(match[1], 10);
+          if (!isNaN(num) && num > maxNum) {
+            maxNum = num;
+          }
         }
       }
     }
 
-    // 2. Ensure candidate ID is completely unique (prevents race condition collisions)
-    let candidate = `${prefix}${String(nextNumber).padStart(5, '0')}`;
+    // 2. Format with 2-digit padding: NOV-2026-01, NOV-2026-02... up to NOV-2026-18, NOV-2026-19
+    let nextNumber = maxNum + 1;
+    let candidate = `${prefix}${String(nextNumber).padStart(2, '0')}`;
     while (await Order.exists({ orderId: candidate })) {
       nextNumber++;
-      candidate = `${prefix}${String(nextNumber).padStart(5, '0')}`;
+      candidate = `${prefix}${String(nextNumber).padStart(2, '0')}`;
     }
 
     return candidate;
@@ -456,13 +458,16 @@ export class OrderService {
         const start = new Date(now);
         start.setDate(now.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
         start.setHours(0, 0, 0, 0);
-        query.createdAt = { $gte: start, $lte: now };
+        const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+        query.createdAt = { $gte: start, $lte: end };
       } else if (period === 'THIS_MONTH') {
         const start = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
-        query.createdAt = { $gte: start, $lte: now };
+        const end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+        query.createdAt = { $gte: start, $lte: end };
       } else if (period === 'THIS_YEAR') {
         const start = new Date(now.getFullYear(), 0, 1, 0, 0, 0, 0);
-        query.createdAt = { $gte: start, $lte: now };
+        const end = new Date(now.getFullYear(), 11, 31, 23, 59, 59, 999);
+        query.createdAt = { $gte: start, $lte: end };
       }
     }
 
@@ -648,8 +653,30 @@ export class OrderService {
       newState: { status: order.orderStatus }
     });
 
-    // Send Courier Dispatch Email with tracking details to Customer via Nodemailer ONLY when DISPATCHED
-    if (status === 'DISPATCHED') {
+    // Customer In-App Notifications based on fulfillment status transitions
+    if (status === 'CONFIRMED') {
+      NotificationService.notifyUser({
+        userId: order.user,
+        userEmail: order.customerDetails?.email,
+        type: 'ORDER_CONFIRMED',
+        title: `Order #${order.orderId} Confirmed!`,
+        message: `Your order #${order.orderId} is confirmed and queued for packing.`,
+        priority: 'NORMAL',
+        data: { orderId: order.orderId },
+        actionUrl: '/my-orders'
+      }).catch(err => console.error('[Customer Notification Error]:', err.message));
+    } else if (status === 'PACKED') {
+      NotificationService.notifyUser({
+        userId: order.user,
+        userEmail: order.customerDetails?.email,
+        type: 'ORDER_PACKED',
+        title: `Order #${order.orderId} Packed & Sealed!`,
+        message: `Your order #${order.orderId} has been carefully inspected, packed, and is ready for courier handover.`,
+        priority: 'NORMAL',
+        data: { orderId: order.orderId },
+        actionUrl: '/my-orders'
+      }).catch(err => console.error('[Customer Notification Error]:', err.message));
+    } else if (status === 'DISPATCHED') {
       sendOrderDispatchedEmail(order, note).catch(err => console.error('[Dispatch Email Error]:', err.message));
       NotificationService.notifyUser({
         userId: order.user,
@@ -664,6 +691,17 @@ export class OrderService {
           trackingNumber: order.shipment?.awbCode || order.shipment?.trackingNumber,
           trackingUrl: order.shipment?.trackingUrl
         },
+        actionUrl: '/my-orders'
+      }).catch(err => console.error('[Customer Notification Error]:', err.message));
+    } else if (status === 'OUT_FOR_DELIVERY') {
+      NotificationService.notifyUser({
+        userId: order.user,
+        userEmail: order.customerDetails?.email,
+        type: 'ORDER_OUT_FOR_DELIVERY',
+        title: `Out for Delivery: #${order.orderId}!`,
+        message: `Good news! Your Novis Herbal parcel #${order.orderId} is out for delivery with the courier executive today.`,
+        priority: 'HIGH',
+        data: { orderId: order.orderId },
         actionUrl: '/my-orders'
       }).catch(err => console.error('[Customer Notification Error]:', err.message));
     } else if (status === 'DELIVERED') {
@@ -1276,7 +1314,7 @@ export class OrderService {
     order.trackingTimeline.push({
       status: order.orderStatus,
       title: 'Complaint Video Removed',
-      description: `Report verification video was permanently deleted from Cloudinary folder Order_Report_Videos by ${adminUser?.email || 'ADMIN'}`,
+      description: `Report verification video was permanently deleted from Cloudinary folder NOVISE_HERBAL/Order_Report_Videos by ${adminUser?.email || 'ADMIN'}`,
       timestamp: new Date(),
       updatedBy: adminUser?.email || 'ADMIN'
     });

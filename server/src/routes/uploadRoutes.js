@@ -20,9 +20,12 @@ router.post('/', protect, authorize('admin', 'staff'), upload.single('image'), a
     const isHeroBanner = req.body.folder === 'Hero_Banner' || req.body.type === 'hero-banner';
     const oldImageUrl = req.body.oldImageUrl || null;
 
-    const uploadResult = isHeroBanner
-      ? await CloudinaryService.uploadHeroBanner(req.file.buffer, req.file.originalname, oldImageUrl)
-      : await CloudinaryService.uploadProductImage(req.file.buffer, req.file.originalname);
+    let uploadResult;
+    if (isHeroBanner) {
+      uploadResult = await CloudinaryService.uploadHeroBanner(req.file.buffer, req.file.originalname, oldImageUrl);
+    } else {
+      uploadResult = await CloudinaryService.uploadProductImage(req.file.buffer, req.file.originalname);
+    }
 
     res.json({
       success: true,
@@ -195,7 +198,7 @@ router.delete('/avatar', protect, async (req, res) => {
 
 /**
  * @route POST /api/upload/complaint-video
- * @desc Customer Order Damage/Missing Item Report Video Upload to Cloudinary (Order_Report_Videos)
+ * @desc Customer Order Damage/Missing Item Report Video Upload to Cloudinary (NOVISE_HERBAL/Order_Report_Videos)
  * @access Customer (Protected)
  */
 router.post('/complaint-video', protect, uploadComplaintVideo.single('video'), async (req, res) => {

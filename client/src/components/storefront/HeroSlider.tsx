@@ -5,7 +5,6 @@ import {
   ShieldCheck,
   ShoppingBag,
   Star,
-  CheckCircle,
   Truck,
   Heart,
   ChevronLeft,
@@ -99,26 +98,23 @@ export const HeroSlider: React.FC<HeroProps> = ({ onNavigate, products: propProd
   const defaultHeroSlides = [
     {
       title: 'The Complete Hair & Scalp Restoration Ritual',
-      subtitle: 'Overnight root strengthening with Ayurvedic Growth Oil + Morning anti-fungal clarifying shampoo. Save instantly on our best-selling synergistic kit.',
+      subtitle: 'Overnight root strengthening with Ayurvedic Growth Oil + Morning anti-dandruff clarifying shampoo. Save instantly on our best-selling synergistic kit.',
       buttonText: 'CLAIM OFFER (ADD TO BAG)',
       buttonLink: '/shop',
-      badge: 'Flat 57% OFF on Combos',
       imageUrl: 'https://res.cloudinary.com/ipb9jst1/image/upload/v1793361823/NOVISE_HERBAL/products/novise_combo_1.jpg'
     },
     {
       title: 'Scalp Clarifying Anti-Dandruff & Itch Relief Shampoo',
-      subtitle: 'Targeted anti-fungal formula combining Ketoconazole 1%, Australian Tea Tree Oil & Salicylic Acid. Gently exfoliates without stripping natural hair moisture.',
+      subtitle: 'Targeted anti-dandruff formula combining Zinc Pyrithione, Australian Tea Tree Oil & Salicylic Acid. Gently exfoliates flakes without stripping natural hair moisture.',
       buttonText: 'CLAIM OFFER (ADD TO BAG)',
       buttonLink: '/product/novise-anti-dandruff-shampoo',
-      badge: 'Dermatologically Tested',
       imageUrl: 'https://res.cloudinary.com/ipb9jst1/image/upload/v1793361817/NOVISE_HERBAL/products/novise_shampoo_1.jpg'
     },
     {
-      title: 'Clinically Formulated 14-Day Hair Fall Control Oil',
-      subtitle: 'Crafted with 18 sacred Ayurvedic botanicals including Rosemary Oil, Redensyl, and Bhringraj to awaken dormant follicles and boost new dense hair growth.',
+      title: 'Ayurvedic Hair Fall Control & Deep Root Nourishing Oil',
+      subtitle: 'Crafted with 20 traditional cold-pressed botanicals including Rosemary, Bhringraj, and Redensyl to nourish hair follicles and support stronger, resilient hair strands.',
       buttonText: 'CLAIM OFFER (ADD TO BAG)',
       buttonLink: '/product/novise-ayurvedic-hair-growth-oil',
-      badge: '100% Natural Formulation',
       imageUrl: 'https://res.cloudinary.com/ipb9jst1/image/upload/v1793361811/NOVISE_HERBAL/products/novise_hair_oil_1.jpg'
     }
   ];
@@ -178,14 +174,12 @@ export const HeroSlider: React.FC<HeroProps> = ({ onNavigate, products: propProd
       tabTitle = 'Ayurvedic Hair Growth Oil';
     } else if (matchedProduct?.name) {
       tabTitle = matchedProduct.name.length > 24 ? `${matchedProduct.name.slice(0, 22)}...` : matchedProduct.name;
-    } else if (slide.badge) {
-      tabTitle = slide.badge;
     } else if (slide.title) {
       tabTitle = slide.title.length > 22 ? `${slide.title.slice(0, 20)}...` : slide.title;
     }
 
     const tabLabel = `${idx + 1}. ${tabTitle}`;
-    const discountBadge = disc > 0 ? `${disc}% OFF` : (slide.badge || 'OFFER');
+    const discountBadge = disc > 0 ? `${disc}% OFF` : 'OFFER';
 
     const defaultImg = idx === 0
       ? 'https://res.cloudinary.com/ipb9jst1/image/upload/v1793361823/NOVISE_HERBAL/products/novise_combo_1.jpg'
@@ -197,22 +191,21 @@ export const HeroSlider: React.FC<HeroProps> = ({ onNavigate, products: propProd
       id: matchedProduct?._id || `slide-${idx}`,
       sku: matchedProduct?.sku || (idx === 0 ? 'NOV-CMB-001' : (idx === 1 ? 'NOV-SHM-250' : 'NOV-OIL-200')),
       slug: matchedProduct?.slug || 'novise-hair-oil-shampoo-combo',
-      tag: slide.badge || (disc > 0 ? `${disc}% OFF • BOTANICAL AYURVEDA` : 'BOTANICAL AYURVEDA'),
+      tag: disc > 0 ? `${disc}% OFF • BOTANICAL AYURVEDA` : 'BOTANICAL AYURVEDA',
       tabLabel,
       discountBadge,
       title: slide.title || matchedProduct?.name || 'Pure Botanical Scalp & Hair Care',
-      subtitle: slide.subtitle || matchedProduct?.shortDescription || 'Synergistic botanical actives to arrest hair fall and eliminate stubborn flakes.',
+      subtitle: slide.subtitle || matchedProduct?.shortDescription || 'Synergistic botanical actives to nourish hair roots and clarify stubborn flakes.',
       mrp,
       price,
       discountPercent: disc,
       discountText: disc > 0 ? `Save ₹${mrp - price} (${disc}% OFF)` : '',
       volume: matchedProduct?.volumeText || (idx === 0 ? '200 ML Oil + 250 ML Shampoo' : (idx === 1 ? '250 ML Bottle' : '200 ML Precision Dropper')),
       image: getSafeImage(slide.imageUrl, matchedProduct?.images?.[0], defaultImg),
-      rating: matchedProduct?.averageRating ? matchedProduct.averageRating.toFixed(1) : '4.9',
-      reviews: matchedProduct?.numReviews ? `${matchedProduct.numReviews}+` : '280+',
-      highlights: (matchedProduct?.benefits && matchedProduct.benefits.length > 0) ? matchedProduct.benefits.slice(0, 3) : ['100% Cold-Pressed Ayurvedic Herbs', 'Visible Results in 14 Days', 'Zero Sulfates & Harsh Chemicals'],
-      badgeFloat1: slide.badge ? `✨ ${slide.badge}` : '✨ 100% Pure Botanical Ayurveda',
-      badgeFloat2: '🛡️ Clinically Proven Results',
+      rating: (matchedProduct?.averageRating !== undefined && matchedProduct.averageRating > 0)
+        ? matchedProduct.averageRating.toFixed(1)
+        : '5.0',
+      reviews: typeof matchedProduct?.numReviews === 'number' ? matchedProduct.numReviews : 0,
       buttonText: slide.buttonText || 'CLAIM OFFER (ADD TO BAG)',
       buttonLink: slide.buttonLink || '/shop'
     };
@@ -322,28 +315,6 @@ export const HeroSlider: React.FC<HeroProps> = ({ onNavigate, products: propProd
               </div>
             </div>
 
-            {/* Mobile Metric Badges strip */}
-            <div className="flex sm:hidden flex-wrap items-center justify-center gap-1.5 mt-2.5 w-full">
-              <span className="bg-white/10 backdrop-blur-md text-white border border-white/20 text-[10px] font-bold px-2.5 py-1 rounded-full">
-                {current.badgeFloat1}
-              </span>
-              <span className="bg-white/10 backdrop-blur-md text-white border border-white/20 text-[10px] font-bold px-2.5 py-1 rounded-full">
-                {current.badgeFloat2}
-              </span>
-            </div>
-
-            {/* Desktop Floating Metric Badge 1 (Top Left) */}
-            <div className="hidden sm:flex absolute top-2 left-2 bg-white/95 backdrop-blur-md text-forest-950 px-3.5 py-2 rounded-2xl shadow-xl border border-white/40 items-center space-x-2 text-xs font-bold animate-float">
-              <span className="text-sm">✨</span>
-              <span>{current.badgeFloat1}</span>
-            </div>
-
-            {/* Desktop Floating Metric Badge 2 (Bottom Right) */}
-            <div className="hidden sm:flex absolute bottom-2 right-2 bg-white/95 backdrop-blur-md text-forest-950 px-3.5 py-2 rounded-2xl shadow-xl border border-white/40 items-center space-x-2 text-xs font-bold animate-float" style={{ animationDelay: '2s' }}>
-              <span className="text-sm">🛡️</span>
-              <span>{current.badgeFloat2}</span>
-            </div>
-
           </div>
 
           {/* Left Column (Editorial Content & CTAs) */}
@@ -365,16 +336,6 @@ export const HeroSlider: React.FC<HeroProps> = ({ onNavigate, products: propProd
               {current.subtitle}
             </p>
 
-            {/* Highlights checkmarks */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-2.5 pt-1 text-xs text-slate-200">
-              {current.highlights.map((h, i) => (
-                <div key={i} className="flex items-center space-x-2">
-                  <CheckCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gold-400 shrink-0" />
-                  <span>{h}</span>
-                </div>
-              ))}
-            </div>
-
             {/* Pricing Box & Savings Strip */}
             <div className="p-3.5 sm:p-5 rounded-2xl bg-white/5 backdrop-blur-md border border-white/10 flex flex-wrap items-center justify-between gap-3 sm:gap-4 max-w-xl">
               <div>
@@ -393,7 +354,9 @@ export const HeroSlider: React.FC<HeroProps> = ({ onNavigate, products: propProd
               <div className="flex items-center space-x-1.5 text-xs text-amber-400 bg-amber-400/10 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl border border-amber-400/20">
                 <Star className="w-3.5 h-3.5 fill-current text-amber-400" />
                 <span className="font-bold text-white">{current.rating}</span>
-                <span className="text-slate-400 text-[11px]">({current.reviews})</span>
+                <span className="text-slate-400 text-[11px]">
+                  ({current.reviews} {current.reviews === 1 ? 'review' : 'reviews'})
+                </span>
               </div>
             </div>
 

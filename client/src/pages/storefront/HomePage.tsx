@@ -57,7 +57,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
             </span>
             <span className="flex items-center justify-center space-x-1.5 p-1">
               <ShieldCheck className="w-3.5 h-3.5 text-gold-400 shrink-0" />
-              <span>14-Day Results</span>
+              <span>Pure Botanical Care</span>
             </span>
             <span className="flex items-center justify-center space-x-1.5 p-1">
               <Truck className="w-3.5 h-3.5 text-gold-400 shrink-0" />
@@ -85,7 +85,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
                 Targeted Ayurvedic Hair Care
               </h2>
               <p className="text-xs sm:text-sm text-slate-600 mt-1.5 max-w-2xl leading-relaxed font-normal">
-                Whether you suffer from receding hairlines, postpartum shedding, or stubborn itchy dandruff flakes, our 3 hero solutions work from within the root.
+                Whether dealing with everyday hair fall due to breakage, dry itchy scalp, or stubborn dandruff flakes, our botanical formulas deliver targeted root nourishment and gentle scalp cleansing.
               </p>
             </div>
 
@@ -124,7 +124,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
       <WhyNovise />
 
       {/* 6. Customer Reviews & Ratings */}
-      <CustomerReviewsSection />
+      <CustomerReviewsSection onNavigate={onNavigate} />
 
       {/* 7. FAQ Accordion */}
       <FAQAccordion />

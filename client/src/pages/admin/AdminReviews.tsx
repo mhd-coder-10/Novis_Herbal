@@ -1,20 +1,20 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { 
-  Star, 
-  Check, 
-  X, 
-  MessageSquare, 
-  Trash2, 
-  Eye, 
-  ArrowLeft, 
-  ShieldCheck, 
-  Image as ImageIcon, 
-  Video, 
-  Play, 
-  CheckCircle2, 
-  Clock, 
-  Package, 
-  User, 
+import {
+  Star,
+  Check,
+  X,
+  MessageSquare,
+  Trash2,
+  Eye,
+  ArrowLeft,
+  ShieldCheck,
+  Image as ImageIcon,
+  Video,
+  Play,
+  CheckCircle2,
+  Clock,
+  Package,
+  User,
   ExternalLink,
   Search,
   Filter,
@@ -457,11 +457,10 @@ export const AdminReviews: React.FC = () => {
 
                           {/* Status */}
                           <td className="py-3.5 px-4 whitespace-nowrap">
-                            <span className={`inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-[10px] font-bold border uppercase tracking-wider ${
-                              r.isApproved 
-                                ? 'bg-emerald-50 text-emerald-800 border-emerald-200' 
-                                : 'bg-slate-100 text-slate-600 border-slate-200'
-                            }`}>
+                            <span className={`inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-[10px] font-bold border uppercase tracking-wider ${r.isApproved
+                              ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                              : 'bg-slate-100 text-slate-600 border-slate-200'
+                              }`}>
                               <span className={`w-1.5 h-1.5 rounded-full ${r.isApproved ? 'bg-emerald-500' : 'bg-slate-400'}`} />
                               <span>{r.isApproved ? 'Approved' : 'Hidden'}</span>
                             </span>
@@ -485,11 +484,10 @@ export const AdminReviews: React.FC = () => {
                               <button
                                 type="button"
                                 onClick={() => handleToggle(r._id)}
-                                className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer shadow-2xs ${
-                                  r.isApproved 
-                                    ? 'bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200/60' 
-                                    : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200/60'
-                                }`}
+                                className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer shadow-2xs ${r.isApproved
+                                  ? 'bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200/60'
+                                  : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200/60'
+                                  }`}
                                 title={r.isApproved ? 'Hide review from product page' : 'Approve and publish review to storefront'}
                               >
                                 {r.isApproved ? 'Hide' : 'Approve'}
@@ -533,62 +531,62 @@ export const AdminReviews: React.FC = () => {
            ==================================================================== */
         <div className="space-y-6 w-full animate-fadeIn pb-12">
           {/* Top Action Nav Bar with 1-Step Back Navigation */}
-          <div className="bg-white p-5 sm:p-6 rounded-3xl border border-slate-200/90 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="flex items-center space-x-3.5 sm:space-x-4">
-              <button
-                type="button"
-                onClick={() => setSelectedReview(null)}
-                className="inline-flex items-center space-x-2 px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-xl bg-slate-100 hover:bg-forest-900 hover:text-gold-400 text-slate-700 font-bold text-xs sm:text-sm transition cursor-pointer shadow-xs group"
-                title="Return to customer reviews moderation list"
-              >
-                <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-                <span>Back to Customer Reviews</span>
-              </button>
-              <div className="h-6 w-px bg-slate-200 hidden sm:block" />
-              <div>
-                <div className="flex items-center space-x-2">
-                  <div className="w-9 h-9 rounded-xl bg-forest-900/10 text-forest-900 flex items-center justify-center font-serif text-sm font-bold">
-                    <MessageSquare className="w-4 h-4 text-forest-900" />
+            <div className="bg-white p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-slate-200/90 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 min-w-0">
+                <button
+                  type="button"
+                  onClick={() => setSelectedReview(null)}
+                  className="inline-flex items-center space-x-2 px-3 py-2 sm:px-4 sm:py-2.5 rounded-xl bg-slate-100 hover:bg-forest-900 hover:text-gold-400 text-slate-700 font-bold text-xs sm:text-sm transition cursor-pointer shadow-xs group w-fit shrink-0"
+                  title="Return to customer reviews moderation list"
+                >
+                  <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+                  <span>Back to Reviews</span>
+                </button>
+                <div className="h-6 w-px bg-slate-200 hidden sm:block shrink-0" />
+                <div className="min-w-0">
+                  <div className="flex items-center space-x-2.5">
+                    <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-forest-900/10 text-forest-900 flex items-center justify-center font-serif text-sm font-bold shrink-0">
+                      <MessageSquare className="w-4 h-4 text-forest-900" />
+                    </div>
+                    <h2 className="font-serif text-lg sm:text-2xl font-black text-forest-950 truncate">
+                      Review: {selectedReview.customerName}
+                    </h2>
                   </div>
-                  <h2 className="font-serif text-xl sm:text-2xl font-black text-forest-950">
-                    Review Details: {selectedReview.customerName}
-                  </h2>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Submitted {selectedReview.createdAt ? new Date(selectedReview.createdAt).toLocaleString('en-IN') : 'N/A'}
+                    <span className="hidden sm:inline"> &bull; </span>
+                    <span className="block sm:inline font-mono text-[11px] text-slate-400 break-all">ID: {selectedReview._id}</span>
+                  </p>
                 </div>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Submitted on {selectedReview.createdAt ? new Date(selectedReview.createdAt).toLocaleString('en-IN') : 'N/A'} &bull; Review ID: <span className="font-mono">{selectedReview._id}</span>
-                </p>
               </div>
-            </div>
 
-            <div className="flex flex-wrap items-center gap-2.5">
-              {/* Publication Status Badge */}
-              <span className={`px-3 py-1 rounded-full text-xs font-bold border uppercase tracking-wider ${
-                selectedReview.isApproved 
-                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200' 
-                  : 'bg-amber-50 text-amber-800 border-amber-200'
-              }`}>
-                {selectedReview.isApproved ? '✓ Approved & Public' : '⚠ Hidden from Store'}
-              </span>
+              <div className="flex flex-wrap items-center gap-2 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100">
+                {/* Publication Status Badge */}
+                <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold border uppercase tracking-wider ${selectedReview.isApproved
+                    ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                    : 'bg-amber-50 text-amber-800 border-amber-200'
+                  }`}>
+                  {selectedReview.isApproved ? '✓ Approved' : '⚠ Hidden'}
+                </span>
 
-              {/* Toggle Approve / Hide Button */}
-              <button
+                {/* Toggle Approve / Hide Button */}
+                <button
                 type="button"
                 onClick={() => handleToggle(selectedReview._id)}
-                className={`inline-flex items-center space-x-1.5 px-4 py-2 rounded-xl text-xs font-bold transition shadow-xs cursor-pointer ${
-                  selectedReview.isApproved
+                className={`inline-flex items-center space-x-1.5 px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl text-xs font-bold transition shadow-xs cursor-pointer ${selectedReview.isApproved
                     ? 'bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300'
                     : 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                }`}
+                  }`}
               >
                 {selectedReview.isApproved ? (
                   <>
                     <EyeOff className="w-3.5 h-3.5" />
-                    <span>Hide Review</span>
+                    <span>Hide</span>
                   </>
                 ) : (
                   <>
                     <Check className="w-3.5 h-3.5" />
-                    <span>Approve & Publish</span>
+                    <span>Approve</span>
                   </>
                 )}
               </button>
@@ -597,7 +595,7 @@ export const AdminReviews: React.FC = () => {
               <button
                 type="button"
                 onClick={() => handleDeleteReview(selectedReview._id, selectedReview.customerName)}
-                className="inline-flex items-center space-x-1.5 px-3.5 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs border border-rose-200/80 transition cursor-pointer"
+                className="inline-flex items-center space-x-1.5 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs border border-rose-200/80 transition cursor-pointer"
                 title="Delete customer review permanently"
               >
                 <Trash2 className="w-3.5 h-3.5" />
@@ -607,7 +605,7 @@ export const AdminReviews: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setSelectedReview(null)}
-                className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition cursor-pointer"
+                className="px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition cursor-pointer"
               >
                 Close
               </button>
@@ -616,7 +614,7 @@ export const AdminReviews: React.FC = () => {
 
           {/* Main 2-Column Luxury Grid */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            
+
             {/* Left Column (8 cols): Feedback Content & Photos / Videos Gallery */}
             <div className="lg:col-span-8 space-y-6">
 
@@ -756,11 +754,10 @@ export const AdminReviews: React.FC = () => {
 
                                 {/* Top Type Badge */}
                                 <div className="absolute top-2.5 left-2.5 z-10">
-                                  <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider backdrop-blur-md shadow-xs ${
-                                    isVideo 
-                                      ? 'bg-purple-900/90 text-purple-200 border border-purple-400/40' 
-                                      : 'bg-black/70 text-white border border-white/20'
-                                  }`}>
+                                  <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider backdrop-blur-md shadow-xs ${isVideo
+                                    ? 'bg-purple-900/90 text-purple-200 border border-purple-400/40'
+                                    : 'bg-black/70 text-white border border-white/20'
+                                    }`}>
                                     {isVideo ? '🎥 Video' : '📷 Photo'}
                                   </span>
                                 </div>
@@ -805,16 +802,16 @@ export const AdminReviews: React.FC = () => {
             <div className="lg:col-span-4 space-y-6">
 
               {/* 1. Customer Information Card */}
-              <div className="bg-white rounded-3xl border border-slate-200/90 p-6 shadow-xs space-y-4">
-                <div className="flex items-center space-x-3 pb-3 border-b border-slate-100">
-                  <div className="w-12 h-12 rounded-2xl bg-forest-900 text-gold-400 font-bold flex items-center justify-center font-serif text-lg shadow-sm">
+              <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200/90 p-5 sm:p-6 shadow-xs space-y-4">
+                <div className="flex items-center space-x-3 pb-3 border-b border-slate-100 min-w-0">
+                  <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-forest-900 text-gold-400 font-bold flex items-center justify-center font-serif text-lg shadow-sm shrink-0">
                     {(selectedReview.customerName || 'U').charAt(0).toUpperCase()}
                   </div>
-                  <div>
-                    <h4 className="font-serif font-bold text-forest-950 text-base">
+                  <div className="min-w-0 flex-1">
+                    <h4 className="font-serif font-bold text-forest-950 text-base truncate">
                       {selectedReview.customerName}
                     </h4>
-                    <p className="text-xs text-slate-500 font-mono">
+                    <p className="text-xs text-slate-500 font-mono break-all">
                       {selectedReview.customerEmail || 'Verified Customer'}
                     </p>
                   </div>
@@ -823,7 +820,7 @@ export const AdminReviews: React.FC = () => {
                 <div className="space-y-2.5 text-xs">
                   <div className="flex items-center justify-between py-1.5 border-b border-slate-100/70">
                     <span className="text-slate-500">Customer Status</span>
-                    <span className="font-bold text-emerald-700 flex items-center space-x-1">
+                    <span className="font-bold text-emerald-700 flex items-center space-x-1 shrink-0">
                       <ShieldCheck className="w-3.5 h-3.5" />
                       <span>Verified Buyer</span>
                     </span>
@@ -831,15 +828,15 @@ export const AdminReviews: React.FC = () => {
 
                   <div className="flex items-center justify-between py-1.5 border-b border-slate-100/70">
                     <span className="text-slate-500">Review Date</span>
-                    <span className="font-mono font-semibold text-slate-800 text-[11px]">
+                    <span className="font-mono font-semibold text-slate-800 text-[11px] shrink-0">
                       {selectedReview.createdAt ? new Date(selectedReview.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
                     </span>
                   </div>
 
                   {selectedReview.user?._id && (
-                    <div className="flex items-center justify-between py-1.5">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between py-1.5 gap-1">
                       <span className="text-slate-500">User Account ID</span>
-                      <span className="font-mono text-slate-600 text-[10px]">
+                      <span className="font-mono text-slate-600 text-[10px] break-all">
                         {selectedReview.user._id}
                       </span>
                     </div>
@@ -901,17 +898,16 @@ export const AdminReviews: React.FC = () => {
                   </h4>
                 </div>
 
-                <div className={`p-4 rounded-2xl border text-xs leading-relaxed space-y-1 ${
-                  selectedReview.isApproved 
-                    ? 'bg-emerald-50/70 border-emerald-200 text-emerald-900' 
-                    : 'bg-amber-50/70 border-amber-200 text-amber-900'
-                }`}>
+                <div className={`p-4 rounded-2xl border text-xs leading-relaxed space-y-1 ${selectedReview.isApproved
+                  ? 'bg-emerald-50/70 border-emerald-200 text-emerald-900'
+                  : 'bg-amber-50/70 border-amber-200 text-amber-900'
+                  }`}>
                   <p className="font-bold">
                     {selectedReview.isApproved ? 'Public on Storefront' : 'Hidden from Storefront'}
                   </p>
                   <p className="text-[11px] opacity-80">
-                    {selectedReview.isApproved 
-                      ? 'This customer review and its uploaded photos/videos are live on the product page.' 
+                    {selectedReview.isApproved
+                      ? 'This customer review and its uploaded photos/videos are live on the product page.'
                       : 'This review is unlisted and hidden from potential buyers browsing the store.'}
                   </p>
                 </div>
@@ -920,11 +916,10 @@ export const AdminReviews: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => handleToggle(selectedReview._id)}
-                    className={`w-full py-3 rounded-2xl font-bold text-xs transition flex items-center justify-center space-x-2 shadow-xs cursor-pointer ${
-                      selectedReview.isApproved
-                        ? 'bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300'
-                        : 'bg-forest-900 hover:bg-forest-950 text-gold-400 shadow-md'
-                    }`}
+                    className={`w-full py-3 rounded-2xl font-bold text-xs transition flex items-center justify-center space-x-2 shadow-xs cursor-pointer ${selectedReview.isApproved
+                      ? 'bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300'
+                      : 'bg-forest-900 hover:bg-forest-950 text-gold-400 shadow-md'
+                      }`}
                   >
                     {selectedReview.isApproved ? (
                       <>

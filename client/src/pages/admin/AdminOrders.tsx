@@ -49,7 +49,9 @@ import api, { getFullImageUrl } from '../../services/api';
 import { toast } from '../../store/useToastStore';
 import { AdminPagination } from '../../components/common/AdminPagination';
 import { AdminConfirmModal } from '../../components/common/AdminConfirmModal';
+import { TimeRangeDropdown } from '../../components/common/TimeRangeDropdown';
 import { emitLiveEvent } from '../../services/realtimeSync';
+import { useAuthStore } from '../../store/useAuthStore';
 
 export interface AdminOrdersProps {
   initialOrderId?: string | null;
@@ -62,6 +64,29 @@ export const AdminOrders: React.FC<AdminOrdersProps> = ({
   onSelectOrder,
   onClearInitialOrder
 }) => {
+  const { user } = useAuthStore();
+  const [storeSettings, setStoreSettings] = useState<{
+    gstNumber?: string;
+    businessAddress?: string;
+    supportEmail?: string;
+    supportPhone?: string;
+    storeName?: string;
+  } | null>(null);
+
+  useEffect(() => {
+    const fetchStoreSettings = async () => {
+      try {
+        const res = await api.get('/orders/admin/settings/order-policy');
+        if (res.data?.success && res.data.settings?.storeSettings) {
+          setStoreSettings(res.data.settings.storeSettings);
+        }
+      } catch (e) {
+        console.warn('Could not load store settings for report:', e);
+      }
+    };
+    fetchStoreSettings();
+  }, []);
+
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedStatus, setSelectedStatus] = useState('ALL');
@@ -172,7 +197,6 @@ export const AdminOrders: React.FC<AdminOrdersProps> = ({
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
   const [showCustomDateModal, setShowCustomDateModal] = useState(false);
-  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [orderSummary, setOrderSummary] = useState<{
     totalOrders: number;
     totalRevenue: number;
@@ -1259,3158 +1283,3105 @@ export const AdminOrders: React.FC<AdminOrdersProps> = ({
   // Paginated orders slice
   const paginatedOrders = filteredOrders.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
+  // Exact metrics for active filtered report scope (respects current date period & tab filters)
+  const reportOrders = filteredOrders;
+  const reportTotalOrders = reportOrders.length;
+  const reportTotalRevenue = reportOrders.reduce((sum, o) => sum + (o.pricing?.totalAmount || 0), 0);
+  const reportDeliveredCount = reportOrders.filter(o => o.orderStatus === 'DELIVERED').length;
+  const reportInTransitCount = reportOrders.filter(o => ['IN_TRANSIT', 'OUT_FOR_DELIVERY', 'SHIPMENT_BOOKED', 'PACKED', 'CONFIRMED', 'PICKED_UP'].includes(o.orderStatus)).length;
+  const reportCancelledCount = reportOrders.filter(o => ['CANCELLED', 'CANCELLATION_REQUESTED'].includes(o.orderStatus)).length;
+  const reportRtoCount = reportOrders.filter(o => ['RTO_INITIATED', 'IN_TRANSIT_TO_SELLER', 'RTO_IN_TRANSIT', 'RETURNED_TO_SELLER', 'RTO_COMPLETED'].includes(o.orderStatus)).length;
+  const reportCodCount = reportOrders.filter(o => o.paymentInfo?.method === 'COD' || o.paymentMethod === 'COD').length;
+  const reportOnlineCount = reportOrders.filter(o => o.paymentInfo?.method === 'ONLINE' || o.paymentMethod === 'ONLINE').length;
+  const reportTotalUnits = reportOrders.reduce((acc, o) => acc + (o.items?.reduce((s, it) => s + (it.quantity || 1), 0) || 0), 0);
+
+  // Simplify product name for printable audit report (keeps columns compact and prevents amount truncation)
+  const getShortItemName = (name: string): string => {
+    if (!name) return 'Item';
+    const lower = name.toLowerCase();
+    if (lower.includes('combo') || lower.includes('kit') || lower.includes('set') || lower.includes('bundle') || lower.includes('routine')) {
+      return 'Combo';
+    }
+    if (lower.includes('oil')) {
+      return 'Hair Oil';
+    }
+    if (lower.includes('shampoo')) {
+      return 'Shampoo';
+    }
+    return name.length > 15 ? name.slice(0, 13) + '…' : name;
+  };
+
+  // Dynamic, human-readable Scope label reflecting active status/filter
+  const getScopeLabel = (): string => {
+    if (selectedStatus && selectedStatus !== 'ALL') {
+      const match = ALL_ORDER_STATUSES.find(s => s.value === selectedStatus);
+      return match ? `${match.label} Orders` : `${selectedStatus} Orders`;
+    }
+    if (activeTab === 'DELIVERED') return 'Delivered Orders';
+    if (activeTab === 'CANCELLED') return 'Cancelled Orders';
+    if (activeTab === 'CANCELLATIONS') return 'Cancellation Requests';
+    if (activeTab === 'COMPLAINTS') return 'Customer Damage Claims';
+    if (activeTab === 'RTO') return 'RTO (Return to Origin) Orders';
+    return 'All Orders';
+  };
+
   return (
     <div className="space-y-6 w-full">
-      {isReportModalOpen ? (
-        /* DEDICATED FULL-PAGE REPORT VIEW */
-        <div className="space-y-6 w-full animate-fadeIn pb-12">
-          {/* Top Action Nav Bar with Back Button */}
-          <div className="bg-white p-5 sm:p-6 rounded-3xl border border-slate-200/90 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4 print:hidden">
-            <div className="flex items-center space-x-3.5 sm:space-x-4">
-              <button
-                type="button"
-                onClick={() => setIsReportModalOpen(false)}
-                className="inline-flex items-center space-x-2 px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-xl bg-slate-100 hover:bg-forest-900 hover:text-gold-400 text-slate-700 font-bold text-xs sm:text-sm transition cursor-pointer shadow-xs group"
-                title="Return to orders"
-              >
-                <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-                <span>Back to Orders</span>
-              </button>
-              <div className="h-6 w-px bg-slate-200 hidden sm:block" />
-              <div>
-                <div className="flex items-center space-x-2">
-                  <div className="w-9 h-9 rounded-xl bg-forest-900/10 text-forest-900 flex items-center justify-center font-serif text-sm font-bold">
-                    <FileCheck2 className="w-4 h-4 text-forest-900" />
-                  </div>
-                  <h2 className="font-serif text-xl sm:text-2xl font-black text-forest-950">
-                    Order Fulfillment & Logistics Audit Report
-                  </h2>
-                </div>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Period: <strong className="text-forest-900">{getPeriodLabel()}</strong> &bull; Total Orders: <strong className="font-mono">{orders.length}</strong> Records
-                </p>
-              </div>
+      {/* 1. PRINTABLE REPORT CONTAINER (HIDDEN ON SCREEN, ACTIVE IN PRINT/PDF) */}
+      <div className="hidden print:block printable-report font-serif space-y-6">
+        {/* Document Header */}
+        <div className="border-b-2 border-forest-950 pb-5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 print-avoid-break">
+          <div>
+            <div className="flex items-center space-x-2">
+              <span className="font-serif text-2xl font-black text-forest-950 tracking-wider">NOVIS HERBAL</span>
             </div>
-
-            <div className="flex items-center space-x-3">
-              <button
-                onClick={handlePrintReport}
-                className="inline-flex items-center space-x-2 px-5 py-2.5 bg-forest-900 hover:bg-forest-950 text-gold-400 font-bold text-xs sm:text-sm rounded-xl transition shadow-md shadow-forest-900/15 cursor-pointer"
-                title="Download and save formatted report directly to your PC"
-              >
-                <Download className="w-4 h-4 text-gold-400" />
-                <span>Download / Print PDF</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setIsReportModalOpen(false)}
-                className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition cursor-pointer"
-              >
-                Close Report
-              </button>
-            </div>
+            <p className="text-xs text-slate-600 font-sans mt-0.5">
+              100% Ayurvedic & Botanical Care &bull; Official Order & Logistics Fulfillment Audit
+            </p>
+            <p className="text-[11px] text-slate-600 font-sans mt-0.5">
+              <span className="font-semibold text-slate-700">GSTIN:</span>{' '}
+              <strong className="text-slate-900 font-mono font-bold">{storeSettings?.gstNumber || '27AAAAA0000A1Z5'}</strong>
+              <span className="mx-1.5 text-slate-400">&bull;</span>
+              <span>{storeSettings?.supportEmail || 'support@noviseherbal.com'}</span>
+            </p>
           </div>
 
-          {/* PRINTABLE REPORT PREVIEW CONTAINER */}
-          <div className="p-6 sm:p-10 rounded-3xl border border-slate-200/90 shadow-xs bg-white text-slate-900 font-serif space-y-6 printable-report">
-            {/* Document Header */}
-            <div className="border-b-2 border-forest-950 pb-5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-              <div>
-                <div className="flex items-center space-x-2">
-                  <span className="font-serif text-2xl font-black text-forest-950 tracking-wider">NOVISE HERBAL</span>
-                  <span className="text-xs bg-forest-950 text-gold-400 px-2 py-0.5 rounded font-mono font-bold">
-                    PVT. LTD.
-                  </span>
-                </div>
-                <p className="text-xs text-slate-600 font-sans mt-0.5">
-                  100% Ayurvedic & Botanical Care &bull; Official Order & Logistics Fulfillment Audit
-                </p>
-                <p className="text-[11px] text-slate-400 font-sans mt-0.5">
-                  GSTIN: 24AAACN1234F1Z5 &bull; Warehouse: Sidhpur, Gujarat - 384151 &bull; support@noviseherbal.com
-                </p>
-              </div>
-
-              <div className="text-right font-sans text-xs space-y-0.5">
-                <p className="font-bold text-forest-950 uppercase tracking-wide">
-                  STATEMENT: <span className="text-forest-900 font-black">ORDER LOGISTICS REPORT</span>
-                </p>
-                <p className="text-slate-600">Period: <strong className="text-slate-900">{getPeriodLabel()}</strong></p>
-                <p className="text-slate-400 text-[11px] font-mono">Generated: {new Date().toLocaleString('en-IN')}</p>
-                <p className="text-slate-500 text-[11px]">Authorized Signatory: <strong className="text-slate-700">Novise Admin</strong></p>
-              </div>
-            </div>
-
-            {/* Executive KPI Summary Cards */}
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 font-sans text-center">
-              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
-                <span className="text-[10px] uppercase font-bold text-slate-500 block">Total Orders</span>
-                <span className="font-mono font-bold text-lg text-slate-900 block mt-0.5">
-                  {orderSummary.totalOrders}
-                </span>
-                <span className="text-[10px] text-emerald-700 font-bold block mt-0.5">
-                  ₹{orderSummary.totalRevenue.toLocaleString('en-IN')}
-                </span>
-              </div>
-
-              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
-                <span className="text-[10px] uppercase font-bold text-slate-500 block">Delivered</span>
-                <span className="font-mono font-bold text-lg text-emerald-700 block mt-0.5">
-                  {orderSummary.deliveredCount}
-                </span>
-                <span className="text-[10px] text-slate-500 font-medium block mt-0.5">
-                  {orderSummary.totalOrders > 0 ? `${Math.round((orderSummary.deliveredCount / orderSummary.totalOrders) * 100)}% Fulfilled` : '0%'}
-                </span>
-              </div>
-
-              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
-                <span className="text-[10px] uppercase font-bold text-slate-500 block">In Logistics</span>
-                <span className="font-mono font-bold text-lg text-blue-700 block mt-0.5">
-                  {orderSummary.inTransitCount}
-                </span>
-                <span className="text-[10px] text-blue-600 font-medium block mt-0.5">
-                  Active Shipments
-                </span>
-              </div>
-
-              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
-                <span className="text-[10px] uppercase font-bold text-slate-500 block">Cancelled</span>
-                <span className="font-mono font-bold text-lg text-rose-700 block mt-0.5">
-                  {orderSummary.cancelledCount}
-                </span>
-                <span className="text-[10px] text-rose-600 font-medium block mt-0.5">
-                  {orderSummary.totalOrders > 0 ? `${Math.round((orderSummary.cancelledCount / orderSummary.totalOrders) * 100)}% Cancelled` : '0%'}
-                </span>
-              </div>
-
-              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl col-span-2 sm:col-span-1">
-                <span className="text-[10px] uppercase font-bold text-slate-500 block">RTO / Failed</span>
-                <span className="font-mono font-bold text-lg text-orange-700 block mt-0.5">
-                  {orderSummary.rtoCount}
-                </span>
-                <span className="text-[10px] text-orange-600 font-medium block mt-0.5">
-                  Courier Exceptions
-                </span>
-              </div>
-            </div>
-
-            {/* Payment Split Banner */}
-            <div className="bg-[#FAF8F5] p-3 rounded-xl border border-slate-200 flex flex-wrap items-center justify-between text-xs font-sans text-slate-700 gap-2">
-              <div className="flex items-center space-x-2">
-                <span className="font-bold text-slate-900">Payment Breakdown:</span>
-                <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded font-semibold text-[11px]">
-                  Online Prepaid: {orderSummary.onlineCount} Orders
-                </span>
-                <span className="px-2 py-0.5 bg-amber-100 text-amber-800 rounded font-semibold text-[11px]">
-                  Cash on Delivery (COD): {orderSummary.codCount} Orders
-                </span>
-              </div>
-              <div className="text-[11px] text-slate-500 font-mono">
-                Report Scope: {orders.length} order items listed below
-              </div>
-            </div>
-
-            {/* Detailed Orders Breakdown Table */}
-            <div>
-              <h4 className="font-serif font-bold text-sm text-forest-950 mb-2">
-                Itemized Order Records ({orders.length})
-              </h4>
-              <div className="border border-slate-200 rounded-xl overflow-hidden font-sans">
-                <table className="w-full text-left divide-y divide-slate-200 text-xs">
-                  <thead className="bg-slate-100 font-bold uppercase text-[10px] text-slate-700">
-                    <tr>
-                      <th className="p-2.5">#</th>
-                      <th className="p-2.5">Order ID</th>
-                      <th className="p-2.5">Date</th>
-                      <th className="p-2.5">Customer & City</th>
-                      <th className="p-2.5">Items</th>
-                      <th className="p-2.5">Payment</th>
-                      <th className="p-2.5">Status</th>
-                      <th className="p-2.5">Carrier & AWB</th>
-                      <th className="p-2.5 text-right">Amount</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 bg-white">
-                    {orders.map((o, idx) => (
-                      <tr key={o._id || o.orderId} className="hover:bg-slate-50/60">
-                        <td className="p-2.5 font-mono text-[11px] text-slate-400">{idx + 1}</td>
-                        <td className="p-2.5 font-mono font-bold text-slate-900">{o.orderId}</td>
-                        <td className="p-2.5 text-slate-600 whitespace-nowrap text-[11px]">
-                          {o.createdAt ? new Date(o.createdAt).toLocaleDateString('en-IN') : 'N/A'}
-                        </td>
-                        <td className="p-2.5">
-                          <p className="font-bold text-slate-900">{o.customerDetails?.fullName || 'N/A'}</p>
-                          <p className="text-[10px] text-slate-500">
-                            {o.shippingAddress?.city || ''}{o.shippingAddress?.pincode ? `, ${o.shippingAddress.pincode}` : ''}
-                          </p>
-                        </td>
-                        <td className="p-2.5 text-[11px] text-slate-700 max-w-[200px] truncate">
-                          {o.items?.map(it => `${it.quantity}x ${it.name}`).join(', ') || 'N/A'}
-                        </td>
-                        <td className="p-2.5">
-                          <span className="font-bold text-slate-800 text-[11px]">
-                            {o.paymentInfo?.method || o.paymentMethod || 'PREPAID'}
-                          </span>
-                          {(() => {
-                            const isCod = o.paymentInfo?.method === 'COD' || o.paymentMethod === 'COD';
-                            const isCancelled = ['CANCELLED', 'CANCELLATION_REQUESTED', 'RTO_COMPLETED', 'RETURNED_TO_SELLER'].includes(o.orderStatus);
-                            let payStat = o.paymentInfo?.status || o.paymentStatus || 'PENDING';
-                            if (isCod) {
-                              if (isCancelled && o.orderStatus !== 'DELIVERED') payStat = 'NOT_APPLICABLE';
-                              else if (o.orderStatus !== 'DELIVERED') payStat = 'PENDING';
-                            }
-                            return (
-                              <span className={`block text-[10px] font-bold ${payStat === 'PAID' ? 'text-emerald-700' : 'text-amber-700'}`}>
-                                {payStat}
-                              </span>
-                            );
-                          })()}
-                        </td>
-                        <td className="p-2.5">
-                          <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-800">
-                            {formatStatusName(o.orderStatus)}
-                          </span>
-                        </td>
-                        <td className="p-2.5 text-[11px]">
-                          {o.shipment?.awbCode ? (
-                            <>
-                              <p className="font-mono font-bold text-slate-800">{o.shipment.awbCode}</p>
-                              <p className="text-[10px] text-slate-500">{o.shipment.courierName || 'India Post'}</p>
-                            </>
-                          ) : (
-                            <span className="text-slate-400 text-[10px]">Pending AWB</span>
-                          )}
-                        </td>
-                        <td className="p-2.5 text-right font-mono font-bold text-slate-900">
-                          ₹{o.pricing?.totalAmount || 0}
-                        </td>
-                      </tr>
-                    ))}
-
-                    {orders.length === 0 && (
-                      <tr>
-                        <td colSpan={9} className="p-8 text-center text-slate-400">
-                          No orders found for the selected date range ({getPeriodLabel()}).
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                  <tfoot className="bg-slate-50 font-bold border-t-2 border-slate-300">
-                    <tr>
-                      <td colSpan={4} className="p-2.5 text-slate-700 uppercase text-[10px]">
-                        Total Aggregate ({orders.length} Orders)
-                      </td>
-                      <td className="p-2.5 text-slate-800 text-[11px]">
-                        {orders.reduce((acc, o) => acc + (o.items?.reduce((s, it) => s + (it.quantity || 1), 0) || 0), 0)} Units Sold
-                      </td>
-                      <td colSpan={3}></td>
-                      <td className="p-2.5 text-right font-mono text-sm text-forest-950 font-black">
-                        ₹{orders.reduce((acc, o) => acc + (o.pricing?.totalAmount || 0), 0).toLocaleString('en-IN')}
-                      </td>
-                    </tr>
-                  </tfoot>
-                </table>
-              </div>
-            </div>
-
-            {/* Official Sign-off & Non-Returnable Compliance Footer */}
-            <div className="pt-6 border-t border-slate-200 flex flex-col sm:flex-row justify-between items-start sm:items-end gap-6 font-sans text-xs">
-              <div className="max-w-md space-y-1 text-slate-500 text-[10px] leading-relaxed">
-                <p className="font-bold text-slate-700 uppercase">Non-Returnable Botanical Care Compliance</p>
-                <p>
-                  All Novise Herbal personal care formulations are tamper-evident sealed and strictly non-returnable upon doorstep delivery acceptance in compliance with Indian healthcare and cosmetic hygiene standards. Return to Origin (RTO) entries represent undelivered courier logistics exceptions prior to customer handover.
-                </p>
-              </div>
-
-              <div className="text-right space-y-3 shrink-0">
-                <div className="border-b border-slate-400 w-48 pb-1">
-                  <p className="text-[10px] text-slate-400">Authorized Signatory & Seal</p>
-                </div>
-                <p className="font-serif font-bold text-slate-900 text-sm">NOVISE HERBAL PVT. LTD.</p>
-              </div>
-            </div>
+          <div className="text-right font-sans text-xs space-y-0.5">
+            <p className="font-bold text-forest-950 uppercase tracking-wide">
+              STATEMENT: <span className="text-forest-900 font-black">ORDER LOGISTICS REPORT</span>
+            </p>
+            <p className="text-slate-600">Period: <strong className="text-slate-900">{getPeriodLabel()}</strong></p>
+            <p className="text-slate-500 text-[11px]">Scope: <strong className="text-slate-800 font-bold">{getScopeLabel()}</strong></p>
+            <p className="text-slate-400 text-[10.5px] font-mono">{new Date().toLocaleString('en-IN')}</p>
           </div>
         </div>
-      ) : selectedOrder ? (
-        isViewingComplaintPage && selectedOrder.complaint?.hasComplaint ? (
-          /* ====================================================================
-             DEDICATED FULL-PAGE CUSTOMER COMPLAINT & VIDEO PROOF INSPECTION VIEW
-             ==================================================================== */
-          <div className="space-y-6 w-full animate-fadeIn">
-            {/* Header Bar */}
-            <div className="bg-white p-5 sm:p-6 rounded-3xl border border-slate-200/90 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div className="flex items-center space-x-3.5 flex-wrap gap-y-2">
-                <button
-                  type="button"
-                  onClick={() => setIsViewingComplaintPage(false)}
-                  className="inline-flex items-center space-x-2 px-3.5 py-2 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 hover:text-forest-950 font-bold text-xs border border-slate-200/80 transition shadow-xs group cursor-pointer"
-                  title="Return to order details"
-                >
-                  <ArrowLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition" />
-                  <span>Back to Order Details</span>
-                </button>
 
-                <div className="flex items-center space-x-2.5">
-                  <div className="w-9 h-9 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center shrink-0">
-                    <ShieldAlert className="w-5 h-5 text-amber-700" />
-                  </div>
-                  <div>
-                    <div className="flex items-center space-x-2">
-                      <h2 className="font-serif text-lg sm:text-xl font-bold text-slate-900">
-                        Delivery Issue & Video Proof
-                      </h2>
-                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono uppercase bg-amber-100 text-amber-900 border border-amber-300">
-                        {selectedOrder.complaint.status}
-                      </span>
-                    </div>
-                    <p className="text-xs text-slate-500">
-                      Order <strong className="font-mono text-slate-800">#{selectedOrder.orderId || selectedOrder._id}</strong> • Placed by {selectedOrder.shippingAddress?.fullName || 'Customer'}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Inspection Card Body */}
-            <div className="bg-white rounded-3xl p-5 sm:p-7 border border-slate-200 shadow-sm space-y-6">
-              {/* Top Banner Notice */}
-              <div className="p-4 bg-amber-50/80 rounded-2xl border border-amber-200 text-xs text-amber-900 flex items-start space-x-2.5">
-                <AlertTriangle className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
-                <div>
-                  <p className="font-bold">Strict Non-Returnable & Non-Replaceable Policy Verification</p>
-                  <p className="text-[11px] text-amber-800 mt-0.5 leading-relaxed">
-                    Personal care and Ayurvedic formulations are sealed and strictly non-returnable. Please inspect the customer's unboxing video proof below to verify whether transit damage, broken seal, or incorrect bottle dispatch occurred before issuing a direct refund.
-                  </p>
-                </div>
-              </div>
-
-              {/* Grid: Left Video / Photos - Right Customer & Claim Info */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Left Column: Video & Media Section */}
-                <div className="space-y-4">
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <label className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center space-x-1.5">
-                        <Video className="w-4 h-4 text-forest-700" />
-                        <span>Customer Video Proof</span>
-                      </label>
-                      {selectedOrder.complaint.videoUrl && (
-                        <span className="text-[10px] px-2 py-0.5 rounded-md font-mono bg-emerald-50 text-emerald-800 border border-emerald-200 font-semibold">
-                          Order_Report_Videos
-                        </span>
-                      )}
-                    </div>
-
-                    {selectedOrder.complaint.videoDeletedByAdmin ? (
-                      <div className="p-8 rounded-2xl bg-rose-50/80 border-2 border-dashed border-rose-200 text-center space-y-2">
-                        <div className="w-10 h-10 rounded-full bg-rose-100 text-rose-700 flex items-center justify-center mx-auto">
-                          <Trash2 className="w-5 h-5 text-rose-600" />
-                        </div>
-                        <div>
-                          <span className="inline-block px-3 py-0.5 rounded-full text-xs font-extrabold bg-rose-200 text-rose-900 uppercase tracking-wide">
-                            Deleted by Admin
-                          </span>
-                        </div>
-                        <p className="text-xs font-semibold text-rose-900">
-                          Video proof permanently deleted from Cloudinary folder & database
-                        </p>
-                        {selectedOrder.complaint.videoDeletedAt && (
-                          <p className="text-[11px] text-rose-700/80 font-mono">
-                            Deleted on: {new Date(selectedOrder.complaint.videoDeletedAt).toLocaleString('en-IN')}
-                          </p>
-                        )}
-                      </div>
-                    ) : selectedOrder.complaint.videoUrl ? (
-                      <div className="space-y-2">
-                        <div className="relative rounded-2xl overflow-hidden bg-black border border-slate-800 shadow-md aspect-video max-h-[320px] flex items-center justify-center">
-                          <video
-                            src={selectedOrder.complaint.videoUrl}
-                            controls
-                            className="w-full h-full object-contain"
-                            playsInline
-                            preload="metadata"
-                          />
-                        </div>
-
-                        <div className="flex items-center justify-between text-[11px] text-slate-500 px-1">
-                          <span>
-                            {selectedOrder.complaint.videoDuration
-                              ? `Duration: ~${Math.round(selectedOrder.complaint.videoDuration)}s`
-                              : '1 Video Attached'}
-                          </span>
-                          <a
-                            href={selectedOrder.complaint.videoUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="text-forest-800 hover:text-forest-950 font-bold inline-flex items-center space-x-1 underline"
-                          >
-                            <span>Open In New Tab</span>
-                            <ExternalLink className="w-3 h-3" />
-                          </a>
-                        </div>
-
-                        {/* Admin Delete Video Proof from Cloudinary */}
-                        <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
-                          <button
-                            type="button"
-                            onClick={handleDeleteComplaintVideo}
-                            disabled={isDeletingComplaintVideo}
-                            className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 font-bold text-[11px] rounded-xl transition flex items-center space-x-1.5 disabled:opacity-50 cursor-pointer"
-                          >
-                            {isDeletingComplaintVideo ? (
-                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                            ) : (
-                              <Trash2 className="w-3.5 h-3.5 text-rose-600" />
-                            )}
-                            <span>Delete Video</span>
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="p-8 rounded-2xl bg-slate-50 border-2 border-dashed border-slate-200 text-center space-y-2">
-                        <Video className="w-8 h-8 text-slate-300 mx-auto" />
-                        <p className="text-xs font-bold text-slate-600">No Video Proof Available</p>
-                        <p className="text-[11px] text-slate-400">
-                          Video proof has not been uploaded or was permanently removed from Cloudinary folder "NOVISE_HERBAL/Order_Report_Videos".
-                        </p>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Photo Proofs */}
-                  {selectedOrder.complaint.images && selectedOrder.complaint.images.length > 0 && (
-                    <div>
-                      <label className="text-xs font-bold text-slate-800 uppercase tracking-wider block mb-2">
-                        Additional Photo Proof ({selectedOrder.complaint.images.length})
-                      </label>
-                      <div className="grid grid-cols-3 gap-2">
-                        {selectedOrder.complaint.images.map((img, i) => (
-                          <a
-                            key={i}
-                            href={img}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="group relative aspect-square rounded-xl overflow-hidden border border-slate-200 bg-slate-100 shadow-xs block"
-                          >
-                            <img src={img} alt="proof" className="w-full h-full object-cover group-hover:scale-110 transition duration-200" />
-                            <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
-                              <ExternalLink className="w-4 h-4 text-white" />
-                            </div>
-                          </a>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Right Column: Customer Info, Issue details, and Refund details */}
-                <div className="space-y-4">
-                  {/* Customer Contact Card */}
-                  <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
-                    <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-                      Customer Contact Details
-                    </h4>
-                    <div className="space-y-1.5 text-xs">
-                      <div className="flex justify-between">
-                        <span className="text-slate-500">Name:</span>
-                        <strong className="text-slate-900">{selectedOrder.shippingAddress?.fullName || 'N/A'}</strong>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-slate-500">Report Mobile:</span>
-                        <strong className="font-mono text-slate-900">
-                          {selectedOrder.complaint.customerPhone || selectedOrder.shippingAddress?.phone || 'N/A'}
-                        </strong>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-slate-500">Delivery City:</span>
-                        <strong className="text-slate-900">
-                          {selectedOrder.shippingAddress?.city}, {selectedOrder.shippingAddress?.state}
-                        </strong>
-                      </div>
-                    </div>
-
-                    {/* Quick Call & WhatsApp Action Buttons */}
-                    {(selectedOrder.complaint.customerPhone || selectedOrder.shippingAddress?.phone) && (
-                      <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-200">
-                        <a
-                          href={getComplaintWhatsAppUrl(selectedOrder)}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs flex items-center justify-center space-x-1.5 shadow-xs transition"
-                        >
-                          <MessageCircle className="w-3.5 h-3.5" />
-                          <span>WhatsApp</span>
-                        </a>
-                        <a
-                          href={`tel:${selectedOrder.complaint.customerPhone || selectedOrder.shippingAddress?.phone}`}
-                          className="px-3 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-xl font-bold text-xs flex items-center justify-center space-x-1.5 transition"
-                        >
-                          <Phone className="w-3.5 h-3.5" />
-                          <span>Direct Call</span>
-                        </a>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Claim Details Card */}
-                  <div className="p-4 rounded-2xl bg-amber-50/60 border border-amber-200/80 space-y-2 text-xs">
-                    <h4 className="text-xs font-bold text-amber-950 uppercase tracking-wider">
-                      Claim Specification
-                    </h4>
-                    <div>
-                      <span className="text-amber-800 block text-[11px]">Issue Category:</span>
-                      <strong className="text-slate-900 font-bold">{selectedOrder.complaint.reason}</strong>
-                    </div>
-                    <div>
-                      <span className="text-amber-800 block text-[11px]">Customer Explanation:</span>
-                      <p className="p-2.5 rounded-xl bg-white border border-amber-200 text-slate-800 text-xs italic mt-1 leading-relaxed">
-                        "{selectedOrder.complaint.description || 'No detailed note provided.'}"
-                      </p>
-                    </div>
-                    {selectedOrder.complaint.reportedAt && (
-                      <div className="flex justify-between text-[11px] text-amber-800 pt-1">
-                        <span>Reported At:</span>
-                        <strong className="text-slate-900">
-                          {new Date(selectedOrder.complaint.reportedAt).toLocaleString('en-IN', {
-                            day: 'numeric',
-                            month: 'short',
-                            year: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          })}
-                        </strong>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Bank / UPI Details for Direct Refund (or Direct Contact Info) */}
-                  {(selectedOrder.complaint.bankDetails?.accountNumber || selectedOrder.complaint.bankDetails?.upiId) ? (
-                    <div className="p-4 rounded-2xl bg-emerald-50/60 border border-emerald-200 space-y-2 text-xs">
-                      <h4 className="text-xs font-bold text-emerald-950 uppercase tracking-wider">
-                        Customer Refund Details
-                      </h4>
-                      {selectedOrder.complaint.bankDetails?.accountNumber && (
-                        <div className="space-y-1 text-[11px]">
-                          <p><span className="text-slate-500">Beneficiary:</span> <strong>{selectedOrder.complaint.bankDetails.beneficiaryName}</strong></p>
-                          <p><span className="text-slate-500">Account:</span> <strong className="font-mono">{selectedOrder.complaint.bankDetails.accountNumber}</strong></p>
-                          <p><span className="text-slate-500">IFSC Code:</span> <strong className="font-mono">{selectedOrder.complaint.bankDetails.ifscCode}</strong></p>
-                          {selectedOrder.complaint.bankDetails.bankName && (
-                            <p><span className="text-slate-500">Bank:</span> <strong>{selectedOrder.complaint.bankDetails.bankName}</strong></p>
-                          )}
-                        </div>
-                      )}
-                      {selectedOrder.complaint.bankDetails?.upiId && (
-                        <div className="pt-1 text-[11px]">
-                          <span className="text-slate-500">UPI ID:</span>{' '}
-                          <strong className="font-mono text-emerald-900 font-bold">{selectedOrder.complaint.bankDetails.upiId}</strong>
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="p-4 rounded-2xl bg-emerald-50/70 border border-emerald-200 space-y-1.5 text-xs text-emerald-950">
-                      <div className="flex items-center space-x-2">
-                        <ShieldCheck className="w-4 h-4 text-emerald-700 shrink-0" />
-                        <h4 className="text-xs font-bold text-emerald-950 uppercase tracking-wider">
-                          Direct Contact Resolution Mode
-                        </h4>
-                      </div>
-                      <p className="text-[11.5px] text-emerald-800 leading-relaxed">
-                        Customer has securely submitted issue details and video proof without disclosing sensitive bank account details. Click <strong>WhatsApp (Auto-Report Msg)</strong> or <strong>Direct Call</strong> above to coordinate with customer directly and finalize refund or replacement.
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Current Resolution State if already resolved */}
-                  {selectedOrder.complaint.status === 'RESOLVED' && (
-                    <div className="p-4 rounded-2xl bg-emerald-100 border border-emerald-300 text-xs text-emerald-950 space-y-1">
-                      <p className="font-bold">Claim Resolved</p>
-                      <p className="text-[11px]">Resolution: <strong>{selectedOrder.complaint.resolutionType}</strong></p>
-                      {selectedOrder.complaint.resolutionNotes && (
-                        <p className="text-[11px] text-emerald-800">"{selectedOrder.complaint.resolutionNotes}"</p>
-                      )}
-                    </div>
-                  )}
-                  {selectedOrder.complaint.status === 'REJECTED' && (
-                    <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-xs text-rose-950 space-y-1">
-                      <p className="font-bold">Claim Rejected</p>
-                      {selectedOrder.complaint.rejectionReason && (
-                        <p className="text-[11px] text-rose-800">Reason: "{selectedOrder.complaint.rejectionReason}"</p>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Inspection Footer with Action Buttons */}
-              <div className="p-5 border-t border-slate-100 bg-slate-50/80 rounded-2xl flex flex-wrap items-center justify-between gap-3">
-                <button
-                  type="button"
-                  onClick={() => setIsViewingComplaintPage(false)}
-                  className="px-5 py-2.5 border border-slate-200 rounded-xl font-bold text-slate-600 hover:bg-slate-100 transition text-xs cursor-pointer"
-                >
-                  Close Inspection
-                </button>
-
-                {['SUBMITTED', 'UNDER_REVIEW'].includes(selectedOrder.complaint.status || '') && (
-                  <div className="flex items-center space-x-2">
-                    {selectedOrder.complaint.status === 'SUBMITTED' && (
-                      <button
-                        type="button"
-                        onClick={() => handleReviewComplaint('UNDER_REVIEW')}
-                        disabled={isProcessingAction}
-                        className="px-4 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-xl shadow-xs transition cursor-pointer"
-                      >
-                        Mark Under Review
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => setShowComplaintRejectModal(true)}
-                      disabled={isProcessingAction}
-                      className="px-4 py-2.5 bg-rose-100 hover:bg-rose-200 text-rose-800 font-bold text-xs rounded-xl transition cursor-pointer"
-                    >
-                      Reject Claim
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setShowComplaintResolveModal(true)}
-                      disabled={isProcessingAction}
-                      className="px-5 py-2.5 bg-forest-900 hover:bg-forest-800 text-gold-400 font-bold text-xs rounded-xl shadow-xs transition cursor-pointer"
-                    >
-                      Approve & Issue Refund
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
+        {/* Executive KPI Summary Cards - Clean 4-card structure */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 font-sans text-center print-avoid-break">
+          <div className="p-3 bg-white border border-slate-300 rounded-xl">
+            <span className="text-[10px] uppercase font-bold text-slate-600 block">Total Orders</span>
+            <span className="font-mono font-bold text-lg text-slate-900 block mt-0.5">
+              {reportTotalOrders}
+            </span>
+            <span className="text-[10px] text-emerald-800 font-bold block mt-0.5">
+              ₹{reportTotalRevenue.toLocaleString('en-IN')}
+            </span>
+            <span className="text-[9.5px] text-slate-500 block mt-0.5">
+              Prepaid: {reportOnlineCount} | COD: {reportCodCount}
+            </span>
           </div>
-        ) : (
-          // DEDICATED FULL-PAGE ORDER DETAILS VIEW
 
-          <div className="space-y-6 w-full animate-fadeIn">
-            {/* Header Bar */}
-            <div className="bg-white p-5 sm:p-6 rounded-3xl border border-slate-200/90 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div className="flex items-center space-x-3.5 flex-wrap gap-y-2">
-                <button
-                  onClick={handleBackToOrders}
-                  className="inline-flex items-center space-x-2 px-3.5 py-2 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 hover:text-forest-950 font-bold text-xs border border-slate-200/80 transition shadow-xs group"
-                  title="Return to order list"
-                >
-                  <ArrowLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition" />
-                  <span>Back to Orders</span>
-                </button>
+          <div className="p-3 bg-white border border-slate-300 rounded-xl">
+            <span className="text-[10px] uppercase font-bold text-slate-600 block">Delivered & Settled</span>
+            <span className="font-mono font-bold text-lg text-emerald-800 block mt-0.5">
+              {reportDeliveredCount}
+            </span>
+            <span className="text-[10px] text-slate-600 font-medium block mt-0.5">
+              {reportTotalOrders > 0 ? `${Math.round((reportDeliveredCount / reportTotalOrders) * 100)}% Fulfilled` : '0%'}
+            </span>
+          </div>
 
-                <div className="flex items-center space-x-2.5">
-                  <h2 className="font-serif text-xl sm:text-2xl font-black text-forest-950 font-mono tracking-tight">
-                    {selectedOrder.orderId}
-                  </h2>
-                  <span className={`px-3 py-1 rounded-full text-xs font-bold border uppercase tracking-wider ${getOrderStatusBadgeClass(selectedOrder.orderStatus)}`}>
-                    {formatStatusName(selectedOrder.orderStatus)}
-                  </span>
-                </div>
-              </div>
+          <div className="p-3 bg-white border border-slate-300 rounded-xl">
+            <span className="text-[10px] uppercase font-bold text-slate-600 block">Active Logistics</span>
+            <span className="font-mono font-bold text-lg text-blue-800 block mt-0.5">
+              {reportInTransitCount}
+            </span>
+            <span className="text-[10px] text-blue-700 font-medium block mt-0.5">
+              In-Transit Shipments
+            </span>
+          </div>
 
-              {/* Quick Actions */}
-              <div className="flex items-center space-x-2.5 flex-wrap gap-y-2">
-                <button
-                  onClick={() => window.open(`${appConfig.apiBaseUrl}/orders/${selectedOrder.orderId}/invoice`, '_blank')}
-                  className="inline-flex items-center space-x-1.5 px-3.5 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs transition shadow-xs"
-                  title="Download Tax Invoice"
-                >
-                  <FileText className="w-4 h-4 text-slate-500" />
-                  <span>Tax Invoice</span>
-                </button>
+          <div className="p-3 bg-white border border-slate-300 rounded-xl">
+            <span className="text-[10px] uppercase font-bold text-slate-600 block">Cancelled & RTO</span>
+            <span className="font-mono font-bold text-lg text-rose-800 block mt-0.5">
+              {reportCancelledCount + reportRtoCount}
+            </span>
+            <span className="text-[10px] text-slate-600 font-medium block mt-0.5">
+              Can: {reportCancelledCount} | RTO: {reportRtoCount}
+            </span>
+          </div>
+        </div>
 
-                {selectedOrder.shipment?.awbCode && (
-                  <button
-                    onClick={() => window.open(`http://localhost:5000/api/shipping/label/${selectedOrder.orderId}`, '_blank')}
-                    className="inline-flex items-center space-x-1.5 px-3.5 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs transition shadow-xs"
-                    title="Print Shipping Label"
-                  >
-                    <Printer className="w-4 h-4 text-slate-500" />
-                    <span>Shipping Label</span>
-                  </button>
+        {/* Detailed Orders Breakdown Table */}
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <h4 className="font-serif font-bold text-sm text-forest-950">
+              Itemized Order Records ({reportTotalOrders})
+            </h4>
+            <span className="text-[11px] text-slate-500 font-sans font-mono">
+              Scope: {getScopeLabel()} &bull; {getPeriodLabel()}
+            </span>
+          </div>
+          <div className="border border-slate-300 rounded-xl overflow-hidden font-sans print:border-slate-300">
+            <table className="w-full text-left divide-y divide-slate-200 text-xs table-fixed">
+              <thead className="bg-white border-b-2 border-slate-300 font-bold uppercase text-[9px] text-slate-800">
+                <tr>
+                  <th className="p-1.5 w-[3%] text-center">#</th>
+                  <th className="p-1.5 w-[12%]">Order ID</th>
+                  <th className="p-1.5 w-[8.5%]">Date</th>
+                  <th className="p-1.5 w-[24%]">Customer & City</th>
+                  <th className="p-1.5 w-[15%]">Items</th>
+                  <th className="p-1.5 w-[9.5%]">Payment</th>
+                  <th className="p-1.5 w-[9%]">Status</th>
+                  <th className="p-1.5 w-[10.5%]">Carrier & AWB</th>
+                  <th className="p-1.5 w-[8.5%] text-right pr-2">Amount</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 bg-white">
+                {reportOrders.map((o, idx) => (
+                  <tr key={o._id || o.orderId} className="hover:bg-slate-50/60 print:hover:bg-transparent">
+                    <td className="p-1.5 font-mono text-[9.5px] text-slate-400 text-center">{idx + 1}</td>
+                    <td className="p-1.5 font-mono font-bold text-slate-900 text-[9.5px] break-all leading-snug" title={o.orderId}>
+                      {o.orderId}
+                    </td>
+                    <td className="p-1.5 text-slate-600 whitespace-nowrap text-[9.5px]">
+                      {o.createdAt ? new Date(o.createdAt).toLocaleDateString('en-IN') : 'N/A'}
+                    </td>
+                    <td className="p-1.5 min-w-0 leading-tight">
+                      <p className="font-bold text-slate-900 text-[9.5px] break-words" title={o.customerDetails?.fullName}>
+                        {o.customerDetails?.fullName || 'N/A'}
+                      </p>
+                      <p className="text-[9px] text-slate-500 break-words">
+                        {o.shippingAddress?.city || ''}{o.shippingAddress?.pincode ? `, ${o.shippingAddress.pincode}` : ''}
+                      </p>
+                    </td>
+                    <td className="p-1.5 text-[9.5px] text-slate-800 font-medium break-words leading-tight" title={o.items?.map(it => `${it.quantity}x ${it.name}`).join(', ')}>
+                      {o.items?.map(it => `${it.quantity || 1}x ${getShortItemName(it.name)}`).join(', ') || 'N/A'}
+                    </td>
+                    <td className="p-1.5 text-[9px] min-w-0 leading-tight">
+                      <span className="font-bold text-slate-800 block text-[9.5px] whitespace-nowrap">
+                        {o.paymentInfo?.method || o.paymentMethod || 'PREPAID'}
+                      </span>
+                      {(() => {
+                        const isCod = o.paymentInfo?.method === 'COD' || o.paymentMethod === 'COD';
+                        const isCancelled = ['CANCELLED', 'CANCELLATION_REQUESTED', 'RTO_COMPLETED', 'RETURNED_TO_SELLER'].includes(o.orderStatus);
+                        let payStat = o.paymentInfo?.status || o.paymentStatus || 'PENDING';
+                        if (isCod) {
+                          if (isCancelled && o.orderStatus !== 'DELIVERED') payStat = 'NOT_APPLICABLE';
+                          else if (o.orderStatus !== 'DELIVERED') payStat = 'PENDING';
+                        }
+                        const displayStat = payStat === 'NOT_APPLICABLE' ? 'N/A' : payStat;
+                        return (
+                          <span className={`block font-bold text-[8.5px] whitespace-nowrap ${payStat === 'PAID' ? 'text-emerald-700' : 'text-amber-700'}`}>
+                            {displayStat}
+                          </span>
+                        );
+                      })()}
+                    </td>
+                    <td className="p-1.5 min-w-0 leading-tight">
+                      <span className="inline-block px-1.5 py-0.5 rounded text-[9px] font-bold border border-slate-300 text-slate-800 bg-white whitespace-nowrap">
+                        {formatStatusName(o.orderStatus)}
+                      </span>
+                    </td>
+                    <td className="p-1.5 text-[9.5px] min-w-0 leading-tight">
+                      {o.shipment?.awbCode ? (
+                        <>
+                          <p className="font-mono font-bold text-slate-900 text-[9.5px] tracking-tight break-all select-all" title={o.shipment.awbCode}>
+                            {o.shipment.awbCode}
+                          </p>
+                          <p className="text-[8.5px] text-slate-500 break-words mt-0.5">
+                            {o.shipment.courierName || 'India Post'}
+                          </p>
+                        </>
+                      ) : (
+                        <span className="text-slate-400 text-[9px] whitespace-nowrap">Pending AWB</span>
+                      )}
+                    </td>
+                    <td className="p-1.5 text-right font-mono font-bold text-slate-900 text-[10.5px] whitespace-nowrap pr-2">
+                      ₹{o.pricing?.totalAmount || 0}
+                    </td>
+                  </tr>
+                ))}
+
+                {reportOrders.length === 0 && (
+                  <tr>
+                    <td colSpan={9} className="p-8 text-center text-slate-400">
+                      No orders found for the selected date range ({getPeriodLabel()}).
+                    </td>
+                  </tr>
                 )}
+              </tbody>
+              <tfoot className="bg-white font-bold border-t-2 border-slate-300">
+                <tr>
+                  <td colSpan={4} className="p-1.5 text-slate-700 uppercase text-[9.5px]">
+                    Total Aggregate ({reportTotalOrders} Orders)
+                  </td>
+                  <td className="p-1.5 text-slate-800 text-[9.5px] font-medium whitespace-nowrap">
+                    {reportTotalUnits} Units Sold
+                  </td>
+                  <td colSpan={3}></td>
+                  <td className="p-1.5 text-right font-mono text-xs text-forest-950 font-black whitespace-nowrap pr-2">
+                    ₹{reportTotalRevenue.toLocaleString('en-IN')}
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      </div>
 
-                {!['CANCELLED', 'RETURNED'].includes(selectedOrder.orderStatus) && (
-                  <button
-                    onClick={() => handleOpenTrackingModal(selectedOrder)}
-                    disabled={isProcessingAction}
-                    className="inline-flex items-center space-x-1.5 px-3.5 py-2 bg-gradient-to-r from-gold-500 to-amber-500 hover:from-gold-600 hover:to-amber-600 text-forest-950 font-black text-xs rounded-xl shadow-md transition transform hover:scale-[1.02]"
-                  >
-                    <Truck className="w-4 h-4" />
-                    <span>{selectedOrder.shipment?.trackingNumber || selectedOrder.shipment?.awbCode ? 'Update Tracking' : 'Add Tracking'}</span>
-                  </button>
-                )}
+      {/* 2. ON-SCREEN VIEWS (HIDDEN IN PRINT) */}
+      <div className="print:hidden space-y-6 w-full">
+                            {selectedOrder ? (
+                              isViewingComplaintPage && selectedOrder.complaint?.hasComplaint ? (
+                                /* ====================================================================
+                                   DEDICATED FULL-PAGE CUSTOMER COMPLAINT & VIDEO PROOF INSPECTION VIEW
+                                   ==================================================================== */
+                                <div className="space-y-6 w-full animate-fadeIn">
+                                  {/* Header Bar */}
+                                  <div className="bg-white p-5 sm:p-6 rounded-3xl border border-slate-200/90 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                    <div className="flex items-center space-x-3.5 flex-wrap gap-y-2">
+                                      <button
+                                        type="button"
+                                        onClick={() => setIsViewingComplaintPage(false)}
+                                        className="inline-flex items-center space-x-2 px-3.5 py-2 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 hover:text-forest-950 font-bold text-xs border border-slate-200/80 transition shadow-xs group cursor-pointer"
+                                        title="Return to order details"
+                                      >
+                                        <ArrowLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition" />
+                                        <span>Back to Order Details</span>
+                                      </button>
 
-                {selectedOrder.orderStatus !== 'DELIVERED' && selectedOrder.orderStatus !== 'CANCELLED' && (
-                  <button
-                    onClick={() => handleOrderStatusUpdate(selectedOrder, 'DELIVERED')}
-                    disabled={isProcessingAction}
-                    className="inline-flex items-center space-x-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition shadow-xs cursor-pointer"
-                    title="Mark this order as Delivered"
-                  >
-                    <CheckCircle2 className="w-4 h-4" />
-                    <span>Mark Delivered</span>
-                  </button>
-                )}
+                                      <div className="flex items-center space-x-2.5">
+                                        <div className="w-9 h-9 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center shrink-0">
+                                          <ShieldAlert className="w-5 h-5 text-amber-700" />
+                                        </div>
+                                        <div>
+                                          <div className="flex items-center space-x-2">
+                                            <h2 className="font-serif text-lg sm:text-xl font-bold text-slate-900">
+                                              Delivery Issue & Video Proof
+                                            </h2>
+                                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono uppercase bg-amber-100 text-amber-900 border border-amber-300">
+                                              {selectedOrder.complaint.status}
+                                            </span>
+                                          </div>
+                                          <p className="text-xs text-slate-500">
+                                            Order <strong className="font-mono text-slate-800">#{selectedOrder.orderId || selectedOrder._id}</strong> • Placed by {selectedOrder.shippingAddress?.fullName || 'Customer'}
+                                          </p>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
 
-                {(selectedOrder.shipment?.trackingNumber || selectedOrder.shipment?.awbCode) && (
-                  <button
-                    onClick={() => handleSendWhatsAppTracking(selectedOrder)}
-                    className="inline-flex items-center space-x-1.5 px-3.5 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs transition shadow-xs"
-                    title="Send tracking details to customer on WhatsApp"
-                  >
-                    <MessageCircle className="w-4 h-4" />
-                    <span>WhatsApp Alert</span>
-                  </button>
-                )}
-              </div>
-            </div>
+                                  {/* Inspection Card Body */}
+                                  <div className="bg-white rounded-3xl p-5 sm:p-7 border border-slate-200 shadow-sm space-y-6">
+                                    {/* Top Banner Notice */}
+                                    <div className="p-4 bg-amber-50/80 rounded-2xl border border-amber-200 text-xs text-amber-900 flex items-start space-x-2.5">
+                                      <AlertTriangle className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+                                      <div>
+                                        <p className="font-bold">Strict Non-Returnable & Non-Replaceable Policy Verification</p>
+                                        <p className="text-[11px] text-amber-800 mt-0.5 leading-relaxed">
+                                          Personal care and Ayurvedic formulations are sealed and strictly non-returnable. Please inspect the customer's unboxing video proof below to verify whether transit damage, broken seal, or incorrect bottle dispatch occurred before issuing a direct refund.
+                                        </p>
+                                      </div>
+                                    </div>
 
-            {/* ================================================================
+                                    {/* Grid: Left Video / Photos - Right Customer & Claim Info */}
+                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                      {/* Left Column: Video & Media Section */}
+                                      <div className="space-y-4">
+                                        <div>
+                                          <div className="flex items-center justify-between mb-2">
+                                            <label className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center space-x-1.5">
+                                              <Video className="w-4 h-4 text-forest-700" />
+                                              <span>Customer Video Proof</span>
+                                            </label>
+                                            {selectedOrder.complaint.videoUrl && (
+                                              <span className="text-[10px] px-2 py-0.5 rounded-md font-mono bg-emerald-50 text-emerald-800 border border-emerald-200 font-semibold">
+                                                Order_Report_Videos
+                                              </span>
+                                            )}
+                                          </div>
+
+                                          {selectedOrder.complaint.videoDeletedByAdmin ? (
+                                            <div className="p-8 rounded-2xl bg-rose-50/80 border-2 border-dashed border-rose-200 text-center space-y-2">
+                                              <div className="w-10 h-10 rounded-full bg-rose-100 text-rose-700 flex items-center justify-center mx-auto">
+                                                <Trash2 className="w-5 h-5 text-rose-600" />
+                                              </div>
+                                              <div>
+                                                <span className="inline-block px-3 py-0.5 rounded-full text-xs font-extrabold bg-rose-200 text-rose-900 uppercase tracking-wide">
+                                                  Deleted by Admin
+                                                </span>
+                                              </div>
+                                              <p className="text-xs font-semibold text-rose-900">
+                                                Video proof permanently deleted from Cloudinary folder & database
+                                              </p>
+                                              {selectedOrder.complaint.videoDeletedAt && (
+                                                <p className="text-[11px] text-rose-700/80 font-mono">
+                                                  Deleted on: {new Date(selectedOrder.complaint.videoDeletedAt).toLocaleString('en-IN')}
+                                                </p>
+                                              )}
+                                            </div>
+                                          ) : selectedOrder.complaint.videoUrl ? (
+                                            <div className="space-y-2">
+                                              <div className="relative rounded-2xl overflow-hidden bg-black border border-slate-800 shadow-md aspect-video max-h-[320px] flex items-center justify-center">
+                                                <video
+                                                  src={selectedOrder.complaint.videoUrl}
+                                                  controls
+                                                  className="w-full h-full object-contain"
+                                                  playsInline
+                                                  preload="metadata"
+                                                />
+                                              </div>
+
+                                              <div className="flex items-center justify-between text-[11px] text-slate-500 px-1">
+                                                <span>
+                                                  {selectedOrder.complaint.videoDuration
+                                                    ? `Duration: ~${Math.round(selectedOrder.complaint.videoDuration)}s`
+                                                    : '1 Video Attached'}
+                                                </span>
+                                                <a
+                                                  href={selectedOrder.complaint.videoUrl}
+                                                  target="_blank"
+                                                  rel="noreferrer"
+                                                  className="text-forest-800 hover:text-forest-950 font-bold inline-flex items-center space-x-1 underline"
+                                                >
+                                                  <span>Open In New Tab</span>
+                                                  <ExternalLink className="w-3 h-3" />
+                                                </a>
+                                              </div>
+
+                                              {/* Admin Delete Video Proof from Cloudinary */}
+                                              <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
+                                                <button
+                                                  type="button"
+                                                  onClick={handleDeleteComplaintVideo}
+                                                  disabled={isDeletingComplaintVideo}
+                                                  className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 font-bold text-[11px] rounded-xl transition flex items-center space-x-1.5 disabled:opacity-50 cursor-pointer"
+                                                >
+                                                  {isDeletingComplaintVideo ? (
+                                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                                  ) : (
+                                                    <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                                                  )}
+                                                  <span>Delete Video</span>
+                                                </button>
+                                              </div>
+                                            </div>
+                                          ) : (
+                                            <div className="p-8 rounded-2xl bg-slate-50 border-2 border-dashed border-slate-200 text-center space-y-2">
+                                              <Video className="w-8 h-8 text-slate-300 mx-auto" />
+                                              <p className="text-xs font-bold text-slate-600">No Video Proof Available</p>
+                                              <p className="text-[11px] text-slate-400">
+                                                Video proof has not been uploaded or was permanently removed from Cloudinary folder "NOVISE_HERBAL/Order_Report_Videos".
+                                              </p>
+                                            </div>
+                                          )}
+                                        </div>
+
+                                        {/* Photo Proofs */}
+                                        {selectedOrder.complaint.images && selectedOrder.complaint.images.length > 0 && (
+                                          <div>
+                                            <label className="text-xs font-bold text-slate-800 uppercase tracking-wider block mb-2">
+                                              Additional Photo Proof ({selectedOrder.complaint.images.length})
+                                            </label>
+                                            <div className="grid grid-cols-3 gap-2">
+                                              {selectedOrder.complaint.images.map((img, i) => (
+                                                <a
+                                                  key={i}
+                                                  href={img}
+                                                  target="_blank"
+                                                  rel="noreferrer"
+                                                  className="group relative aspect-square rounded-xl overflow-hidden border border-slate-200 bg-slate-100 shadow-xs block"
+                                                >
+                                                  <img src={img} alt="proof" className="w-full h-full object-cover group-hover:scale-110 transition duration-200" />
+                                                  <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
+                                                    <ExternalLink className="w-4 h-4 text-white" />
+                                                  </div>
+                                                </a>
+                                              ))}
+                                            </div>
+                                          </div>
+                                        )}
+                                      </div>
+
+                                      {/* Right Column: Customer Info, Issue details, and Refund details */}
+                                      <div className="space-y-4">
+                                        {/* Customer Contact Card */}
+                                        <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
+                                          <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                                            Customer Contact Details
+                                          </h4>
+                                          <div className="space-y-1.5 text-xs">
+                                            <div className="flex justify-between">
+                                              <span className="text-slate-500">Name:</span>
+                                              <strong className="text-slate-900">{selectedOrder.shippingAddress?.fullName || 'N/A'}</strong>
+                                            </div>
+                                            <div className="flex justify-between items-center">
+                                              <span className="text-slate-500">Report Mobile:</span>
+                                              <strong className="font-mono text-slate-900">
+                                                {selectedOrder.complaint.customerPhone || selectedOrder.shippingAddress?.phone || 'N/A'}
+                                              </strong>
+                                            </div>
+                                            <div className="flex justify-between">
+                                              <span className="text-slate-500">Delivery City:</span>
+                                              <strong className="text-slate-900">
+                                                {selectedOrder.shippingAddress?.city}, {selectedOrder.shippingAddress?.state}
+                                              </strong>
+                                            </div>
+                                          </div>
+
+                                          {/* Quick Call & WhatsApp Action Buttons */}
+                                          {(selectedOrder.complaint.customerPhone || selectedOrder.shippingAddress?.phone) && (
+                                            <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-200">
+                                              <a
+                                                href={getComplaintWhatsAppUrl(selectedOrder)}
+                                                target="_blank"
+                                                rel="noreferrer"
+                                                className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs flex items-center justify-center space-x-1.5 shadow-xs transition"
+                                              >
+                                                <MessageCircle className="w-3.5 h-3.5" />
+                                                <span>WhatsApp</span>
+                                              </a>
+                                              <a
+                                                href={`tel:${selectedOrder.complaint.customerPhone || selectedOrder.shippingAddress?.phone}`}
+                                                className="px-3 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-xl font-bold text-xs flex items-center justify-center space-x-1.5 transition"
+                                              >
+                                                <Phone className="w-3.5 h-3.5" />
+                                                <span>Direct Call</span>
+                                              </a>
+                                            </div>
+                                          )}
+                                        </div>
+
+                                        {/* Claim Details Card */}
+                                        <div className="p-4 rounded-2xl bg-amber-50/60 border border-amber-200/80 space-y-2 text-xs">
+                                          <h4 className="text-xs font-bold text-amber-950 uppercase tracking-wider">
+                                            Claim Specification
+                                          </h4>
+                                          <div>
+                                            <span className="text-amber-800 block text-[11px]">Issue Category:</span>
+                                            <strong className="text-slate-900 font-bold">{selectedOrder.complaint.reason}</strong>
+                                          </div>
+                                          <div>
+                                            <span className="text-amber-800 block text-[11px]">Customer Explanation:</span>
+                                            <p className="p-2.5 rounded-xl bg-white border border-amber-200 text-slate-800 text-xs italic mt-1 leading-relaxed">
+                                              "{selectedOrder.complaint.description || 'No detailed note provided.'}"
+                                            </p>
+                                          </div>
+                                          {selectedOrder.complaint.reportedAt && (
+                                            <div className="flex justify-between text-[11px] text-amber-800 pt-1">
+                                              <span>Reported At:</span>
+                                              <strong className="text-slate-900">
+                                                {new Date(selectedOrder.complaint.reportedAt).toLocaleString('en-IN', {
+                                                  day: 'numeric',
+                                                  month: 'short',
+                                                  year: 'numeric',
+                                                  hour: '2-digit',
+                                                  minute: '2-digit'
+                                                })}
+                                              </strong>
+                                            </div>
+                                          )}
+                                        </div>
+
+                                        {/* Bank / UPI Details for Direct Refund (or Direct Contact Info) */}
+                                        {(selectedOrder.complaint.bankDetails?.accountNumber || selectedOrder.complaint.bankDetails?.upiId) ? (
+                                          <div className="p-4 rounded-2xl bg-emerald-50/60 border border-emerald-200 space-y-2 text-xs">
+                                            <h4 className="text-xs font-bold text-emerald-950 uppercase tracking-wider">
+                                              Customer Refund Details
+                                            </h4>
+                                            {selectedOrder.complaint.bankDetails?.accountNumber && (
+                                              <div className="space-y-1 text-[11px]">
+                                                <p><span className="text-slate-500">Beneficiary:</span> <strong>{selectedOrder.complaint.bankDetails.beneficiaryName}</strong></p>
+                                                <p><span className="text-slate-500">Account:</span> <strong className="font-mono">{selectedOrder.complaint.bankDetails.accountNumber}</strong></p>
+                                                <p><span className="text-slate-500">IFSC Code:</span> <strong className="font-mono">{selectedOrder.complaint.bankDetails.ifscCode}</strong></p>
+                                                {selectedOrder.complaint.bankDetails.bankName && (
+                                                  <p><span className="text-slate-500">Bank:</span> <strong>{selectedOrder.complaint.bankDetails.bankName}</strong></p>
+                                                )}
+                                              </div>
+                                            )}
+                                            {selectedOrder.complaint.bankDetails?.upiId && (
+                                              <div className="pt-1 text-[11px]">
+                                                <span className="text-slate-500">UPI ID:</span>{' '}
+                                                <strong className="font-mono text-emerald-900 font-bold">{selectedOrder.complaint.bankDetails.upiId}</strong>
+                                              </div>
+                                            )}
+                                          </div>
+                                        ) : (
+                                          <div className="p-4 rounded-2xl bg-emerald-50/70 border border-emerald-200 space-y-1.5 text-xs text-emerald-950">
+                                            <div className="flex items-center space-x-2">
+                                              <ShieldCheck className="w-4 h-4 text-emerald-700 shrink-0" />
+                                              <h4 className="text-xs font-bold text-emerald-950 uppercase tracking-wider">
+                                                Direct Contact Resolution Mode
+                                              </h4>
+                                            </div>
+                                            <p className="text-[11.5px] text-emerald-800 leading-relaxed">
+                                              Customer has securely submitted issue details and video proof without disclosing sensitive bank account details. Click <strong>WhatsApp (Auto-Report Msg)</strong> or <strong>Direct Call</strong> above to coordinate with customer directly and finalize refund or replacement.
+                                            </p>
+                                          </div>
+                                        )}
+
+                                        {/* Current Resolution State if already resolved */}
+                                        {selectedOrder.complaint.status === 'RESOLVED' && (
+                                          <div className="p-4 rounded-2xl bg-emerald-100 border border-emerald-300 text-xs text-emerald-950 space-y-1">
+                                            <p className="font-bold">Claim Resolved</p>
+                                            <p className="text-[11px]">Resolution: <strong>{selectedOrder.complaint.resolutionType}</strong></p>
+                                            {selectedOrder.complaint.resolutionNotes && (
+                                              <p className="text-[11px] text-emerald-800">"{selectedOrder.complaint.resolutionNotes}"</p>
+                                            )}
+                                          </div>
+                                        )}
+                                        {selectedOrder.complaint.status === 'REJECTED' && (
+                                          <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-xs text-rose-950 space-y-1">
+                                            <p className="font-bold">Claim Rejected</p>
+                                            {selectedOrder.complaint.rejectionReason && (
+                                              <p className="text-[11px] text-rose-800">Reason: "{selectedOrder.complaint.rejectionReason}"</p>
+                                            )}
+                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
+
+                                    {/* Inspection Footer with Action Buttons */}
+                                    <div className="p-5 border-t border-slate-100 bg-slate-50/80 rounded-2xl flex flex-wrap items-center justify-between gap-3">
+                                      <button
+                                        type="button"
+                                        onClick={() => setIsViewingComplaintPage(false)}
+                                        className="px-5 py-2.5 border border-slate-200 rounded-xl font-bold text-slate-600 hover:bg-slate-100 transition text-xs cursor-pointer"
+                                      >
+                                        Close Inspection
+                                      </button>
+
+                                      {['SUBMITTED', 'UNDER_REVIEW'].includes(selectedOrder.complaint.status || '') && (
+                                        <div className="flex items-center space-x-2">
+                                          {selectedOrder.complaint.status === 'SUBMITTED' && (
+                                            <button
+                                              type="button"
+                                              onClick={() => handleReviewComplaint('UNDER_REVIEW')}
+                                              disabled={isProcessingAction}
+                                              className="px-4 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-xl shadow-xs transition cursor-pointer"
+                                            >
+                                              Mark Under Review
+                                            </button>
+                                          )}
+                                          <button
+                                            type="button"
+                                            onClick={() => setShowComplaintRejectModal(true)}
+                                            disabled={isProcessingAction}
+                                            className="px-4 py-2.5 bg-rose-100 hover:bg-rose-200 text-rose-800 font-bold text-xs rounded-xl transition cursor-pointer"
+                                          >
+                                            Reject Claim
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={() => setShowComplaintResolveModal(true)}
+                                            disabled={isProcessingAction}
+                                            className="px-5 py-2.5 bg-forest-900 hover:bg-forest-800 text-gold-400 font-bold text-xs rounded-xl shadow-xs transition cursor-pointer"
+                                          >
+                                            Approve & Issue Refund
+                                          </button>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              ) : (
+                                // DEDICATED FULL-PAGE ORDER DETAILS VIEW
+
+                                <div className="space-y-6 w-full animate-fadeIn">
+                                  {/* Header Bar */}
+                                  <div className="bg-white p-5 sm:p-6 rounded-3xl border border-slate-200/90 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                    <div className="flex items-center space-x-3.5 flex-wrap gap-y-2">
+                                      <button
+                                        onClick={handleBackToOrders}
+                                        className="inline-flex items-center space-x-2 px-3.5 py-2 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 hover:text-forest-950 font-bold text-xs border border-slate-200/80 transition shadow-xs group"
+                                        title="Return to order list"
+                                      >
+                                        <ArrowLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition" />
+                                        <span>Back to Orders</span>
+                                      </button>
+
+                                      <div className="flex items-center space-x-2.5">
+                                        <h2 className="font-serif text-xl sm:text-2xl font-black text-forest-950 font-mono tracking-tight">
+                                          {selectedOrder.orderId}
+                                        </h2>
+                                        <span className={`px-3 py-1 rounded-full text-xs font-bold border uppercase tracking-wider ${getOrderStatusBadgeClass(selectedOrder.orderStatus)}`}>
+                                          {formatStatusName(selectedOrder.orderStatus)}
+                                        </span>
+                                      </div>
+                                    </div>
+
+                                    {/* Quick Actions */}
+                                    <div className="flex items-center space-x-2.5 flex-wrap gap-y-2">
+                                      <button
+                                        onClick={() => window.open(`${appConfig.apiBaseUrl}/orders/${selectedOrder.orderId}/invoice`, '_blank')}
+                                        className="inline-flex items-center space-x-1.5 px-3.5 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs transition shadow-xs"
+                                        title="Download Tax Invoice"
+                                      >
+                                        <FileText className="w-4 h-4 text-slate-500" />
+                                        <span>Tax Invoice</span>
+                                      </button>
+
+                                      {selectedOrder.shipment?.awbCode && (
+                                        <button
+                                          onClick={() => window.open(`http://localhost:5000/api/shipping/label/${selectedOrder.orderId}`, '_blank')}
+                                          className="inline-flex items-center space-x-1.5 px-3.5 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs transition shadow-xs"
+                                          title="Print Shipping Label"
+                                        >
+                                          <Printer className="w-4 h-4 text-slate-500" />
+                                          <span>Shipping Label</span>
+                                        </button>
+                                      )}
+
+                                      {!['CANCELLED', 'RETURNED'].includes(selectedOrder.orderStatus) && (
+                                        <button
+                                          onClick={() => handleOpenTrackingModal(selectedOrder)}
+                                          disabled={isProcessingAction}
+                                          className="inline-flex items-center space-x-1.5 px-3.5 py-2 bg-gradient-to-r from-gold-500 to-amber-500 hover:from-gold-600 hover:to-amber-600 text-forest-950 font-black text-xs rounded-xl shadow-md transition transform hover:scale-[1.02]"
+                                        >
+                                          <Truck className="w-4 h-4" />
+                                          <span>{selectedOrder.shipment?.trackingNumber || selectedOrder.shipment?.awbCode ? 'Update Tracking' : 'Add Tracking'}</span>
+                                        </button>
+                                      )}
+
+                                      {selectedOrder.orderStatus !== 'DELIVERED' && selectedOrder.orderStatus !== 'CANCELLED' && (
+                                        <button
+                                          onClick={() => handleOrderStatusUpdate(selectedOrder, 'DELIVERED')}
+                                          disabled={isProcessingAction}
+                                          className="inline-flex items-center space-x-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition shadow-xs cursor-pointer"
+                                          title="Mark this order as Delivered"
+                                        >
+                                          <CheckCircle2 className="w-4 h-4" />
+                                          <span>Mark Delivered</span>
+                                        </button>
+                                      )}
+
+                                      {(selectedOrder.shipment?.trackingNumber || selectedOrder.shipment?.awbCode) && (
+                                        <button
+                                          onClick={() => handleSendWhatsAppTracking(selectedOrder)}
+                                          className="inline-flex items-center space-x-1.5 px-3.5 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs transition shadow-xs"
+                                          title="Send tracking details to customer on WhatsApp"
+                                        >
+                                          <MessageCircle className="w-4 h-4" />
+                                          <span>WhatsApp Alert</span>
+                                        </button>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  {/* ================================================================
              WORKFLOW ACTION BANNERS (Cancellation, Return, RTO)
              ================================================================ */}
 
-            {/* A. CANCELLATION REQUESTED BANNER */}
-            {selectedOrder.orderStatus === 'CANCELLATION_REQUESTED' && (
-              <div className="p-5 rounded-3xl bg-amber-50 border-2 border-amber-300 shadow-sm space-y-3 animate-fadeIn">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-10 h-10 rounded-2xl bg-amber-200 text-amber-900 flex items-center justify-center shrink-0">
-                      <AlertTriangle className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <h3 className="font-bold text-slate-900 text-sm">Customer Requested Order Cancellation</h3>
-                      <p className="text-xs text-amber-800">
-                        Reason: <strong className="font-semibold text-slate-900">{selectedOrder.cancellation?.reason || 'Cancelled by customer'}</strong>
-                        {selectedOrder.cancellation?.description ? ` • "${selectedOrder.cancellation.description}"` : ''}
-                      </p>
-                    </div>
-                  </div>
+                                  {/* A. CANCELLATION REQUESTED BANNER */}
+                                  {selectedOrder.orderStatus === 'CANCELLATION_REQUESTED' && (
+                                    <div className="p-5 rounded-3xl bg-amber-50 border-2 border-amber-300 shadow-sm space-y-3 animate-fadeIn">
+                                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                        <div className="flex items-center space-x-3">
+                                          <div className="w-10 h-10 rounded-2xl bg-amber-200 text-amber-900 flex items-center justify-center shrink-0">
+                                            <AlertTriangle className="w-5 h-5" />
+                                          </div>
+                                          <div>
+                                            <h3 className="font-bold text-slate-900 text-sm">Customer Requested Order Cancellation</h3>
+                                            <p className="text-xs text-amber-800">
+                                              Reason: <strong className="font-semibold text-slate-900">{selectedOrder.cancellation?.reason || 'Cancelled by customer'}</strong>
+                                              {selectedOrder.cancellation?.description ? ` • "${selectedOrder.cancellation.description}"` : ''}
+                                            </p>
+                                          </div>
+                                        </div>
 
-                  <div className="flex items-center space-x-2 shrink-0">
-                    <button
-                      onClick={() => handleApproveCancellation(selectedOrder)}
-                      disabled={isProcessingAction}
-                      className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl transition flex items-center space-x-1"
-                    >
-                      <Check className="w-3.5 h-3.5" />
-                      <span>Approve Cancellation</span>
-                    </button>
-                    <button
-                      onClick={() => setShowCancelRejectModal(true)}
-                      disabled={isProcessingAction}
-                      className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold text-xs rounded-xl transition flex items-center space-x-1"
-                    >
-                      <Ban className="w-3.5 h-3.5" />
-                      <span>Reject</span>
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
+                                        <div className="flex items-center space-x-2 shrink-0">
+                                          <button
+                                            onClick={() => handleApproveCancellation(selectedOrder)}
+                                            disabled={isProcessingAction}
+                                            className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl transition flex items-center space-x-1"
+                                          >
+                                            <Check className="w-3.5 h-3.5" />
+                                            <span>Approve Cancellation</span>
+                                          </button>
+                                          <button
+                                            onClick={() => setShowCancelRejectModal(true)}
+                                            disabled={isProcessingAction}
+                                            className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold text-xs rounded-xl transition flex items-center space-x-1"
+                                          >
+                                            <Ban className="w-3.5 h-3.5" />
+                                            <span>Reject</span>
+                                          </button>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )}
 
-            {/* B. EXCEPTIONAL CUSTOMER COMPLAINT BANNER (Non-Returnable Products: Damage/Defect/Leakage - Compact Summary Bar) */}
-            {selectedOrder.complaint?.hasComplaint && (
-              <div className="p-5 rounded-3xl bg-amber-50 border-2 border-amber-300 shadow-sm animate-fadeIn">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-10 h-10 rounded-2xl bg-amber-200 text-amber-900 flex items-center justify-center shrink-0">
-                      <ShieldAlert className="w-5 h-5 text-amber-900" />
-                    </div>
-                    <div>
-                      <h3 className="font-bold text-slate-900 text-sm">
-                        Customer Issue Claim: {selectedOrder.complaint.reason}
-                      </h3>
-                      <p className="text-xs text-amber-800">
-                        Description: <strong className="font-semibold text-slate-900">"{selectedOrder.complaint.description || 'No description'}"</strong>
-                      </p>
-                    </div>
-                  </div>
+                                  {/* B. EXCEPTIONAL CUSTOMER COMPLAINT BANNER (Non-Returnable Products: Damage/Defect/Leakage - Compact Summary Bar) */}
+                                  {selectedOrder.complaint?.hasComplaint && (
+                                    <div className="p-5 rounded-3xl bg-amber-50 border-2 border-amber-300 shadow-sm animate-fadeIn">
+                                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                        <div className="flex items-center space-x-3">
+                                          <div className="w-10 h-10 rounded-2xl bg-amber-200 text-amber-900 flex items-center justify-center shrink-0">
+                                            <ShieldAlert className="w-5 h-5 text-amber-900" />
+                                          </div>
+                                          <div>
+                                            <h3 className="font-bold text-slate-900 text-sm">
+                                              Customer Issue Claim: {selectedOrder.complaint.reason}
+                                            </h3>
+                                            <p className="text-xs text-amber-800">
+                                              Description: <strong className="font-semibold text-slate-900">"{selectedOrder.complaint.description || 'No description'}"</strong>
+                                            </p>
+                                          </div>
+                                        </div>
 
-                  <div className="flex items-center space-x-2">
-                    <span className="px-3 py-1 rounded-full bg-amber-200 text-amber-900 text-xs font-bold font-mono uppercase self-start sm:self-auto">
-                      {selectedOrder.complaint.status}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setIsViewingComplaintPage(true)}
-                      className="px-3.5 py-1.5 bg-forest-900 hover:bg-forest-800 text-gold-400 font-bold text-xs rounded-xl shadow-xs transition flex items-center space-x-1.5 shrink-0 cursor-pointer"
-                    >
-                      <Video className="w-3.5 h-3.5 text-gold-300" />
-                      <span>Review Video Proof & Details</span>
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
+                                        <div className="flex items-center space-x-2">
+                                          <span className="px-3 py-1 rounded-full bg-amber-200 text-amber-900 text-xs font-bold font-mono uppercase self-start sm:self-auto">
+                                            {selectedOrder.complaint.status}
+                                          </span>
+                                          <button
+                                            type="button"
+                                            onClick={() => setIsViewingComplaintPage(true)}
+                                            className="px-3.5 py-1.5 bg-forest-900 hover:bg-forest-800 text-gold-400 font-bold text-xs rounded-xl shadow-xs transition flex items-center space-x-1.5 shrink-0 cursor-pointer"
+                                          >
+                                            <Video className="w-3.5 h-3.5 text-gold-300" />
+                                            <span>Review Video Proof & Details</span>
+                                          </button>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )}
 
-            {/* C. RTO WORKFLOW BANNER (Non-Returnable Products) */}
-            {['RTO_INITIATED', 'IN_TRANSIT_TO_SELLER', 'RTO_IN_TRANSIT', 'RETURNED_TO_SELLER', 'RTO_COMPLETED'].includes(selectedOrder.orderStatus) && (
-              <div className="p-5 rounded-3xl bg-orange-50 border-2 border-orange-300 shadow-sm space-y-3 animate-fadeIn">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-10 h-10 rounded-2xl bg-orange-200 text-orange-900 flex items-center justify-center shrink-0">
-                      <Truck className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <h3 className="font-bold text-slate-900 text-sm">Return to Origin (RTO) Tracking</h3>
-                      <p className="text-xs text-orange-800">
-                        Reason: <strong className="font-semibold">{selectedOrder.rtoDetails?.reason || 'Delivery refused / unreachable'}</strong>
-                        {selectedOrder.rtoDetails?.inspectionNotes ? ` • "${selectedOrder.rtoDetails.inspectionNotes}"` : ''}
-                      </p>
-                    </div>
-                  </div>
+                                  {/* C. RTO WORKFLOW BANNER (Non-Returnable Products) */}
+                                  {['RTO_INITIATED', 'IN_TRANSIT_TO_SELLER', 'RTO_IN_TRANSIT', 'RETURNED_TO_SELLER', 'RTO_COMPLETED'].includes(selectedOrder.orderStatus) && (
+                                    <div className="p-5 rounded-3xl bg-orange-50 border-2 border-orange-300 shadow-sm space-y-3 animate-fadeIn">
+                                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                        <div className="flex items-center space-x-3">
+                                          <div className="w-10 h-10 rounded-2xl bg-orange-200 text-orange-900 flex items-center justify-center shrink-0">
+                                            <Truck className="w-5 h-5" />
+                                          </div>
+                                          <div>
+                                            <h3 className="font-bold text-slate-900 text-sm">Return to Origin (RTO) Tracking</h3>
+                                            <p className="text-xs text-orange-800">
+                                              Reason: <strong className="font-semibold">{selectedOrder.rtoDetails?.reason || 'Delivery refused / unreachable'}</strong>
+                                              {selectedOrder.rtoDetails?.inspectionNotes ? ` • "${selectedOrder.rtoDetails.inspectionNotes}"` : ''}
+                                            </p>
+                                          </div>
+                                        </div>
 
-                  <div className="flex items-center space-x-2">
-                    {selectedOrder.orderStatus === 'RTO_INITIATED' && (
-                      <button
-                        onClick={() => handleProgressRTO('IN_TRANSIT_TO_SELLER')}
-                        disabled={isProcessingAction}
-                        className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs rounded-xl shadow-xs transition"
-                      >
-                        Mark In Transit to Seller
-                      </button>
-                    )}
-                    {['IN_TRANSIT_TO_SELLER', 'RTO_IN_TRANSIT'].includes(selectedOrder.orderStatus) && (
-                      <button
-                        onClick={() => handleProgressRTO('RETURNED_TO_SELLER')}
-                        disabled={isProcessingAction}
-                        className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-xs transition"
-                      >
-                        Mark Returned to Seller Warehouse
-                      </button>
-                    )}
-                    {selectedOrder.orderStatus === 'RETURNED_TO_SELLER' && (
-                      <button
-                        onClick={() => setShowRTOInspectionModal(true)}
-                        disabled={isProcessingAction}
-                        className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center space-x-1"
-                      >
-                        <ShieldCheck className="w-3.5 h-3.5" />
-                        <span>Inspect Product & Complete RTO</span>
-                      </button>
-                    )}
-                    {selectedOrder.orderStatus === 'RTO_COMPLETED' && (
-                      <span className="px-3 py-1 bg-emerald-100 text-emerald-800 font-bold text-xs rounded-full">
-                        RTO Completed ({selectedOrder.rtoDetails?.condition === 'SELLABLE' ? 'Restocked' : 'Damaged / Not Restocked'})
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
+                                        <div className="flex items-center space-x-2">
+                                          {selectedOrder.orderStatus === 'RTO_INITIATED' && (
+                                            <button
+                                              onClick={() => handleProgressRTO('IN_TRANSIT_TO_SELLER')}
+                                              disabled={isProcessingAction}
+                                              className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs rounded-xl shadow-xs transition"
+                                            >
+                                              Mark In Transit to Seller
+                                            </button>
+                                          )}
+                                          {['IN_TRANSIT_TO_SELLER', 'RTO_IN_TRANSIT'].includes(selectedOrder.orderStatus) && (
+                                            <button
+                                              onClick={() => handleProgressRTO('RETURNED_TO_SELLER')}
+                                              disabled={isProcessingAction}
+                                              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-xs transition"
+                                            >
+                                              Mark Returned to Seller Warehouse
+                                            </button>
+                                          )}
+                                          {selectedOrder.orderStatus === 'RETURNED_TO_SELLER' && (
+                                            <button
+                                              onClick={() => setShowRTOInspectionModal(true)}
+                                              disabled={isProcessingAction}
+                                              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center space-x-1"
+                                            >
+                                              <ShieldCheck className="w-3.5 h-3.5" />
+                                              <span>Inspect Product & Complete RTO</span>
+                                            </button>
+                                          )}
+                                          {selectedOrder.orderStatus === 'RTO_COMPLETED' && (
+                                            <span className="px-3 py-1 bg-emerald-100 text-emerald-800 font-bold text-xs rounded-full">
+                                              RTO Completed ({selectedOrder.rtoDetails?.condition === 'SELLABLE' ? 'Restocked' : 'Damaged / Not Restocked'})
+                                            </span>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )}
 
-            {/* Two-Column Responsive Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                                  {/* Two-Column Responsive Grid */}
+                                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-              {/* Left / Main Details Column (2 spans) */}
-              <div className="lg:col-span-2 space-y-6">
+                                    {/* Left / Main Details Column (2 spans) */}
+                                    <div className="lg:col-span-2 space-y-6">
 
-                {/* 1. ORDER LIFECYCLE & FORWARD STATUS CONTROLLER */}
-                <div className="bg-white p-6 rounded-3xl border border-slate-200/90 shadow-sm space-y-4">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div>
-                      <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">
-                        Order Fulfillment Status
-                      </span>
-                      <p className="text-sm font-semibold text-slate-800 mt-0.5">
-                        Current Status: <span className="font-bold text-forest-950">{formatStatusName(selectedOrder.orderStatus)}</span>
-                      </p>
-                    </div>
+                                      {/* 1. ORDER LIFECYCLE & FORWARD STATUS CONTROLLER */}
+                                      <div className="bg-white p-6 rounded-3xl border border-slate-200/90 shadow-sm space-y-4">
+                                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                          <div>
+                                            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">
+                                              Order Fulfillment Status
+                                            </span>
+                                            <p className="text-sm font-semibold text-slate-800 mt-0.5">
+                                              Current Status: <span className="font-bold text-forest-950">{formatStatusName(selectedOrder.orderStatus)}</span>
+                                            </p>
+                                          </div>
 
-                    {/* Custom Luxury Order Status Dropdown */}
-                    <div className="flex items-center space-x-2.5">
-                      <span className="text-xs font-bold text-slate-500">Update Status:</span>
+                                          {/* Custom Luxury Order Status Dropdown */}
+                                          <div className="flex items-center space-x-2.5">
+                                            <span className="text-xs font-bold text-slate-500">Update Status:</span>
 
-                      {['CANCELLED', 'RTO_COMPLETED'].includes(selectedOrder.orderStatus) ? (
-                        <div className="flex items-center space-x-1.5 px-3.5 py-2 rounded-2xl bg-slate-100 border border-slate-200 text-xs font-bold text-slate-500">
-                          <Lock className="w-3.5 h-3.5 text-slate-400" />
-                          <span>{formatStatusName(selectedOrder.orderStatus)} (Closed)</span>
-                        </div>
-                      ) : (
-                        <div className="relative" ref={orderStatusDropdownRef}>
-                          <button
-                            type="button"
-                            onClick={() => !isProcessingAction && setIsOrderStatusOpen(!isOrderStatusOpen)}
-                            disabled={isProcessingAction}
-                            className={`inline-flex items-center justify-between space-x-3 px-4 py-2 rounded-2xl border transition-all shadow-xs hover:shadow-sm cursor-pointer min-w-[210px] bg-white ${isOrderStatusOpen
-                              ? 'border-forest-900 ring-2 ring-forest-900/10'
-                              : 'border-slate-200 hover:border-slate-300'
-                              }`}
-                          >
-                            <div className="flex items-center space-x-2.5 min-w-0">
-                              <span className={`w-2.5 h-2.5 rounded-full ${getStatusDotClass(selectedOrder.orderStatus)} shrink-0 shadow-xs`}></span>
-                              <span className="font-serif font-bold text-xs text-forest-950 truncate tracking-tight">
-                                {formatStatusName(selectedOrder.orderStatus)}
-                              </span>
-                            </div>
-                            <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-200 shrink-0 ${isOrderStatusOpen ? 'rotate-180 text-forest-900' : ''}`} />
-                          </button>
+                                            {['CANCELLED', 'RTO_COMPLETED'].includes(selectedOrder.orderStatus) ? (
+                                              <div className="flex items-center space-x-1.5 px-3.5 py-2 rounded-2xl bg-slate-100 border border-slate-200 text-xs font-bold text-slate-500">
+                                                <Lock className="w-3.5 h-3.5 text-slate-400" />
+                                                <span>{formatStatusName(selectedOrder.orderStatus)} (Closed)</span>
+                                              </div>
+                                            ) : (
+                                              <div className="relative" ref={orderStatusDropdownRef}>
+                                                <button
+                                                  type="button"
+                                                  onClick={() => !isProcessingAction && setIsOrderStatusOpen(!isOrderStatusOpen)}
+                                                  disabled={isProcessingAction}
+                                                  className={`inline-flex items-center justify-between space-x-3 px-4 py-2 rounded-2xl border transition-all shadow-xs hover:shadow-sm cursor-pointer min-w-[210px] bg-white ${isOrderStatusOpen
+                                                    ? 'border-forest-900 ring-2 ring-forest-900/10'
+                                                    : 'border-slate-200 hover:border-slate-300'
+                                                    }`}
+                                                >
+                                                  <div className="flex items-center space-x-2.5 min-w-0">
+                                                    <span className={`w-2.5 h-2.5 rounded-full ${getStatusDotClass(selectedOrder.orderStatus)} shrink-0 shadow-xs`}></span>
+                                                    <span className="font-serif font-bold text-xs text-forest-950 truncate tracking-tight">
+                                                      {formatStatusName(selectedOrder.orderStatus)}
+                                                    </span>
+                                                  </div>
+                                                  <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-200 shrink-0 ${isOrderStatusOpen ? 'rotate-180 text-forest-900' : ''}`} />
+                                                </button>
 
-                          {isOrderStatusOpen && (
-                            <div className="absolute right-0 mt-2 z-50 w-80 bg-white rounded-2xl shadow-2xl border border-slate-200/90 py-2 animate-fadeIn overflow-hidden">
-                              <div className="px-3.5 py-2 border-b border-slate-100 flex items-center justify-between text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                                <span>Change Order Status</span>
-                                <span className="text-[10px] text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full font-semibold">
-                                  Owner Direct Control
-                                </span>
-                              </div>
+                                                {isOrderStatusOpen && (
+                                                  <div className="absolute right-0 mt-2 z-50 w-80 bg-white rounded-2xl shadow-2xl border border-slate-200/90 py-2 animate-fadeIn overflow-hidden">
+                                                    <div className="px-3.5 py-2 border-b border-slate-100 flex items-center justify-between text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                                                      <span>Change Order Status</span>
+                                                      <span className="text-[10px] text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full font-semibold">
+                                                        Owner Direct Control
+                                                      </span>
+                                                    </div>
 
-                              <div className="max-h-80 overflow-y-auto no-scrollbar py-1 divide-y divide-slate-50">
-                                {ALL_ORDER_STATUSES.map((item) => {
-                                  const isCurrent = selectedOrder.orderStatus === item.value;
-                                  const { allowed } = checkStatusTransition(selectedOrder.orderStatus, item.value);
+                                                    <div className="max-h-80 overflow-y-auto no-scrollbar py-1 divide-y divide-slate-50">
+                                                      {ALL_ORDER_STATUSES.map((item) => {
+                                                        const isCurrent = selectedOrder.orderStatus === item.value;
+                                                        const { allowed } = checkStatusTransition(selectedOrder.orderStatus, item.value);
 
-                                  return (
-                                    <button
-                                      key={item.value}
-                                      type="button"
-                                      disabled={!allowed || isProcessingAction}
-                                      onClick={() => {
-                                        if (allowed) {
-                                          setIsOrderStatusOpen(false);
-                                          handleOrderStatusUpdate(selectedOrder, item.value);
-                                        }
-                                      }}
-                                      className={`w-full text-left px-3.5 py-2.5 flex items-center justify-between text-xs transition ${isCurrent
-                                        ? 'bg-forest-900/5 text-forest-950 font-bold border-l-4 border-forest-900 cursor-default'
-                                        : 'hover:bg-[#FAF8F5] text-slate-800 hover:text-forest-950 font-medium cursor-pointer group'
-                                        }`}
-                                    >
-                                      <div className="flex items-center space-x-2.5 min-w-0 pr-2">
-                                        <span className={`w-2 h-2 rounded-full ${item.dot} shrink-0`}></span>
-                                        <div className="truncate">
-                                          <p className={`truncate ${isCurrent ? 'font-bold text-forest-950' : 'font-medium text-slate-800'}`}>
-                                            {item.label}
-                                          </p>
-                                          <p className="text-[10px] text-slate-400 truncate">{item.stage}</p>
+                                                        return (
+                                                          <button
+                                                            key={item.value}
+                                                            type="button"
+                                                            disabled={!allowed || isProcessingAction}
+                                                            onClick={() => {
+                                                              if (allowed) {
+                                                                setIsOrderStatusOpen(false);
+                                                                handleOrderStatusUpdate(selectedOrder, item.value);
+                                                              }
+                                                            }}
+                                                            className={`w-full text-left px-3.5 py-2.5 flex items-center justify-between text-xs transition ${isCurrent
+                                                              ? 'bg-forest-900/5 text-forest-950 font-bold border-l-4 border-forest-900 cursor-default'
+                                                              : 'hover:bg-[#FAF8F5] text-slate-800 hover:text-forest-950 font-medium cursor-pointer group'
+                                                              }`}
+                                                          >
+                                                            <div className="flex items-center space-x-2.5 min-w-0 pr-2">
+                                                              <span className={`w-2 h-2 rounded-full ${item.dot} shrink-0`}></span>
+                                                              <div className="truncate">
+                                                                <p className={`truncate ${isCurrent ? 'font-bold text-forest-950' : 'font-medium text-slate-800'}`}>
+                                                                  {item.label}
+                                                                </p>
+                                                                <p className="text-[10px] text-slate-400 truncate">{item.stage}</p>
+                                                              </div>
+                                                            </div>
+
+                                                            <div className="shrink-0 flex items-center space-x-1.5">
+                                                              {isCurrent ? (
+                                                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-forest-900 text-gold-400">
+                                                                  Current
+                                                                </span>
+                                                              ) : (
+                                                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 group-hover:bg-forest-900 group-hover:text-gold-400 transition">
+                                                                  Select
+                                                                </span>
+                                                              )}
+                                                            </div>
+                                                          </button>
+                                                        );
+                                                      })}
+                                                    </div>
+                                                  </div>
+                                                )}
+                                              </div>
+                                            )}
+                                          </div>
+                                        </div>
+
+                                        {/* Additional Action trigger for RTO if in transit / out for delivery */}
+                                        {['IN_TRANSIT', 'OUT_FOR_DELIVERY'].includes(selectedOrder.orderStatus) && (
+                                          <div className="pt-2 flex justify-end">
+                                            <button
+                                              onClick={() => setShowRTOModal(true)}
+                                              className="px-3.5 py-1.5 bg-orange-100 hover:bg-orange-200 text-orange-900 font-bold text-xs rounded-xl border border-orange-300 transition flex items-center space-x-1.5"
+                                            >
+                                              <Truck className="w-3.5 h-3.5 text-orange-700" />
+                                              <span>Initiate RTO (Customer Refused / Delivery Failed)</span>
+                                            </button>
+                                          </div>
+                                        )}
+                                      </div>
+
+                                      {/* 2. ORDERED PRODUCTS & FINANCIAL BREAKDOWN */}
+                                      <div className="bg-white p-6 rounded-3xl border border-slate-200/90 shadow-sm space-y-5">
+                                        <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                                          <div className="flex items-center space-x-2">
+                                            <Package className="w-5 h-5 text-forest-900" />
+                                            <h3 className="font-serif text-lg font-bold text-forest-950">
+                                              Ordered Products ({selectedOrder.items?.length || 0})
+                                            </h3>
+                                          </div>
+                                          <span className="text-xs text-slate-400 font-mono">
+                                            {new Date(selectedOrder.createdAt).toLocaleDateString()} at {new Date(selectedOrder.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                          </span>
+                                        </div>
+
+                                        <div className="divide-y divide-slate-100">
+                                          {selectedOrder.items.map((item, idx) => (
+                                            <div key={idx} className="py-3.5 flex items-center justify-between gap-4 first:pt-0 last:pb-0">
+                                              <div className="flex items-center space-x-3.5 min-w-0">
+                                                <img
+                                                  src={getFullImageUrl(item.image)}
+                                                  alt={item.name}
+                                                  className="w-14 h-14 rounded-2xl object-cover bg-slate-50 border border-slate-100 shrink-0 shadow-xs"
+                                                  onError={(e) => {
+                                                    (e.target as HTMLImageElement).src = '/images/placeholder.jpg';
+                                                  }}
+                                                />
+                                                <div className="min-w-0">
+                                                  <p className="font-bold text-slate-900 text-sm truncate">{item.name}</p>
+                                                  <p className="text-xs text-slate-400 font-mono mt-0.5">
+                                                    SKU: {item.sku || 'N/A'} • Qty: {item.quantity} × ₹{item.price}
+                                                  </p>
+                                                </div>
+                                              </div>
+                                              <div className="text-right shrink-0">
+                                                <p className="font-bold text-forest-950 text-base">₹{item.price * item.quantity}</p>
+                                              </div>
+                                            </div>
+                                          ))}
+                                        </div>
+
+                                        {/* Calculation Breakdown */}
+                                        <div className="pt-4 border-t border-slate-100 space-y-2 text-xs">
+                                          <div className="flex justify-between text-slate-500">
+                                            <span>Subtotal</span>
+                                            <span className="font-medium text-slate-700">₹{selectedOrder.pricing?.subtotal}</span>
+                                          </div>
+                                          {selectedOrder.pricing?.discountAmount > 0 && (
+                                            <div className="flex justify-between text-emerald-600 font-medium">
+                                              <span>Discount</span>
+                                              <span>-₹{selectedOrder.pricing?.discountAmount}</span>
+                                            </div>
+                                          )}
+                                          <div className="flex justify-between text-slate-500">
+                                            <span>Shipping & Packaging</span>
+                                            <span className="font-medium text-slate-700">
+                                              {selectedOrder.pricing?.shippingFee === 0 ? 'FREE' : `₹${selectedOrder.pricing?.shippingFee}`}
+                                            </span>
+                                          </div>
+                                          {(() => {
+                                            const sub = Number(selectedOrder.pricing?.subtotal) || 0;
+                                            const disc = Number(selectedOrder.pricing?.discountAmount) || 0;
+                                            const ship = Number(selectedOrder.pricing?.shippingFee) || 0;
+                                            const tax = Number(selectedOrder.pricing?.taxAmount) || (sub > 0 ? Math.round((sub - disc) * 0.05) : 0);
+                                            const total = (selectedOrder.pricing?.totalAmount && selectedOrder.pricing.totalAmount > (sub - disc))
+                                              ? selectedOrder.pricing.totalAmount
+                                              : ((sub - disc) + ship + tax);
+                                            return (
+                                              <>
+                                                {tax > 0 && (
+                                                  <div className="flex justify-between text-slate-500">
+                                                    <span>GST (5%)</span>
+                                                    <span className="font-medium text-slate-700">₹{tax}</span>
+                                                  </div>
+                                                )}
+                                                <div className="flex justify-between text-sm font-bold text-forest-950 pt-2 border-t border-slate-100">
+                                                  <span>Total Amount</span>
+                                                  <span className="text-lg text-forest-950 font-black">₹{total}</span>
+                                                </div>
+                                              </>
+                                            );
+                                          })()}
                                         </div>
                                       </div>
 
-                                      <div className="shrink-0 flex items-center space-x-1.5">
-                                        {isCurrent ? (
-                                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-forest-900 text-gold-400">
-                                            Current
-                                          </span>
+                                      {/* 4. COURIER DISPATCH & TRACKING (India Post / Manual Courier) */}
+                                      <div className="bg-white p-6 rounded-3xl border border-slate-200/90 shadow-sm space-y-4">
+                                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+                                          <div className="flex items-center space-x-2.5">
+                                            <div className="w-9 h-9 rounded-xl bg-forest-50 text-forest-800 flex items-center justify-center border border-forest-200/80">
+                                              <Truck className="w-5 h-5 text-forest-800" />
+                                            </div>
+                                            <div>
+                                              <h3 className="font-serif text-lg font-bold text-forest-950">Courier Dispatch & Tracking</h3>
+                                              <p className="text-xs text-slate-500">Consignment number, India Post / Courier portal tracking & WhatsApp notification</p>
+                                            </div>
+                                          </div>
+
+                                          <div className="flex items-center space-x-2">
+                                            {selectedOrder.shipment?.trackingNumber || selectedOrder.shipment?.awbCode ? (
+                                              <span className="px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold flex items-center space-x-1.5">
+                                                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                                                <span>Dispatched</span>
+                                              </span>
+                                            ) : (
+                                              <span className="px-3 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200 text-xs font-bold">
+                                                Pending Dispatch
+                                              </span>
+                                            )}
+                                          </div>
+                                        </div>
+
+                                        {selectedOrder.shipment?.trackingNumber || selectedOrder.shipment?.awbCode ? (
+                                          <div className="space-y-3">
+                                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-4 rounded-2xl bg-forest-50/50 border border-forest-200/60 text-xs">
+                                              <div>
+                                                <span className="text-slate-400 font-bold block text-[10px] uppercase">Consignment / Tracking No.</span>
+                                                <div className="flex items-center space-x-1.5 mt-0.5">
+                                                  <span className="font-mono font-black text-forest-950 text-sm">
+                                                    {selectedOrder.shipment.trackingNumber || selectedOrder.shipment.awbCode}
+                                                  </span>
+                                                  <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                      const code = selectedOrder.shipment?.trackingNumber || selectedOrder.shipment?.awbCode || '';
+                                                      navigator.clipboard.writeText(code);
+                                                      toast.success(`Copied Tracking ID "${code}"`, 'Copied to Clipboard');
+                                                    }}
+                                                    className="text-slate-400 hover:text-slate-700 p-0.5"
+                                                    title="Copy Tracking ID"
+                                                  >
+                                                    <Copy className="w-3.5 h-3.5" />
+                                                  </button>
+                                                </div>
+                                              </div>
+
+                                              <div>
+                                                <span className="text-slate-400 font-bold block text-[10px] uppercase">Courier Partner</span>
+                                                <span className="font-bold text-forest-950 text-sm mt-0.5 block">
+                                                  {selectedOrder.shipment.courierName || 'India Post'}
+                                                </span>
+                                              </div>
+
+                                              <div>
+                                                <span className="text-slate-400 font-bold block text-[10px] uppercase">Dispatch Date</span>
+                                                <span className="font-bold text-forest-950 text-sm mt-0.5 block">
+                                                  {selectedOrder.shipment.dispatchedAt
+                                                    ? new Date(selectedOrder.shipment.dispatchedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+                                                    : 'Dispatched'}
+                                                </span>
+                                              </div>
+                                            </div>
+
+                                            <div className="flex flex-wrap items-center justify-between gap-2.5 pt-1">
+                                              <a
+                                                href={selectedOrder.shipment?.trackingUrl || 'https://www.indiapost.gov.in/'}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="inline-flex items-center space-x-1.5 px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs rounded-xl transition"
+                                              >
+                                                <span>Track on India Post</span>
+                                                <ExternalLink className="w-3.5 h-3.5 text-slate-500" />
+                                              </a>
+
+                                              <div className="flex items-center space-x-2">
+                                                <button
+                                                  type="button"
+                                                  onClick={() => handleSendWhatsAppTracking(selectedOrder)}
+                                                  className="inline-flex items-center space-x-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs transition"
+                                                  title="Send tracking details to customer's WhatsApp"
+                                                >
+                                                  <MessageCircle className="w-4 h-4" />
+                                                  <span>Send Tracking on WhatsApp</span>
+                                                </button>
+
+                                                <button
+                                                  type="button"
+                                                  onClick={() => handleOpenTrackingModal(selectedOrder)}
+                                                  className="inline-flex items-center space-x-1.5 px-3.5 py-2 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs rounded-xl transition"
+                                                >
+                                                  <span>Edit Tracking</span>
+                                                </button>
+                                              </div>
+                                            </div>
+                                          </div>
                                         ) : (
-                                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 group-hover:bg-forest-900 group-hover:text-gold-400 transition">
-                                            Select
-                                          </span>
+                                          <div className="p-4 rounded-2xl bg-amber-50/60 border border-amber-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                                            <div>
+                                              <p className="font-bold text-amber-950">Awaiting Courier Dispatch</p>
+                                              <p className="text-slate-600 text-[11px] mt-0.5">
+                                                Hand over parcel to India Post / Courier, then enter the Consignment Tracking Number here.
+                                              </p>
+                                            </div>
+                                            <button
+                                              type="button"
+                                              onClick={() => handleOpenTrackingModal(selectedOrder)}
+                                              disabled={isProcessingAction || ['CANCELLED'].includes(selectedOrder.orderStatus)}
+                                              className="px-4 py-2 bg-forest-900 hover:bg-forest-950 text-gold-400 font-black rounded-xl shadow-xs transition disabled:opacity-50 shrink-0 inline-flex items-center space-x-1.5 cursor-pointer"
+                                            >
+                                              <Truck className="w-4 h-4 text-gold-400" />
+                                              <span>Add Tracking ID & Dispatch</span>
+                                            </button>
+                                          </div>
                                         )}
                                       </div>
-                                    </button>
-                                  );
-                                })}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
 
-                  {/* Additional Action trigger for RTO if in transit / out for delivery */}
-                  {['IN_TRANSIT', 'OUT_FOR_DELIVERY'].includes(selectedOrder.orderStatus) && (
-                    <div className="pt-2 flex justify-end">
-                      <button
-                        onClick={() => setShowRTOModal(true)}
-                        className="px-3.5 py-1.5 bg-orange-100 hover:bg-orange-200 text-orange-900 font-bold text-xs rounded-xl border border-orange-300 transition flex items-center space-x-1.5"
-                      >
-                        <Truck className="w-3.5 h-3.5 text-orange-700" />
-                        <span>Initiate RTO (Customer Refused / Delivery Failed)</span>
-                      </button>
-                    </div>
-                  )}
-                </div>
+                                      {/* 5. AUDIT & TRACKING TIMELINE */}
+                                      <div className="bg-white p-6 rounded-3xl border border-slate-200/90 shadow-sm space-y-4">
+                                        <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                                          <h3 className="font-serif text-lg font-bold text-forest-950">Audit & Tracking Timeline</h3>
+                                          <span className="text-xs text-slate-400 font-mono">
+                                            {((selectedOrder.trackingTimeline?.length || 0) + (selectedOrder.timeline?.length || 0))} events recorded
+                                          </span>
+                                        </div>
 
-                {/* 2. ORDERED PRODUCTS & FINANCIAL BREAKDOWN */}
-                <div className="bg-white p-6 rounded-3xl border border-slate-200/90 shadow-sm space-y-5">
-                  <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-                    <div className="flex items-center space-x-2">
-                      <Package className="w-5 h-5 text-forest-900" />
-                      <h3 className="font-serif text-lg font-bold text-forest-950">
-                        Ordered Products ({selectedOrder.items?.length || 0})
-                      </h3>
-                    </div>
-                    <span className="text-xs text-slate-400 font-mono">
-                      {new Date(selectedOrder.createdAt).toLocaleDateString()} at {new Date(selectedOrder.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </span>
-                  </div>
+                                        <div className="space-y-4 max-h-80 overflow-y-auto no-scrollbar pr-2">
+                                          {((selectedOrder.timeline && selectedOrder.timeline.length > 0)
+                                            ? selectedOrder.timeline
+                                            : (selectedOrder.trackingTimeline || [])
+                                          ).map((t: any, idx: number) => (
+                                            <div key={idx} className="flex items-start space-x-3 text-xs">
+                                              <div className="w-6 h-6 rounded-full bg-forest-50 border border-forest-200 text-forest-900 flex items-center justify-center shrink-0 mt-0.5 font-bold text-[10px]">
+                                                {idx + 1}
+                                              </div>
+                                              <div className="flex-1 pb-3 border-b border-slate-100 last:border-0">
+                                                <div className="flex items-center justify-between">
+                                                  <span className="font-bold text-forest-950 text-sm">{t.title}</span>
+                                                  <span className="text-[11px] text-slate-400 font-mono">
+                                                    {new Date(t.timestamp || t.createdAt).toLocaleString()}
+                                                  </span>
+                                                </div>
+                                                {t.description && (
+                                                  <p className="text-slate-600 mt-1">{t.description}</p>
+                                                )}
+                                                <div className="flex items-center space-x-2 mt-1 text-[10px] text-slate-400">
+                                                  <span>Author: <strong className="text-slate-600">{t.updatedBy || t.author || 'SYSTEM'}</strong></span>
+                                                  {t.location && <span>• Location: {t.location}</span>}
+                                                </div>
+                                              </div>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      </div>
 
-                  <div className="divide-y divide-slate-100">
-                    {selectedOrder.items.map((item, idx) => (
-                      <div key={idx} className="py-3.5 flex items-center justify-between gap-4 first:pt-0 last:pb-0">
-                        <div className="flex items-center space-x-3.5 min-w-0">
-                          <img
-                            src={getFullImageUrl(item.image)}
-                            alt={item.name}
-                            className="w-14 h-14 rounded-2xl object-cover bg-slate-50 border border-slate-100 shrink-0 shadow-xs"
-                            onError={(e) => {
-                              (e.target as HTMLImageElement).src = '/images/placeholder.jpg';
-                            }}
-                          />
-                          <div className="min-w-0">
-                            <p className="font-bold text-slate-900 text-sm truncate">{item.name}</p>
-                            <p className="text-xs text-slate-400 font-mono mt-0.5">
-                              SKU: {item.sku || 'N/A'} • Qty: {item.quantity} × ₹{item.price}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="text-right shrink-0">
-                          <p className="font-bold text-forest-950 text-base">₹{item.price * item.quantity}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                                    </div>
 
-                  {/* Calculation Breakdown */}
-                  <div className="pt-4 border-t border-slate-100 space-y-2 text-xs">
-                    <div className="flex justify-between text-slate-500">
-                      <span>Subtotal</span>
-                      <span className="font-medium text-slate-700">₹{selectedOrder.pricing?.subtotal}</span>
-                    </div>
-                    {selectedOrder.pricing?.discountAmount > 0 && (
-                      <div className="flex justify-between text-emerald-600 font-medium">
-                        <span>Discount</span>
-                        <span>-₹{selectedOrder.pricing?.discountAmount}</span>
-                      </div>
-                    )}
-                    <div className="flex justify-between text-slate-500">
-                      <span>Shipping & Packaging</span>
-                      <span className="font-medium text-slate-700">
-                        {selectedOrder.pricing?.shippingFee === 0 ? 'FREE' : `₹${selectedOrder.pricing?.shippingFee}`}
-                      </span>
-                    </div>
-                    {(() => {
-                      const sub = Number(selectedOrder.pricing?.subtotal) || 0;
-                      const disc = Number(selectedOrder.pricing?.discountAmount) || 0;
-                      const ship = Number(selectedOrder.pricing?.shippingFee) || 0;
-                      const tax = Number(selectedOrder.pricing?.taxAmount) || (sub > 0 ? Math.round((sub - disc) * 0.05) : 0);
-                      const total = (selectedOrder.pricing?.totalAmount && selectedOrder.pricing.totalAmount > (sub - disc))
-                        ? selectedOrder.pricing.totalAmount
-                        : ((sub - disc) + ship + tax);
-                      return (
-                        <>
-                          {tax > 0 && (
-                            <div className="flex justify-between text-slate-500">
-                              <span>GST (5%)</span>
-                              <span className="font-medium text-slate-700">₹{tax}</span>
-                            </div>
-                          )}
-                          <div className="flex justify-between text-sm font-bold text-forest-950 pt-2 border-t border-slate-100">
-                            <span>Total Amount</span>
-                            <span className="text-lg text-forest-950 font-black">₹{total}</span>
-                          </div>
-                        </>
-                      );
-                    })()}
-                  </div>
-                </div>
+                                    {/* Right Column / Sidebar (Payment, Refund, Customer, Address) */}
+                                    <div className="space-y-6">
 
-                {/* 4. COURIER DISPATCH & TRACKING (India Post / Manual Courier) */}
-                <div className="bg-white p-6 rounded-3xl border border-slate-200/90 shadow-sm space-y-4">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
-                    <div className="flex items-center space-x-2.5">
-                      <div className="w-9 h-9 rounded-xl bg-forest-50 text-forest-800 flex items-center justify-center border border-forest-200/80">
-                        <Truck className="w-5 h-5 text-forest-800" />
-                      </div>
-                      <div>
-                        <h3 className="font-serif text-lg font-bold text-forest-950">Courier Dispatch & Tracking</h3>
-                        <p className="text-xs text-slate-500">Consignment number, India Post / Courier portal tracking & WhatsApp notification</p>
-                      </div>
-                    </div>
+                                      {/* PAYMENT STATUS & CONTROLLER */}
+                                      {(() => {
+                                        const isSelectedOrderCod = selectedOrder.paymentInfo?.method === 'COD' || selectedOrder.paymentMethod === 'COD';
+                                        const isSelectedOrderCancelledBeforeDel = ['CANCELLED', 'CANCELLATION_REQUESTED', 'RTO_COMPLETED', 'RETURNED_TO_SELLER'].includes(selectedOrder.orderStatus);
+                                        const isSelectedOrderCodCancelled = isSelectedOrderCod && isSelectedOrderCancelledBeforeDel && selectedOrder.orderStatus !== 'DELIVERED';
 
-                    <div className="flex items-center space-x-2">
-                      {selectedOrder.shipment?.trackingNumber || selectedOrder.shipment?.awbCode ? (
-                        <span className="px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold flex items-center space-x-1.5">
-                          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                          <span>Dispatched</span>
-                        </span>
-                      ) : (
-                        <span className="px-3 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200 text-xs font-bold">
-                          Pending Dispatch
-                        </span>
-                      )}
-                    </div>
-                  </div>
+                                        let currentPayStatus = selectedOrder.paymentInfo?.status || selectedOrder.paymentStatus || 'PENDING';
+                                        if (isSelectedOrderCod) {
+                                          if (isSelectedOrderCodCancelled) {
+                                            currentPayStatus = 'NOT_APPLICABLE';
+                                          } else if (selectedOrder.orderStatus !== 'DELIVERED') {
+                                            currentPayStatus = 'PENDING';
+                                          }
+                                        }
 
-                  {selectedOrder.shipment?.trackingNumber || selectedOrder.shipment?.awbCode ? (
-                    <div className="space-y-3">
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-4 rounded-2xl bg-forest-50/50 border border-forest-200/60 text-xs">
-                        <div>
-                          <span className="text-slate-400 font-bold block text-[10px] uppercase">Consignment / Tracking No.</span>
-                          <div className="flex items-center space-x-1.5 mt-0.5">
-                            <span className="font-mono font-black text-forest-950 text-sm">
-                              {selectedOrder.shipment.trackingNumber || selectedOrder.shipment.awbCode}
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const code = selectedOrder.shipment?.trackingNumber || selectedOrder.shipment?.awbCode || '';
-                                navigator.clipboard.writeText(code);
-                                toast.success(`Copied Tracking ID "${code}"`, 'Copied to Clipboard');
-                              }}
-                              className="text-slate-400 hover:text-slate-700 p-0.5"
-                              title="Copy Tracking ID"
-                            >
-                              <Copy className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </div>
+                                        return (
+                                          <div className="bg-white p-6 rounded-3xl border border-slate-200/90 shadow-sm space-y-4">
+                                            <div className="flex items-center justify-between">
+                                              <div className="flex items-center space-x-2">
+                                                <CreditCard className="w-4 h-4 text-forest-900" />
+                                                <h4 className="font-serif text-base font-bold text-forest-950">Payment Status</h4>
+                                              </div>
+                                              <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold uppercase border ${getPaymentStatusBadgeClass(currentPayStatus)}`}>
+                                                {currentPayStatus.replace(/_/g, ' ')}
+                                              </span>
+                                            </div>
 
-                        <div>
-                          <span className="text-slate-400 font-bold block text-[10px] uppercase">Courier Partner</span>
-                          <span className="font-bold text-forest-950 text-sm mt-0.5 block">
-                            {selectedOrder.shipment.courierName || 'India Post'}
-                          </span>
-                        </div>
+                                            <div className="border-t border-slate-100 pt-3 space-y-3 text-xs">
+                                              <div className="flex items-center justify-between gap-2">
+                                                <span className="text-slate-500 font-semibold shrink-0">Update Payment:</span>
 
-                        <div>
-                          <span className="text-slate-400 font-bold block text-[10px] uppercase">Dispatch Date</span>
-                          <span className="font-bold text-forest-950 text-sm mt-0.5 block">
-                            {selectedOrder.shipment.dispatchedAt
-                              ? new Date(selectedOrder.shipment.dispatchedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
-                              : 'Dispatched'}
-                          </span>
-                        </div>
-                      </div>
+                                                {isSelectedOrderCodCancelled ? (
+                                                  <div className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-500 font-semibold text-xs shadow-2xs">
+                                                    <Lock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                                    <span>Not Applicable (₹0 Collected)</span>
+                                                  </div>
+                                                ) : (
+                                                  /* Custom Luxury Payment Dropdown */
+                                                  <div className="relative" ref={paymentStatusDropdownRef}>
+                                                    <button
+                                                      type="button"
+                                                      onClick={() => !isProcessingAction && setIsPaymentStatusOpen(!isPaymentStatusOpen)}
+                                                      disabled={isProcessingAction}
+                                                      className={`inline-flex items-center justify-between space-x-2 px-3.5 py-1.5 rounded-xl border transition-all shadow-xs hover:shadow-sm cursor-pointer min-w-[130px] bg-white ${isPaymentStatusOpen
+                                                        ? 'border-forest-900 ring-2 ring-forest-900/10'
+                                                        : 'border-slate-200 hover:border-slate-300'
+                                                        }`}
+                                                    >
+                                                      <div className="flex items-center space-x-2 truncate">
+                                                        <span className={`w-2 h-2 rounded-full ${getPaymentStatusDot(currentPayStatus)} shrink-0`}></span>
+                                                        <span className="font-serif font-bold text-xs text-forest-950 truncate tracking-tight">
+                                                          {currentPayStatus}
+                                                        </span>
+                                                      </div>
+                                                      <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 shrink-0 ${isPaymentStatusOpen ? 'rotate-180 text-forest-900' : ''}`} />
+                                                    </button>
 
-                      <div className="flex flex-wrap items-center justify-between gap-2.5 pt-1">
-                        <a
-                          href={selectedOrder.shipment?.trackingUrl || 'https://www.indiapost.gov.in/'}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center space-x-1.5 px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs rounded-xl transition"
-                        >
-                          <span>Track on India Post</span>
-                          <ExternalLink className="w-3.5 h-3.5 text-slate-500" />
-                        </a>
+                                                    {isPaymentStatusOpen && (
+                                                      <div className="absolute right-0 mt-2 z-50 w-64 bg-white rounded-2xl shadow-2xl border border-slate-200/90 py-1.5 animate-fadeIn overflow-hidden">
+                                                        <div className="px-3 py-1.5 border-b border-slate-100 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                                                          Select Payment Status
+                                                        </div>
+                                                        <div className="py-1">
+                                                          {ALL_PAYMENT_STATUSES.map((opt) => {
+                                                            const isCurrent = currentPayStatus === opt.value;
+                                                            const isPaidLockedForCod = isSelectedOrderCod && selectedOrder.orderStatus !== 'DELIVERED' && opt.value === 'PAID';
+                                                            const isRefundLockedForCod = isSelectedOrderCod && selectedOrder.orderStatus !== 'DELIVERED' && opt.value === 'REFUNDED';
+                                                            const isOptionDisabled = isProcessingAction || isPaidLockedForCod || isRefundLockedForCod;
 
-                        <div className="flex items-center space-x-2">
-                          <button
-                            type="button"
-                            onClick={() => handleSendWhatsAppTracking(selectedOrder)}
-                            className="inline-flex items-center space-x-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs transition"
-                            title="Send tracking details to customer's WhatsApp"
-                          >
-                            <MessageCircle className="w-4 h-4" />
-                            <span>Send Tracking on WhatsApp</span>
-                          </button>
+                                                            return (
+                                                              <button
+                                                                key={opt.value}
+                                                                type="button"
+                                                                disabled={isOptionDisabled}
+                                                                onClick={() => {
+                                                                  if (!isOptionDisabled) {
+                                                                    setIsPaymentStatusOpen(false);
+                                                                    handlePaymentStatusUpdate(selectedOrder, opt.value);
+                                                                  }
+                                                                }}
+                                                                className={`w-full text-left px-3.5 py-2.5 flex items-center justify-between text-xs transition ${isCurrent
+                                                                  ? 'bg-forest-900/5 text-forest-950 font-bold border-l-4 border-forest-900 cursor-default'
+                                                                  : isOptionDisabled
+                                                                    ? 'opacity-40 text-slate-400 bg-slate-50/50 cursor-not-allowed'
+                                                                    : 'hover:bg-[#FAF8F5] text-slate-700 hover:text-forest-950 font-medium cursor-pointer'
+                                                                  }`}
+                                                              >
+                                                                <div className="space-y-0.5 min-w-0 pr-2">
+                                                                  <div className="flex items-center space-x-2">
+                                                                    <span className={`w-2 h-2 rounded-full ${opt.dot} shrink-0`}></span>
+                                                                    <span className="font-bold text-slate-900">{opt.label}</span>
+                                                                    {isPaidLockedForCod && (
+                                                                      <span className="text-[9px] px-1.5 py-0.5 bg-amber-100 text-amber-900 rounded font-bold">
+                                                                        Upon Delivery
+                                                                      </span>
+                                                                    )}
+                                                                  </div>
+                                                                  <p className="text-[10px] text-slate-400 truncate pl-4">
+                                                                    {isPaidLockedForCod ? 'Only available when order is Delivered' : opt.desc}
+                                                                  </p>
+                                                                </div>
+                                                                {isCurrent && <Check className="w-4 h-4 text-forest-900 shrink-0" />}
+                                                                {isOptionDisabled && !isCurrent && <Lock className="w-3 h-3 text-slate-400 shrink-0" />}
+                                                              </button>
+                                                            );
+                                                          })}
+                                                        </div>
+                                                      </div>
+                                                    )}
+                                                  </div>
+                                                )}
+                                              </div>
 
-                          <button
-                            type="button"
-                            onClick={() => handleOpenTrackingModal(selectedOrder)}
-                            className="inline-flex items-center space-x-1.5 px-3.5 py-2 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs rounded-xl transition"
-                          >
-                            <span>Edit Tracking</span>
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="p-4 rounded-2xl bg-amber-50/60 border border-amber-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-                      <div>
-                        <p className="font-bold text-amber-950">Awaiting Courier Dispatch</p>
-                        <p className="text-slate-600 text-[11px] mt-0.5">
-                          Hand over parcel to India Post / Courier, then enter the Consignment Tracking Number here.
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => handleOpenTrackingModal(selectedOrder)}
-                        disabled={isProcessingAction || ['CANCELLED'].includes(selectedOrder.orderStatus)}
-                        className="px-4 py-2 bg-forest-900 hover:bg-forest-950 text-gold-400 font-black rounded-xl shadow-xs transition disabled:opacity-50 shrink-0 inline-flex items-center space-x-1.5 cursor-pointer"
-                      >
-                        <Truck className="w-4 h-4 text-gold-400" />
-                        <span>Add Tracking ID & Dispatch</span>
-                      </button>
-                    </div>
-                  )}
-                </div>
+                                              {isSelectedOrderCod && selectedOrder.orderStatus !== 'DELIVERED' && !isSelectedOrderCancelledBeforeDel && (
+                                                <div className="p-2.5 rounded-xl bg-amber-50/80 border border-amber-200/80 text-amber-900 text-[11px] leading-relaxed flex items-start space-x-2">
+                                                  <AlertTriangle className="w-3.5 h-3.5 text-amber-700 shrink-0 mt-0.5" />
+                                                  <span><strong>Cash on Delivery (Pending):</strong> Payment status remains <strong>Pending</strong> until courier delivers parcel at doorstep and collects cash.</span>
+                                                </div>
+                                              )}
 
-                {/* 5. AUDIT & TRACKING TIMELINE */}
-                <div className="bg-white p-6 rounded-3xl border border-slate-200/90 shadow-sm space-y-4">
-                  <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-                    <h3 className="font-serif text-lg font-bold text-forest-950">Audit & Tracking Timeline</h3>
-                    <span className="text-xs text-slate-400 font-mono">
-                      {((selectedOrder.trackingTimeline?.length || 0) + (selectedOrder.timeline?.length || 0))} events recorded
-                    </span>
-                  </div>
+                                              {isSelectedOrderCodCancelled && (
+                                                <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80 text-slate-600 text-[11px] leading-relaxed">
+                                                  <strong>Cash on Delivery (₹0 Collected):</strong> This order was cancelled before doorstep delivery. Since no payment was collected from the customer, payment status is locked to <strong>Not Applicable</strong>.
+                                                </div>
+                                              )}
 
-                  <div className="space-y-4 max-h-80 overflow-y-auto no-scrollbar pr-2">
-                    {((selectedOrder.timeline && selectedOrder.timeline.length > 0)
-                      ? selectedOrder.timeline
-                      : (selectedOrder.trackingTimeline || [])
-                    ).map((t: any, idx: number) => (
-                      <div key={idx} className="flex items-start space-x-3 text-xs">
-                        <div className="w-6 h-6 rounded-full bg-forest-50 border border-forest-200 text-forest-900 flex items-center justify-center shrink-0 mt-0.5 font-bold text-[10px]">
-                          {idx + 1}
-                        </div>
-                        <div className="flex-1 pb-3 border-b border-slate-100 last:border-0">
-                          <div className="flex items-center justify-between">
-                            <span className="font-bold text-forest-950 text-sm">{t.title}</span>
-                            <span className="text-[11px] text-slate-400 font-mono">
-                              {new Date(t.timestamp || t.createdAt).toLocaleString()}
-                            </span>
-                          </div>
-                          {t.description && (
-                            <p className="text-slate-600 mt-1">{t.description}</p>
-                          )}
-                          <div className="flex items-center space-x-2 mt-1 text-[10px] text-slate-400">
-                            <span>Author: <strong className="text-slate-600">{t.updatedBy || t.author || 'SYSTEM'}</strong></span>
-                            {t.location && <span>• Location: {t.location}</span>}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                                              <div className="space-y-2 pt-2 border-t border-slate-100">
+                                                <div className="flex justify-between items-center">
+                                                  <span className="text-slate-500">Method</span>
+                                                  <span className="font-bold text-forest-950">
+                                                    {selectedOrder.paymentInfo?.method === 'COD' || selectedOrder.paymentMethod === 'COD' ? 'Cash On Delivery' : 'Online Prepaid (Razorpay)'}
+                                                  </span>
+                                                </div>
+                                                {selectedOrder.paymentInfo?.razorpayPaymentId && (
+                                                  <div className="flex justify-between items-center">
+                                                    <span className="text-slate-500">Payment ID</span>
+                                                    <span className="font-mono text-slate-700 text-[11px]">{selectedOrder.paymentInfo.razorpayPaymentId}</span>
+                                                  </div>
+                                                )}
+                                              </div>
+                                            </div>
+                                          </div>
+                                        );
+                                      })()}
 
-              </div>
+                                      {/* DEDICATED REFUND MANAGEMENT CARD */}
+                                      {(() => {
+                                        const isSelectedOrderCod = selectedOrder.paymentInfo?.method === 'COD' || selectedOrder.paymentMethod === 'COD';
+                                        const isSelectedOrderCancelledBeforeDel = ['CANCELLED', 'CANCELLATION_REQUESTED', 'RTO_COMPLETED', 'RETURNED_TO_SELLER'].includes(selectedOrder.orderStatus);
+                                        const isSelectedOrderCodCancelled = isSelectedOrderCod && isSelectedOrderCancelledBeforeDel && selectedOrder.orderStatus !== 'DELIVERED';
 
-              {/* Right Column / Sidebar (Payment, Refund, Customer, Address) */}
-              <div className="space-y-6">
+                                        return (
+                                          <div className="bg-white p-6 rounded-3xl border border-slate-200/90 shadow-sm space-y-4">
+                                            <div className="flex items-center justify-between">
+                                              <div className="flex items-center space-x-2">
+                                                <DollarSign className="w-4 h-4 text-emerald-700" />
+                                                <h4 className="font-serif text-base font-bold text-forest-950">Refund Tracking</h4>
+                                              </div>
+                                              {isSelectedOrderCodCancelled ? (
+                                                <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-100 text-slate-700 border border-slate-200 uppercase">
+                                                  NOT APPLICABLE
+                                                </span>
+                                              ) : selectedOrder.refundInfo?.status && selectedOrder.refundInfo.status !== 'NONE' ? (
+                                                <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold uppercase border ${getRefundStatusBadgeClass(selectedOrder.refundInfo.status)}`}>
+                                                  {selectedOrder.refundInfo.status.replace(/_/g, ' ')}
+                                                </span>
+                                              ) : (
+                                                <span className="text-xs text-slate-400">No active refund</span>
+                                              )}
+                                            </div>
 
-                {/* PAYMENT STATUS & CONTROLLER */}
-                {(() => {
-                  const isSelectedOrderCod = selectedOrder.paymentInfo?.method === 'COD' || selectedOrder.paymentMethod === 'COD';
-                  const isSelectedOrderCancelledBeforeDel = ['CANCELLED', 'CANCELLATION_REQUESTED', 'RTO_COMPLETED', 'RETURNED_TO_SELLER'].includes(selectedOrder.orderStatus);
-                  const isSelectedOrderCodCancelled = isSelectedOrderCod && isSelectedOrderCancelledBeforeDel && selectedOrder.orderStatus !== 'DELIVERED';
+                                            <div className="border-t border-slate-100 pt-3 space-y-3 text-xs">
+                                              {isSelectedOrderCodCancelled ? (
+                                                <div className="space-y-3">
+                                                  <div className="p-3.5 rounded-2xl bg-amber-50/70 border border-amber-200/80 space-y-1.5">
+                                                    <div className="flex items-center space-x-2 text-amber-900 font-bold text-xs">
+                                                      <ShieldAlert className="w-4 h-4 text-amber-700 shrink-0" />
+                                                      <span>No Refund Applicable (Cash on Delivery)</span>
+                                                    </div>
+                                                    <p className="text-[11px] text-amber-800 leading-relaxed">
+                                                      This order was cancelled before doorstep delivery. Because the order was Cash on Delivery, <strong>no cash was collected (₹0)</strong>. Customer paid ₹0, so no refund is due or permitted.
+                                                    </p>
+                                                  </div>
+                                                  <div className="flex justify-between text-slate-500 pt-1">
+                                                    <span>Amount Collected from Customer</span>
+                                                    <span className="font-bold text-slate-800">₹0</span>
+                                                  </div>
+                                                  <div className="flex justify-between text-slate-500">
+                                                    <span>Refund Amount Required</span>
+                                                    <span className="font-bold text-slate-800">₹0 (Not Applicable)</span>
+                                                  </div>
+                                                  <div className="pt-1">
+                                                    <button
+                                                      disabled
+                                                      className="w-full py-2 bg-slate-100 text-slate-400 font-bold rounded-xl text-xs cursor-not-allowed flex items-center justify-center space-x-1.5"
+                                                    >
+                                                      <Lock className="w-3.5 h-3.5" />
+                                                      <span>Refund Locked (₹0 Collected)</span>
+                                                    </button>
+                                                  </div>
+                                                </div>
+                                              ) : selectedOrder.refundInfo && selectedOrder.refundInfo.status !== 'NONE' ? (
+                                                <div className="space-y-2">
+                                                  <div className="flex justify-between">
+                                                    <span className="text-slate-500">Refund Amount</span>
+                                                    <span className="font-bold text-forest-950">₹{selectedOrder.refundInfo.amount}</span>
+                                                  </div>
+                                                  <div className="flex justify-between">
+                                                    <span className="text-slate-500">Settlement Destination</span>
+                                                    <span className="font-semibold text-slate-800">
+                                                      {selectedOrder.refundInfo.method || (selectedOrder.paymentMethod === 'COD' ? 'Bank Account / UPI' : 'Original Source')}
+                                                    </span>
+                                                  </div>
+                                                  {selectedOrder.refundInfo.transactionId && (
+                                                    <div className="flex justify-between">
+                                                      <span className="text-slate-500">Transaction Ref</span>
+                                                      <span className="font-mono text-slate-800">{selectedOrder.refundInfo.transactionId}</span>
+                                                    </div>
+                                                  )}
+                                                  {selectedOrder.refundInfo.failureReason && (
+                                                    <p className="text-rose-700 bg-rose-50 p-2 rounded-lg text-[11px]">
+                                                      Failure: {selectedOrder.refundInfo.failureReason}
+                                                    </p>
+                                                  )}
+                                                  <div className="pt-2">
+                                                    <button
+                                                      onClick={() => setShowRefundModal(true)}
+                                                      className="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold rounded-xl text-xs transition"
+                                                    >
+                                                      Update Refund Status / Reference
+                                                    </button>
+                                                  </div>
+                                                </div>
+                                              ) : (
+                                                <div className="space-y-2">
+                                                  <p className="text-slate-500 text-[11px]">
+                                                    Refunds are automatically triggered upon Order Cancellation or approved transit damage claim.
+                                                  </p>
+                                                  <div className="pt-2">
+                                                    <button
+                                                      onClick={() => setShowRefundModal(true)}
+                                                      className="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold rounded-xl text-xs transition"
+                                                    >
+                                                      Update Refund Status / Reference
+                                                    </button>
+                                                  </div>
+                                                </div>
+                                              )}
+                                            </div>
+                                          </div>
+                                        );
+                                      })()}
 
-                  let currentPayStatus = selectedOrder.paymentInfo?.status || selectedOrder.paymentStatus || 'PENDING';
-                  if (isSelectedOrderCod) {
-                    if (isSelectedOrderCodCancelled) {
-                      currentPayStatus = 'NOT_APPLICABLE';
-                    } else if (selectedOrder.orderStatus !== 'DELIVERED') {
-                      currentPayStatus = 'PENDING';
-                    }
-                  }
+                                      {/* Customer Profile Card */}
+                                      <div className="bg-white p-6 rounded-3xl border border-slate-200/90 shadow-sm space-y-4">
+                                        <div className="flex items-center space-x-3">
+                                          <div className="w-10 h-10 rounded-2xl bg-forest-900 text-gold-400 font-bold flex items-center justify-center text-sm shadow-xs border border-gold-500/30">
+                                            {selectedOrder.customerDetails?.fullName?.charAt(0)?.toUpperCase() || 'C'}
+                                          </div>
+                                          <div>
+                                            <h4 className="font-serif text-base font-bold text-forest-950">Customer Profile</h4>
+                                            <p className="text-xs text-slate-400 font-mono">Verified Customer</p>
+                                          </div>
+                                        </div>
 
-                  return (
-                    <div className="bg-white p-6 rounded-3xl border border-slate-200/90 shadow-sm space-y-4">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-2">
-                          <CreditCard className="w-4 h-4 text-forest-900" />
-                          <h4 className="font-serif text-base font-bold text-forest-950">Payment Status</h4>
-                        </div>
-                        <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold uppercase border ${getPaymentStatusBadgeClass(currentPayStatus)}`}>
-                          {currentPayStatus.replace(/_/g, ' ')}
-                        </span>
-                      </div>
+                                        <div className="space-y-2.5 text-xs border-t border-slate-100 pt-3">
+                                          <div>
+                                            <span className="text-slate-400 font-semibold block text-[10px] uppercase">Full Name</span>
+                                            <p className="font-bold text-slate-800 text-sm mt-0.5">{selectedOrder.customerDetails?.fullName}</p>
+                                          </div>
+                                          <div>
+                                            <span className="text-slate-400 font-semibold block text-[10px] uppercase">Email Address</span>
+                                            <p className="font-medium text-slate-700 mt-0.5">{selectedOrder.customerDetails?.email}</p>
+                                          </div>
+                                          <div>
+                                            <span className="text-slate-400 font-semibold block text-[10px] uppercase">Phone Number</span>
+                                            <p className="font-medium text-slate-700 mt-0.5 font-mono">{selectedOrder.customerDetails?.phone}</p>
+                                          </div>
+                                        </div>
+                                      </div>
 
-                      <div className="border-t border-slate-100 pt-3 space-y-3 text-xs">
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-slate-500 font-semibold shrink-0">Update Payment:</span>
+                                      {/* Delivery Address Card */}
+                                      <div className="bg-white p-6 rounded-3xl border border-slate-200/90 shadow-sm space-y-4">
+                                        <div className="flex items-center space-x-2.5">
+                                          <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-800 flex items-center justify-center border border-emerald-200/80 shrink-0 aspect-square">
+                                            <MapPin className="w-4 h-4" />
+                                          </div>
+                                          <h4 className="font-serif text-base font-bold text-forest-950">Delivery Destination</h4>
+                                        </div>
 
-                          {isSelectedOrderCodCancelled ? (
-                            <div className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-500 font-semibold text-xs shadow-2xs">
-                              <Lock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                              <span>Not Applicable (₹0 Collected)</span>
-                            </div>
-                          ) : (
-                            /* Custom Luxury Payment Dropdown */
-                            <div className="relative" ref={paymentStatusDropdownRef}>
-                              <button
-                                type="button"
-                                onClick={() => !isProcessingAction && setIsPaymentStatusOpen(!isPaymentStatusOpen)}
-                                disabled={isProcessingAction}
-                                className={`inline-flex items-center justify-between space-x-2 px-3.5 py-1.5 rounded-xl border transition-all shadow-xs hover:shadow-sm cursor-pointer min-w-[130px] bg-white ${isPaymentStatusOpen
-                                  ? 'border-forest-900 ring-2 ring-forest-900/10'
-                                  : 'border-slate-200 hover:border-slate-300'
-                                  }`}
-                              >
-                                <div className="flex items-center space-x-2 truncate">
-                                  <span className={`w-2 h-2 rounded-full ${getPaymentStatusDot(currentPayStatus)} shrink-0`}></span>
-                                  <span className="font-serif font-bold text-xs text-forest-950 truncate tracking-tight">
-                                    {currentPayStatus}
-                                  </span>
-                                </div>
-                                <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 shrink-0 ${isPaymentStatusOpen ? 'rotate-180 text-forest-900' : ''}`} />
-                              </button>
+                                        <div className="space-y-1.5 text-xs border-t border-slate-100 pt-3 text-slate-700">
+                                          <p className="font-bold text-slate-900 text-sm">
+                                            {selectedOrder.shippingAddress?.fullName}
+                                          </p>
+                                          <p className="text-slate-500 text-[11px] font-mono">
+                                            Phone: {selectedOrder.shippingAddress?.phone}
+                                          </p>
+                                          <p className="text-slate-600 leading-relaxed mt-1">
+                                            {selectedOrder.shippingAddress?.addressLine1}
+                                            {selectedOrder.shippingAddress?.addressLine2 && `, ${selectedOrder.shippingAddress.addressLine2}`}
+                                            {selectedOrder.shippingAddress?.landmark && ` (Near ${selectedOrder.shippingAddress.landmark})`}
+                                          </p>
+                                          <p className="font-bold text-forest-950">
+                                            {selectedOrder.shippingAddress?.city}, {selectedOrder.shippingAddress?.state} - {selectedOrder.shippingAddress?.pincode}
+                                          </p>
+                                          <p className="text-slate-400 text-[11px]">{selectedOrder.shippingAddress?.country || 'India'}</p>
+                                        </div>
+                                      </div>
 
-                              {isPaymentStatusOpen && (
-                                <div className="absolute right-0 mt-2 z-50 w-64 bg-white rounded-2xl shadow-2xl border border-slate-200/90 py-1.5 animate-fadeIn overflow-hidden">
-                                  <div className="px-3 py-1.5 border-b border-slate-100 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                                    Select Payment Status
+                                    </div>
                                   </div>
-                                  <div className="py-1">
-                                    {ALL_PAYMENT_STATUSES.map((opt) => {
-                                      const isCurrent = currentPayStatus === opt.value;
-                                      const isPaidLockedForCod = isSelectedOrderCod && selectedOrder.orderStatus !== 'DELIVERED' && opt.value === 'PAID';
-                                      const isRefundLockedForCod = isSelectedOrderCod && selectedOrder.orderStatus !== 'DELIVERED' && opt.value === 'REFUNDED';
-                                      const isOptionDisabled = isProcessingAction || isPaidLockedForCod || isRefundLockedForCod;
+                                </div>
+                              )
+                            ) : (
+                              /* ====================================================================
+                                 ORDERS TABLE LIST VIEW
+                                 ==================================================================== */
+                              <>
+                                {/* Title Header */}
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                  <div>
+                                    <h2 className="font-serif text-2xl font-bold text-slate-800">
+                                      Order Lifecycle & Logistics Fulfillment
+                                    </h2>
+                                    <p className="text-xs text-slate-500">
+                                      Manage order workflow, courier tracking, cancellation reviews, customer damage claims & refunds, and RTO processing.
+                                    </p>
+                                  </div>
+                                </div>
 
-                                      return (
+                                {/* 1. Date & Time Selection Toolbar */}
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-3.5 sm:p-4 rounded-3xl border border-slate-200/90 shadow-2xs relative z-20">
+                                  <div className="flex items-center space-x-2 w-full sm:w-auto">
+                                    <TimeRangeDropdown
+                                      value={selectedPeriod}
+                                      onChange={(p) => {
+                                        setSelectedPeriod(p as DatePeriod);
+                                        if (p !== 'CUSTOM') {
+                                          setCustomStartDate('');
+                                          setCustomEndDate('');
+                                        }
+                                      }}
+                                      customStartDate={customStartDate}
+                                      customEndDate={customEndDate}
+                                      onCustomStartDateChange={setCustomStartDate}
+                                      onCustomEndDateChange={setCustomEndDate}
+                                      onApplyCustom={(start, end) => {
+                                        setCustomStartDate(start);
+                                        setCustomEndDate(end);
+                                        setSelectedPeriod('CUSTOM');
+                                      }}
+                                      format="uppercase"
+                                      label="TIME PERIOD:"
+                                    />
+                                  </div>
+
+                                  {/* Global Actions: Download PDF Report & Refresh */}
+                                  <div className="flex items-center space-x-2 shrink-0 self-start lg:self-auto">
+                                    <button
+                                      type="button"
+                                      onClick={handlePrintReport}
+                                      className="inline-flex items-center space-x-2 px-3.5 py-2 bg-gradient-to-r from-forest-900 to-forest-950 hover:from-forest-950 hover:to-black text-gold-400 font-bold text-xs rounded-xl shadow-xs transition group cursor-pointer border border-gold-400/20"
+                                      title="Download PDF Report Directly"
+                                    >
+                                      <Download className="w-4 h-4 text-gold-300 group-hover:scale-110 transition" />
+                                      <span>Download PDF Report</span>
+                                    </button>
+
+                                    <button
+                                      type="button"
+                                      onClick={() => fetchOrders()}
+                                      className="p-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl transition cursor-pointer"
+                                      title="Refresh Orders Data"
+                                    >
+                                      <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+                                    </button>
+                                  </div>
+                                </div>
+
+                                {/* 2. Top Metric / Stat KPI Small Boxes */}
+                                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
+                                  {/* Card 1: Total Orders */}
+                                  <div className="bg-white p-4 rounded-2xl border border-slate-200/90 shadow-2xs hover:shadow-xs transition">
+                                    <div className="flex items-center justify-between mb-2">
+                                      <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Orders</span>
+                                      <div className="w-8 h-8 rounded-xl bg-forest-900/10 text-forest-900 flex items-center justify-center">
+                                        <Package className="w-4 h-4" />
+                                      </div>
+                                    </div>
+                                    <p className="font-serif text-2xl font-black text-forest-950">
+                                      {orderSummary.totalOrders}
+                                    </p>
+                                    <p className="text-[11px] font-semibold text-emerald-700 mt-1 truncate">
+                                      ₹{orderSummary.totalRevenue.toLocaleString('en-IN')} gross sales
+                                    </p>
+                                  </div>
+
+                                  {/* Card 2: Delivered */}
+                                  <div className="bg-white p-4 rounded-2xl border border-slate-200/90 shadow-2xs hover:shadow-xs transition">
+                                    <div className="flex items-center justify-between mb-2">
+                                      <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Delivered</span>
+                                      <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center">
+                                        <CheckCircle2 className="w-4 h-4" />
+                                      </div>
+                                    </div>
+                                    <p className="font-serif text-2xl font-black text-emerald-900">
+                                      {orderSummary.deliveredCount}
+                                    </p>
+                                    <p className="text-[11px] font-semibold text-slate-500 mt-1">
+                                      {orderSummary.totalOrders > 0
+                                        ? `${Math.round((orderSummary.deliveredCount / orderSummary.totalOrders) * 100)}% Fulfilled`
+                                        : '0% Fulfilled'}
+                                    </p>
+                                  </div>
+
+                                  {/* Card 3: In Logistics / In Transit */}
+                                  <div className="bg-white p-4 rounded-2xl border border-slate-200/90 shadow-2xs hover:shadow-xs transition">
+                                    <div className="flex items-center justify-between mb-2">
+                                      <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">In Logistics</span>
+                                      <div className="w-8 h-8 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center">
+                                        <Truck className="w-4 h-4" />
+                                      </div>
+                                    </div>
+                                    <p className="font-serif text-2xl font-black text-blue-900">
+                                      {orderSummary.inTransitCount}
+                                    </p>
+                                    <p className="text-[11px] font-semibold text-blue-600 mt-1">
+                                      In Transit & Delivery
+                                    </p>
+                                  </div>
+
+                                  {/* Card 4: Cancelled */}
+                                  <div className="bg-white p-4 rounded-2xl border border-slate-200/90 shadow-2xs hover:shadow-xs transition">
+                                    <div className="flex items-center justify-between mb-2">
+                                      <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Cancelled</span>
+                                      <div className="w-8 h-8 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center">
+                                        <Ban className="w-4 h-4" />
+                                      </div>
+                                    </div>
+                                    <p className="font-serif text-2xl font-black text-rose-900">
+                                      {orderSummary.cancelledCount}
+                                    </p>
+                                    <p className="text-[11px] font-semibold text-rose-600 mt-1">
+                                      {orderSummary.totalOrders > 0
+                                        ? `${Math.round((orderSummary.cancelledCount / orderSummary.totalOrders) * 100)}% Cancelled`
+                                        : '0% Cancelled'}
+                                    </p>
+                                  </div>
+
+                                  {/* Card 5: RTO (Return to Origin) */}
+                                  <div className="bg-white p-4 rounded-2xl border border-slate-200/90 shadow-2xs hover:shadow-xs transition col-span-2 sm:col-span-1">
+                                    <div className="flex items-center justify-between mb-2">
+                                      <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">RTO / Failed</span>
+                                      <div className="w-8 h-8 rounded-xl bg-orange-100 text-orange-700 flex items-center justify-center">
+                                        <RotateCcw className="w-4 h-4" />
+                                      </div>
+                                    </div>
+                                    <p className="font-serif text-2xl font-black text-orange-900">
+                                      {orderSummary.rtoCount}
+                                    </p>
+                                    <p className="text-[11px] font-semibold text-orange-600 mt-1">
+                                      Courier delivery failed
+                                    </p>
+                                  </div>
+                                </div>
+
+                                {/* Quick Filter Tabs */}
+                                <div className="flex items-center space-x-2 overflow-x-auto no-scrollbar pb-1 text-xs">
+                                  <button
+                                    onClick={() => { setActiveTab('ALL'); setSelectedStatus('ALL'); }}
+                                    className={`px-3.5 py-2 rounded-xl font-bold whitespace-nowrap transition ${activeTab === 'ALL'
+                                      ? 'bg-forest-900 text-gold-400 shadow-sm'
+                                      : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+                                      }`}
+                                  >
+                                    All Orders ({orders.length})
+                                  </button>
+
+                                  <button
+                                    onClick={() => { setActiveTab('CANCELLATIONS'); setSelectedStatus('CANCELLATION_REQUESTED'); }}
+                                    className={`px-3.5 py-2 rounded-xl font-bold whitespace-nowrap transition flex items-center space-x-1.5 ${activeTab === 'CANCELLATIONS'
+                                      ? 'bg-amber-600 text-white shadow-sm'
+                                      : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+                                      }`}
+                                  >
+                                    <AlertTriangle className="w-3.5 h-3.5" />
+                                    <span>Cancellation Requests</span>
+                                  </button>
+
+                                  <button
+                                    onClick={() => { setActiveTab('COMPLAINTS'); setSelectedStatus('ALL'); }}
+                                    className={`px-3.5 py-2 rounded-xl font-bold whitespace-nowrap transition flex items-center space-x-1.5 ${activeTab === 'COMPLAINTS'
+                                      ? 'bg-rose-700 text-white shadow-sm'
+                                      : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+                                      }`}
+                                  >
+                                    <ShieldAlert className="w-3.5 h-3.5" />
+                                    <span>Customer Damage Claims</span>
+                                  </button>
+
+                                  <button
+                                    onClick={() => { setActiveTab('RTO'); setSelectedStatus('ALL'); }}
+                                    className={`px-3.5 py-2 rounded-xl font-bold whitespace-nowrap transition flex items-center space-x-1.5 ${activeTab === 'RTO'
+                                      ? 'bg-orange-600 text-white shadow-sm'
+                                      : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+                                      }`}
+                                  >
+                                    <Truck className="w-3.5 h-3.5" />
+                                    <span>RTO (Return to Origin)</span>
+                                  </button>
+
+                                  <button
+                                    onClick={() => { setActiveTab('DELIVERED'); setSelectedStatus('DELIVERED'); }}
+                                    className={`px-3.5 py-2 rounded-xl font-bold whitespace-nowrap transition ${activeTab === 'DELIVERED'
+                                      ? 'bg-emerald-700 text-white shadow-sm'
+                                      : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+                                      }`}
+                                  >
+                                    Delivered
+                                  </button>
+
+                                  <button
+                                    onClick={() => { setActiveTab('CANCELLED'); setSelectedStatus('CANCELLED'); }}
+                                    className={`px-3.5 py-2 rounded-xl font-bold whitespace-nowrap transition ${activeTab === 'CANCELLED'
+                                      ? 'bg-rose-700 text-white shadow-sm'
+                                      : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+                                      }`}
+                                  >
+                                    Cancelled
+                                  </button>
+                                </div>
+
+                                {/* Filter and Search Bar */}
+                                <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4 text-xs">
+                                  <div className="relative w-full md:w-80">
+                                    <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                                    <input
+                                      type="text"
+                                      placeholder="Search Order ID, AWB, Customer..."
+                                      value={search}
+                                      onChange={(e) => setSearch(e.target.value)}
+                                      className="w-full pl-10 pr-3.5 py-2 border border-slate-200 rounded-xl bg-[#FAF8F5] focus:outline-none focus:ring-1 focus:ring-forest-900"
+                                    />
+                                  </div>
+
+                                  <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-2 w-full md:w-auto relative" ref={filterStatusDropdownRef}>
+                                    <div className="flex items-center justify-between sm:justify-start">
+                                      <span className="text-slate-500 font-semibold text-xs whitespace-nowrap">Filter Status:</span>
+                                      {selectedStatus !== 'ALL' && (
                                         <button
-                                          key={opt.value}
                                           type="button"
-                                          disabled={isOptionDisabled}
-                                          onClick={() => {
-                                            if (!isOptionDisabled) {
-                                              setIsPaymentStatusOpen(false);
-                                              handlePaymentStatusUpdate(selectedOrder, opt.value);
-                                            }
-                                          }}
-                                          className={`w-full text-left px-3.5 py-2.5 flex items-center justify-between text-xs transition ${isCurrent
-                                            ? 'bg-forest-900/5 text-forest-950 font-bold border-l-4 border-forest-900 cursor-default'
-                                            : isOptionDisabled
-                                              ? 'opacity-40 text-slate-400 bg-slate-50/50 cursor-not-allowed'
-                                              : 'hover:bg-[#FAF8F5] text-slate-700 hover:text-forest-950 font-medium cursor-pointer'
-                                            }`}
+                                          onClick={() => setSelectedStatus('ALL')}
+                                          className="text-[11px] text-emerald-800 font-bold hover:underline sm:hidden"
                                         >
-                                          <div className="space-y-0.5 min-w-0 pr-2">
+                                          Reset Filter
+                                        </button>
+                                      )}
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={() => setIsFilterStatusOpen(!isFilterStatusOpen)}
+                                      className={`w-full sm:w-auto inline-flex items-center justify-between space-x-2.5 px-3.5 py-2.5 sm:py-2 rounded-xl border transition-all shadow-2xs hover:shadow-xs cursor-pointer min-w-0 sm:min-w-[240px] bg-[#FAF8F5] ${isFilterStatusOpen
+                                        ? 'border-forest-900 ring-2 ring-forest-900/10 bg-white'
+                                        : 'border-slate-200 hover:border-slate-300'
+                                        }`}
+                                    >
+                                      <div className="flex items-center space-x-2 truncate">
+                                        <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${selectedStatus === 'ALL'
+                                          ? 'bg-slate-400'
+                                          : (ALL_ORDER_STATUSES.find(s => s.value === selectedStatus)?.dot || 'bg-slate-400')
+                                          }`} />
+                                        <span className="font-semibold text-xs text-slate-800 truncate">
+                                          {selectedStatus === 'ALL'
+                                            ? 'All Statuses (12 Lifecycle Steps)'
+                                            : (ALL_ORDER_STATUSES.find(s => s.value === selectedStatus)?.label || selectedStatus)}
+                                        </span>
+                                      </div>
+                                      <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-200 shrink-0 ${isFilterStatusOpen ? 'rotate-180 text-forest-900' : ''}`} />
+                                    </button>
+
+                                    {/* MOBILE VIEW: Luxury Bottom Sheet Drawer (Screen < sm) */}
+                                    {isFilterStatusOpen && typeof document !== 'undefined' && createPortal(
+                                      <div
+                                        className="fixed inset-0 z-[9999] bg-slate-950/70 backdrop-blur-xs flex items-end justify-center p-0 sm:hidden animate-in fade-in duration-200"
+                                        onClick={() => setIsFilterStatusOpen(false)}
+                                      >
+                                        <div
+                                          className="bg-white w-full max-w-lg rounded-t-3xl max-h-[82vh] flex flex-col shadow-2xl border-t border-slate-200 overflow-hidden animate-in slide-in-from-bottom duration-250"
+                                          onClick={(e) => e.stopPropagation()}
+                                        >
+                                          {/* Pull Bar */}
+                                          <div className="pt-3 pb-1 flex justify-center">
+                                            <div className="w-12 h-1.5 bg-slate-200 rounded-full" />
+                                          </div>
+
+                                          {/* Sheet Header */}
+                                          <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
+                                            <div>
+                                              <h3 className="font-bold text-slate-900 text-sm">Filter by Order Status</h3>
+                                              <p className="text-[11px] text-slate-400">Tap a lifecycle stage to filter orders</p>
+                                            </div>
                                             <div className="flex items-center space-x-2">
-                                              <span className={`w-2 h-2 rounded-full ${opt.dot} shrink-0`}></span>
-                                              <span className="font-bold text-slate-900">{opt.label}</span>
-                                              {isPaidLockedForCod && (
-                                                <span className="text-[9px] px-1.5 py-0.5 bg-amber-100 text-amber-900 rounded font-bold">
-                                                  Upon Delivery
+                                              <span className="text-[10px] text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full font-semibold">
+                                                12 Steps
+                                              </span>
+                                              <button
+                                                type="button"
+                                                onClick={() => setIsFilterStatusOpen(false)}
+                                                className="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 transition"
+                                              >
+                                                <X className="w-4 h-4" />
+                                              </button>
+                                            </div>
+                                          </div>
+
+                                          {/* Scrollable Status Options */}
+                                          <div className="flex-1 overflow-y-auto overscroll-contain py-1 divide-y divide-slate-100 px-3 pb-8">
+                                            {/* ALL STATUSES OPTION */}
+                                            <button
+                                              type="button"
+                                              onClick={() => {
+                                                setSelectedStatus('ALL');
+                                                setIsFilterStatusOpen(false);
+                                              }}
+                                              className={`w-full text-left px-3.5 py-3 rounded-xl flex items-center justify-between text-xs transition my-1 ${selectedStatus === 'ALL'
+                                                ? 'bg-[#FAF8F5] text-forest-950 font-bold border-l-4 border-forest-900 shadow-2xs'
+                                                : 'hover:bg-slate-50 text-slate-800 font-medium'
+                                                }`}
+                                            >
+                                              <div className="flex items-center space-x-3 min-w-0 pr-2">
+                                                <span className="w-3 h-3 rounded-full bg-slate-400 shrink-0" />
+                                                <div className="truncate">
+                                                  <p className={`truncate text-sm ${selectedStatus === 'ALL' ? 'font-bold text-forest-950' : 'font-semibold text-slate-800'}`}>
+                                                    All Statuses
+                                                  </p>
+                                                  <p className="text-[11px] text-slate-400 truncate">Show all orders across all 12 stages</p>
+                                                </div>
+                                              </div>
+
+                                              <div className="shrink-0 flex items-center space-x-1.5">
+                                                {selectedStatus === 'ALL' ? (
+                                                  <span className="px-3 py-1 rounded-full text-xs font-bold bg-forest-900 text-gold-400 shadow-2xs">
+                                                    Selected
+                                                  </span>
+                                                ) : (
+                                                  <span className="px-3 py-1 rounded-full text-xs font-bold bg-[#0B3B24] text-[#ECC94B] shadow-2xs">
+                                                    Select
+                                                  </span>
+                                                )}
+                                              </div>
+                                            </button>
+
+                                            {/* 12 LIFECYCLE STEPS */}
+                                            {ALL_ORDER_STATUSES.map((item) => {
+                                              const isSelected = selectedStatus === item.value;
+                                              return (
+                                                <button
+                                                  key={item.value}
+                                                  type="button"
+                                                  onClick={() => {
+                                                    setSelectedStatus(item.value);
+                                                    setIsFilterStatusOpen(false);
+                                                  }}
+                                                  className={`w-full text-left px-3.5 py-3 rounded-xl flex items-center justify-between text-xs transition my-1 ${isSelected
+                                                    ? 'bg-[#FAF8F5] text-forest-950 font-bold border-l-4 border-forest-900 shadow-2xs'
+                                                    : 'hover:bg-slate-50 text-slate-800 font-medium'
+                                                    }`}
+                                                >
+                                                  <div className="flex items-center space-x-3 min-w-0 pr-2">
+                                                    <span className={`w-3 h-3 rounded-full ${item.dot} shrink-0`} />
+                                                    <div className="truncate">
+                                                      <p className={`truncate text-sm ${isSelected ? 'font-bold text-forest-950' : 'font-semibold text-slate-800'}`}>
+                                                        {item.label}
+                                                      </p>
+                                                      <p className="text-[11px] text-slate-400 truncate">{item.stage}</p>
+                                                    </div>
+                                                  </div>
+
+                                                  <div className="shrink-0 flex items-center space-x-1.5">
+                                                    {isSelected ? (
+                                                      <span className="px-3 py-1 rounded-full text-xs font-bold bg-forest-900 text-gold-400 shadow-2xs">
+                                                        Selected
+                                                      </span>
+                                                    ) : (
+                                                      <span className="px-3 py-1 rounded-full text-xs font-bold bg-[#0B3B24] text-[#ECC94B] shadow-2xs">
+                                                        Select
+                                                      </span>
+                                                    )}
+                                                  </div>
+                                                </button>
+                                              );
+                                            })}
+                                          </div>
+                                        </div>
+                                      </div>,
+                                      document.body
+                                    )}
+
+                                    {/* DESKTOP VIEW: Anchored Floating Dropdown (Screen >= sm) */}
+                                    {isFilterStatusOpen && (
+                                      <div className="hidden sm:block absolute right-0 top-full mt-2 z-50 w-84 bg-white rounded-2xl shadow-2xl border border-slate-200/90 py-2 animate-fadeIn overflow-hidden">
+                                        <div className="px-4 py-2 border-b border-slate-100 flex items-center justify-between text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                                          <span>Filter Order Status</span>
+                                          <span className="text-[10px] text-emerald-800 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full font-semibold">
+                                            12 Lifecycle Steps
+                                          </span>
+                                        </div>
+
+                                        <div className="max-h-80 overflow-y-auto no-scrollbar py-1 divide-y divide-slate-50">
+                                          {/* ALL STATUSES OPTION */}
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              setSelectedStatus('ALL');
+                                              setIsFilterStatusOpen(false);
+                                            }}
+                                            className={`w-full text-left px-4 py-2.5 flex items-center justify-between text-xs transition ${selectedStatus === 'ALL'
+                                              ? 'bg-[#FAF8F5] text-forest-950 font-bold border-l-4 border-forest-900'
+                                              : 'hover:bg-[#FAF8F5] text-slate-800 hover:text-forest-950 font-medium cursor-pointer group'
+                                              }`}
+                                          >
+                                            <div className="flex items-center space-x-3 min-w-0 pr-2">
+                                              <span className="w-2.5 h-2.5 rounded-full bg-slate-400 shrink-0" />
+                                              <div className="truncate">
+                                                <p className={`truncate text-xs ${selectedStatus === 'ALL' ? 'font-bold text-forest-950' : 'font-semibold text-slate-800'}`}>
+                                                  All Statuses
+                                                </p>
+                                                <p className="text-[10px] text-slate-400 truncate">All 12 lifecycle stages</p>
+                                              </div>
+                                            </div>
+
+                                            <div className="shrink-0 flex items-center space-x-1.5">
+                                              {selectedStatus === 'ALL' ? (
+                                                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-forest-900 text-gold-400 shadow-2xs">
+                                                  Selected
+                                                </span>
+                                              ) : (
+                                                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#0B3B24] text-[#ECC94B] group-hover:brightness-110 transition shadow-2xs">
+                                                  Select
                                                 </span>
                                               )}
                                             </div>
-                                            <p className="text-[10px] text-slate-400 truncate pl-4">
-                                              {isPaidLockedForCod ? 'Only available when order is Delivered' : opt.desc}
+                                          </button>
+
+                                          {/* 12 LIFECYCLE STEPS */}
+                                          {ALL_ORDER_STATUSES.map((item) => {
+                                            const isSelected = selectedStatus === item.value;
+                                            return (
+                                              <button
+                                                key={item.value}
+                                                type="button"
+                                                onClick={() => {
+                                                  setSelectedStatus(item.value);
+                                                  setIsFilterStatusOpen(false);
+                                                }}
+                                                className={`w-full text-left px-4 py-2.5 flex items-center justify-between text-xs transition ${isSelected
+                                                  ? 'bg-[#FAF8F5] text-forest-950 font-bold border-l-4 border-forest-900'
+                                                  : 'hover:bg-[#FAF8F5] text-slate-800 hover:text-forest-950 font-medium cursor-pointer group'
+                                                  }`}
+                                              >
+                                                <div className="flex items-center space-x-3 min-w-0 pr-2">
+                                                  <span className={`w-2.5 h-2.5 rounded-full ${item.dot} shrink-0`} />
+                                                  <div className="truncate">
+                                                    <p className={`truncate text-xs ${isSelected ? 'font-bold text-forest-950' : 'font-semibold text-slate-800'}`}>
+                                                      {item.label}
+                                                    </p>
+                                                    <p className="text-[10px] text-slate-400 truncate">{item.stage}</p>
+                                                  </div>
+                                                </div>
+
+                                                <div className="shrink-0 flex items-center space-x-1.5">
+                                                  {isSelected ? (
+                                                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-forest-900 text-gold-400 shadow-2xs">
+                                                      Selected
+                                                    </span>
+                                                  ) : (
+                                                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#0B3B24] text-[#ECC94B] group-hover:brightness-110 transition shadow-2xs">
+                                                      Select
+                                                    </span>
+                                                  )}
+                                                </div>
+                                              </button>
+                                            );
+                                          })}
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+
+                                {/* Orders Table */}
+                                <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+                                  <div className="overflow-x-auto">
+                                    <table className="w-full text-left text-sm">
+                                      <thead className="bg-[#FAF8F5] text-slate-500 uppercase text-xs font-bold border-b border-slate-100">
+                                        <tr>
+                                          <th className="p-4">Order ID / Date</th>
+                                          <th className="p-4">Customer Details</th>
+                                          <th className="p-4">Amount / Payment</th>
+                                          <th className="p-4">Delivery Status</th>
+                                          <th className="p-4">Carrier & AWB</th>
+                                          <th className="p-4 text-right">Actions</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody className="divide-y divide-slate-100">
+                                        {isLoading ? (
+                                          <tr>
+                                            <td colSpan={6} className="p-8 text-center text-slate-400">Loading orders...</td>
+                                          </tr>
+                                        ) : filteredOrders.length === 0 ? (
+                                          <tr>
+                                            <td colSpan={6} className="p-8 text-center text-slate-400">No matching orders found.</td>
+                                          </tr>
+                                        ) : (
+                                          paginatedOrders.map((order) => (
+                                            <tr
+                                              key={order._id}
+                                              onClick={() => handleSelectOrder(order)}
+                                              className="hover:bg-slate-50/80 transition cursor-pointer group"
+                                            >
+                                              <td className="p-4">
+                                                <p className="font-mono font-bold text-forest-900 group-hover:text-gold-600 transition flex items-center space-x-1.5">
+                                                  <span>{order.orderId}</span>
+                                                  <Eye className="w-3.5 h-3.5 text-slate-400 group-hover:text-forest-900" />
+                                                </p>
+                                                <p className="text-[10px] text-slate-400 mt-0.5">{new Date(order.createdAt).toLocaleDateString()}</p>
+                                              </td>
+
+                                              <td className="p-4">
+                                                <p className="font-bold text-slate-800">{order.customerDetails?.fullName}</p>
+                                                <p className="text-[10px] text-slate-400">{order.shippingAddress?.city}, {order.shippingAddress?.pincode}</p>
+                                              </td>
+
+                                              <td className="p-4">
+                                                {(() => {
+                                                  const sub = Number(order.pricing?.subtotal) || 0;
+                                                  const disc = Number(order.pricing?.discountAmount) || 0;
+                                                  const ship = Number(order.pricing?.shippingFee) || 0;
+                                                  const tax = Number(order.pricing?.taxAmount) || (sub > 0 ? Math.round((sub - disc) * 0.05) : 0);
+                                                  const total = (order.pricing?.totalAmount && order.pricing.totalAmount > (sub - disc))
+                                                    ? order.pricing.totalAmount
+                                                    : ((sub - disc) + ship + tax);
+                                                  return <p className="font-bold text-slate-900">₹{total}</p>;
+                                                })()}
+                                                <div className="flex items-center space-x-1 mt-0.5" onClick={(e) => e.stopPropagation()}>
+                                                  <span className="text-[10px] font-semibold text-slate-500">
+                                                    {order.paymentInfo?.method || order.paymentMethod || 'ONLINE'}:
+                                                  </span>
+                                                  {(() => {
+                                                    const isCod = order.paymentInfo?.method === 'COD' || order.paymentMethod === 'COD';
+                                                    const isCancelledBeforeDelivery = ['CANCELLED', 'CANCELLATION_REQUESTED', 'RTO_COMPLETED', 'RETURNED_TO_SELLER'].includes(order.orderStatus);
+                                                    const isCodCancelled = isCod && isCancelledBeforeDelivery && order.orderStatus !== 'DELIVERED';
+                                                    let displayStatus = order.paymentInfo?.status || order.paymentStatus || 'PENDING';
+                                                    if (isCod) {
+                                                      if (isCodCancelled) {
+                                                        displayStatus = 'NOT_APPLICABLE';
+                                                      } else if (order.orderStatus !== 'DELIVERED') {
+                                                        displayStatus = 'PENDING';
+                                                      }
+                                                    }
+                                                    return (
+                                                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${getPaymentStatusBadgeClass(displayStatus)}`}>
+                                                        {displayStatus.replace(/_/g, ' ')}
+                                                      </span>
+                                                    );
+                                                  })()}
+                                                </div>
+                                              </td>
+
+                                              <td className="p-4">
+                                                <span className={`px-2.5 py-1 rounded-full text-xs font-bold border uppercase tracking-wider ${getOrderStatusBadgeClass(order.orderStatus)}`}>
+                                                  {formatStatusName(order.orderStatus)}
+                                                </span>
+                                              </td>
+
+                                              <td className="p-4 font-mono">
+                                                {order.shipment?.awbCode ? (
+                                                  <div>
+                                                    <p className="font-bold text-forest-900 text-xs">{order.shipment.awbCode}</p>
+                                                    <p className="text-[10px] text-slate-400">{order.shipment.courierName}</p>
+                                                  </div>
+                                                ) : (
+                                                  <span className="text-xs text-slate-400 italic">Awaiting Booking</span>
+                                                )}
+                                              </td>
+
+                                              <td className="p-4 text-right" onClick={(e) => e.stopPropagation()}>
+                                                <div className="flex items-center justify-end space-x-2">
+                                                  {order.orderStatus === 'CANCELLATION_REQUESTED' ? (
+                                                    <button
+                                                      onClick={() => handleSelectOrder(order)}
+                                                      className="px-2.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-lg text-xs transition"
+                                                    >
+                                                      Review Cancel
+                                                    </button>
+                                                  ) : order.complaint?.hasComplaint && order.complaint?.status === 'SUBMITTED' ? (
+                                                    <button
+                                                      onClick={() => handleSelectOrder(order)}
+                                                      className="px-2.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-lg text-xs transition"
+                                                    >
+                                                      Review Claim
+                                                    </button>
+                                                  ) : (
+                                                    <button
+                                                      onClick={() => handleSelectOrder(order)}
+                                                      className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg text-xs transition"
+                                                    >
+                                                      Manage
+                                                    </button>
+                                                  )}
+                                                </div>
+                                              </td>
+                                            </tr>
+                                          ))
+                                        )}
+                                      </tbody>
+                                    </table>
+                                  </div>
+
+                                  {/* Pagination Controls */}
+                                  {filteredOrders.length > 0 && (
+                                    <AdminPagination
+                                      currentPage={currentPage}
+                                      totalItems={filteredOrders.length}
+                                      pageSize={pageSize}
+                                      onPageChange={setCurrentPage}
+                                      onPageSizeChange={setPageSize}
+                                      itemLabel="orders"
+                                    />
+                                  )}
+                                </div>
+                              </>
+                            )}
+                          </div>
+
+                          {/* ====================================================================
+         MODALS & DIALOGS
+         ==================================================================== */}
+
+                          {/* 1. Cancellation Rejection Modal */}
+                          {showCancelRejectModal && typeof document !== 'undefined' && createPortal(
+                            <div className="fixed inset-0 z-[9999] bg-slate-950/75 backdrop-blur-md flex items-center justify-center p-4">
+                              <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-200 text-xs">
+                                <div className="flex justify-between items-center pb-3 border-b border-slate-100">
+                                  <h3 className="font-serif text-lg font-bold text-slate-900">Reject Cancellation Request</h3>
+                                  <button onClick={() => setShowCancelRejectModal(false)} className="p-1 hover:bg-slate-100 rounded-full text-slate-400">
+                                    <X className="w-4 h-4" />
+                                  </button>
+                                </div>
+
+                                <p className="text-slate-600">
+                                  The order will revert to its fulfillment status (Packed / Shipment Booked) and continue forward.
+                                </p>
+
+                                <div>
+                                  <label className="font-bold text-slate-700 block mb-1">Reason for Rejection *</label>
+                                  <textarea
+                                    rows={3}
+                                    placeholder="e.g. Parcel has already been handed over to courier dispatch..."
+                                    value={cancelRejectionReason}
+                                    onChange={(e) => setCancelRejectionReason(e.target.value)}
+                                    className="w-full p-2.5 border border-slate-200 rounded-xl bg-slate-50 focus:outline-none focus:ring-1 focus:ring-forest-900"
+                                  />
+                                </div>
+
+                                <div className="flex items-center justify-end space-x-2 pt-3 border-t border-slate-100">
+                                  <button
+                                    type="button"
+                                    onClick={() => setShowCancelRejectModal(false)}
+                                    className="px-4 py-2 border border-slate-200 rounded-xl font-bold text-slate-600 hover:bg-slate-50"
+                                  >
+                                    Cancel
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={handleRejectCancellation}
+                                    disabled={isProcessingAction}
+                                    className="px-5 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl"
+                                  >
+                                    Confirm Rejection
+                                  </button>
+                                </div>
+                              </div>
+                            </div>,
+                            document.body
+                          )}
+
+                          {/* 2. Customer Damage Claim Rejection Modal */}
+                          {showComplaintRejectModal && typeof document !== 'undefined' && createPortal(
+                            <div className="fixed inset-0 z-[9999] bg-slate-950/75 backdrop-blur-md flex items-center justify-center p-4">
+                              <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-200 text-xs">
+                                <div className="flex justify-between items-center pb-3 border-b border-slate-100">
+                                  <h3 className="font-serif text-lg font-bold text-slate-900">Reject Customer Claim</h3>
+                                  <button onClick={() => setShowComplaintRejectModal(false)} className="p-1 hover:bg-slate-100 rounded-full text-slate-400">
+                                    <X className="w-4 h-4" />
+                                  </button>
+                                </div>
+
+                                <p className="text-slate-600">
+                                  Explain why this damage/defect claim is being rejected (e.g. proof images indicate user mishandling, seal was broken post-delivery, or report exceeded 48-hour window).
+                                </p>
+
+                                <div>
+                                  <label className="font-bold text-slate-700 block mb-1">Reason for Rejection *</label>
+                                  <textarea
+                                    rows={3}
+                                    placeholder="State rejection reason clearly for customer..."
+                                    value={complaintRejectionReason}
+                                    onChange={(e) => setComplaintRejectionReason(e.target.value)}
+                                    className="w-full p-2.5 border border-slate-200 rounded-xl bg-slate-50 focus:outline-none focus:ring-1 focus:ring-forest-900"
+                                  />
+                                </div>
+
+                                <div className="flex items-center justify-end space-x-2 pt-3 border-t border-slate-100">
+                                  <button
+                                    type="button"
+                                    onClick={() => setShowComplaintRejectModal(false)}
+                                    className="px-4 py-2 border border-slate-200 rounded-xl font-bold text-slate-600 hover:bg-slate-50"
+                                  >
+                                    Cancel
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleReviewComplaint('REJECT')}
+                                    disabled={isProcessingAction}
+                                    className="px-5 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl"
+                                  >
+                                    Confirm Rejection
+                                  </button>
+                                </div>
+                              </div>
+                            </div>,
+                            document.body
+                          )}
+
+                          {/* 3. Customer Damage Claim Resolution Modal */}
+                          {showComplaintResolveModal && typeof document !== 'undefined' && createPortal(
+                            <div className="fixed inset-0 z-[9999] bg-slate-950/75 backdrop-blur-md flex items-center justify-center p-4">
+                              <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-200 text-xs">
+                                <div className="flex justify-between items-center pb-3 border-b border-slate-100">
+                                  <h3 className="font-serif text-lg font-bold text-slate-900">Resolve Customer Claim</h3>
+                                  <button onClick={() => setShowComplaintResolveModal(false)} className="p-1 hover:bg-slate-100 rounded-full text-slate-400">
+                                    <X className="w-4 h-4" />
+                                  </button>
+                                </div>
+
+                                <div className="space-y-3">
+                                  <div>
+                                    <label className="font-bold text-slate-700 block mb-1">Resolution *</label>
+                                    <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center space-x-2 text-emerald-950 font-bold text-xs">
+                                      <ShieldCheck className="w-4 h-4 text-emerald-700 shrink-0" />
+                                      <span>Approved Direct Refund (Items are strictly Non-Returnable & Non-Replaceable)</span>
+                                    </div>
+                                  </div>
+
+                                  <div>
+                                    <label className="font-bold text-slate-700 block mb-1">Resolution Notes</label>
+                                    <textarea
+                                      rows={2}
+                                      placeholder="e.g. Approved 100% refund for verified transit leakage..."
+                                      value={complaintResolutionNotes}
+                                      onChange={(e) => setComplaintResolutionNotes(e.target.value)}
+                                      className="w-full p-2.5 border border-slate-200 rounded-xl bg-slate-50 focus:outline-none"
+                                    />
+                                  </div>
+                                </div>
+
+                                <div className="flex items-center justify-end space-x-2 pt-3 border-t border-slate-100">
+                                  <button
+                                    type="button"
+                                    onClick={() => setShowComplaintResolveModal(false)}
+                                    className="px-4 py-2 border border-slate-200 rounded-xl font-bold text-slate-600 hover:bg-slate-50"
+                                  >
+                                    Cancel
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleReviewComplaint('RESOLVE')}
+                                    disabled={isProcessingAction}
+                                    className="px-5 py-2 bg-forest-900 hover:bg-forest-800 text-gold-400 font-bold rounded-xl"
+                                  >
+                                    Confirm Resolution
+                                  </button>
+                                </div>
+                              </div>
+                            </div>,
+                            document.body
+                          )}
+
+
+
+                          {/* 4. RTO Product Warehouse Inspection Modal */}
+                          {showRTOInspectionModal && typeof document !== 'undefined' && createPortal(
+                            <div className="fixed inset-0 z-[9999] bg-slate-950/75 backdrop-blur-md flex items-center justify-center p-4">
+                              <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-200 text-xs">
+                                <div className="flex justify-between items-center pb-3 border-b border-slate-100">
+                                  <div className="flex items-center space-x-2">
+                                    <ShieldCheck className="w-5 h-5 text-indigo-700" />
+                                    <h3 className="font-serif text-lg font-bold text-slate-900">Inspect Returned RTO Parcel</h3>
+                                  </div>
+                                  <button onClick={() => setShowRTOInspectionModal(false)} className="p-1 hover:bg-slate-100 rounded-full text-slate-400">
+                                    <X className="w-4 h-4" />
+                                  </button>
+                                </div>
+
+                                <p className="text-slate-600">
+                                  Verify the condition of the personal care products in this returned parcel. Personal care items may only be restocked if sealed and undamaged.
+                                </p>
+
+                                <div className="space-y-3">
+                                  <div>
+                                    <label className="font-bold text-slate-700 block mb-1">Product Condition *</label>
+                                    <div className="grid grid-cols-2 gap-2">
+                                      <button
+                                        type="button"
+                                        onClick={() => setRtoCondition('SELLABLE')}
+                                        className={`p-3 rounded-xl border text-left transition ${rtoCondition === 'SELLABLE'
+                                          ? 'border-emerald-500 bg-emerald-50 text-emerald-950 ring-2 ring-emerald-500/20'
+                                          : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                                          }`}
+                                      >
+                                        <p className="font-bold text-emerald-900">Sellable Condition</p>
+                                        <p className="text-[10px] text-emerald-700 mt-0.5">Seals intact. Automatically restock inventory.</p>
+                                      </button>
+
+                                      <button
+                                        type="button"
+                                        onClick={() => setRtoCondition('DAMAGED_UNSELLABLE')}
+                                        className={`p-3 rounded-xl border text-left transition ${rtoCondition === 'DAMAGED_UNSELLABLE'
+                                          ? 'border-rose-500 bg-rose-50 text-rose-950 ring-2 ring-rose-500/20'
+                                          : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                                          }`}
+                                      >
+                                        <p className="font-bold text-rose-900">Damaged / Unsellable</p>
+                                        <p className="text-[10px] text-rose-700 mt-0.5">Broken seal or leaked. Do NOT restock.</p>
+                                      </button>
+                                    </div>
+                                  </div>
+
+                                  <div>
+                                    <label className="font-bold text-slate-700 block mb-1">Inspection Notes</label>
+                                    <textarea
+                                      rows={2}
+                                      placeholder="e.g. Outer cardboard box bent, bottles intact with tamper seal..."
+                                      value={rtoNotes}
+                                      onChange={(e) => setRtoNotes(e.target.value)}
+                                      className="w-full p-2.5 border border-slate-200 rounded-xl bg-slate-50 focus:outline-none"
+                                    />
+                                  </div>
+                                </div>
+
+                                <div className="flex items-center justify-end space-x-2 pt-3 border-t border-slate-100">
+                                  <button
+                                    type="button"
+                                    onClick={() => setShowRTOInspectionModal(false)}
+                                    className="px-4 py-2 border border-slate-200 rounded-xl font-bold text-slate-600 hover:bg-slate-50"
+                                  >
+                                    Cancel
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={handleCompleteRTO}
+                                    disabled={isProcessingAction}
+                                    className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-xs"
+                                  >
+                                    Complete RTO & Finalize
+                                  </button>
+                                </div>
+                              </div>
+                            </div>,
+                            document.body
+                          )}
+
+                          {/* 5. RTO Initiation Modal */}
+                          {showRTOModal && typeof document !== 'undefined' && createPortal(
+                            <div className="fixed inset-0 z-[9999] bg-slate-950/75 backdrop-blur-md flex items-center justify-center p-4">
+                              <div className="bg-white rounded-3xl max-w-lg w-full p-5 sm:p-6 shadow-2xl space-y-4 sm:space-y-5 animate-in fade-in zoom-in-95 duration-200 text-xs">
+                                {/* Header */}
+                                <div className="flex items-center justify-between pb-3.5 border-b border-slate-100">
+                                  <div className="flex items-center space-x-3">
+                                    <div className="w-10 h-10 rounded-2xl bg-orange-100 flex items-center justify-center text-orange-600 shrink-0">
+                                      <RotateCcw className="w-5 h-5" />
+                                    </div>
+                                    <div>
+                                      <h3 className="font-serif text-base sm:text-lg font-bold text-slate-900 leading-tight">
+                                        Initiate Return to Origin (RTO)
+                                      </h3>
+                                      <p className="text-[11px] text-slate-500 mt-0.5">
+                                        Order #{selectedOrder?.orderId} &bull; Non-deliverable shipment return
+                                      </p>
+                                    </div>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setShowRTOModal(false);
+                                      setIsRtoReasonDropdownOpen(false);
+                                    }}
+                                    className="p-1.5 hover:bg-slate-100 rounded-full text-slate-400 hover:text-slate-600 transition cursor-pointer"
+                                  >
+                                    <X className="w-4 h-4" />
+                                  </button>
+                                </div>
+
+                                {/* Dropdown Selector Area */}
+                                <div className="space-y-2">
+                                  <label className="text-xs font-bold text-slate-700 flex items-center justify-between">
+                                    <span>Reason for Return to Origin (RTO) *</span>
+                                    <span className="text-[10px] font-semibold text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full border border-orange-200/60">
+                                      Required for Courier
+                                    </span>
+                                  </label>
+
+                                  {/* Luxury Custom Dropdown */}
+                                  <div className="relative" ref={rtoReasonDropdownRef}>
+                                    {(() => {
+                                      const activeReason = RTO_REASONS.find(r => r.value === rtoReason) || RTO_REASONS[0];
+                                      const ActiveIcon = activeReason.icon;
+                                      return (
+                                        <>
+                                          <button
+                                            type="button"
+                                            onClick={() => setIsRtoReasonDropdownOpen(!isRtoReasonDropdownOpen)}
+                                            className={`w-full flex items-center justify-between p-3 sm:p-3.5 rounded-2xl border transition-all shadow-xs cursor-pointer bg-white text-left ${isRtoReasonDropdownOpen
+                                              ? 'border-orange-500 ring-2 ring-orange-500/20 shadow-md'
+                                              : 'border-slate-200 hover:border-slate-300'
+                                              }`}
+                                          >
+                                            <div className="flex items-center space-x-3 min-w-0 pr-2">
+                                              <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${activeReason.iconBg}`}>
+                                                <ActiveIcon className="w-4 h-4" />
+                                              </div>
+                                              <div className="min-w-0">
+                                                <p className="font-bold text-slate-900 text-xs sm:text-sm truncate">
+                                                  {activeReason.label}
+                                                </p>
+                                                <div className="flex items-center space-x-2 mt-0.5">
+                                                  <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold border ${activeReason.badgeClass}`}>
+                                                    {activeReason.badge}
+                                                  </span>
+                                                  <span className="text-[10px] text-slate-400 truncate hidden sm:inline">
+                                                    {activeReason.short}
+                                                  </span>
+                                                </div>
+                                              </div>
+                                            </div>
+
+                                            <div className="shrink-0 flex items-center pl-2">
+                                              <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${isRtoReasonDropdownOpen ? 'rotate-180 text-orange-600' : ''}`} />
+                                            </div>
+                                          </button>
+
+                                          {/* Dropdown Options Popover */}
+                                          {isRtoReasonDropdownOpen && (
+                                            <div className="absolute left-0 right-0 mt-2 z-50 bg-white rounded-2xl shadow-2xl border border-slate-200/90 py-1.5 animate-fadeIn overflow-hidden">
+                                              <div className="px-3.5 py-1.5 border-b border-slate-100 flex items-center justify-between text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                                                <span>Select Exact Failure Reason</span>
+                                                <span className="text-[10px] text-orange-700 bg-orange-50 px-2 py-0.5 rounded-full font-semibold">
+                                                  4 Options Available
+                                                </span>
+                                              </div>
+
+                                              <div className="max-h-64 sm:max-h-72 overflow-y-auto no-scrollbar py-1 divide-y divide-slate-50">
+                                                {RTO_REASONS.map((item) => {
+                                                  const isSelected = rtoReason === item.value;
+                                                  const ItemIcon = item.icon;
+                                                  return (
+                                                    <button
+                                                      key={item.value}
+                                                      type="button"
+                                                      onClick={() => {
+                                                        setRtoReason(item.value);
+                                                        setIsRtoReasonDropdownOpen(false);
+                                                      }}
+                                                      className={`w-full text-left px-3.5 py-2.5 sm:py-3 flex items-start justify-between text-xs transition cursor-pointer ${isSelected
+                                                        ? 'bg-orange-50/70 border-l-4 border-orange-600 text-orange-950 font-medium'
+                                                        : 'hover:bg-slate-50 text-slate-700 hover:text-slate-900'
+                                                        }`}
+                                                    >
+                                                      <div className="flex items-start space-x-3 min-w-0 pr-2">
+                                                        <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${item.iconBg}`}>
+                                                          <ItemIcon className="w-3.5 h-3.5" />
+                                                        </div>
+                                                        <div className="min-w-0">
+                                                          <div className="flex items-center space-x-2">
+                                                            <p className={`text-xs ${isSelected ? 'font-bold text-slate-900' : 'font-semibold text-slate-800'}`}>
+                                                              {item.label}
+                                                            </p>
+                                                            <span className={`px-2 py-0.5 rounded-md text-[9px] font-bold border shrink-0 ${item.badgeClass}`}>
+                                                              {item.badge}
+                                                            </span>
+                                                          </div>
+                                                          <p className="text-[11px] text-slate-500 mt-0.5 leading-snug">
+                                                            {item.desc}
+                                                          </p>
+                                                        </div>
+                                                      </div>
+
+                                                      <div className="shrink-0 pt-1">
+                                                        {isSelected ? (
+                                                          <div className="w-5 h-5 rounded-full bg-orange-600 text-white flex items-center justify-center shadow-xs">
+                                                            <Check className="w-3 h-3 stroke-[3]" />
+                                                          </div>
+                                                        ) : (
+                                                          <div className="w-4 h-4 rounded-full border border-slate-300" />
+                                                        )}
+                                                      </div>
+                                                    </button>
+                                                  );
+                                                })}
+                                              </div>
+                                            </div>
+                                          )}
+                                        </>
+                                      );
+                                    })()}
+                                  </div>
+                                </div>
+
+                                {/* Quick-Select Cards (Responsive 2x2 grid for instant 1-tap switching) */}
+                                <div className="space-y-1.5">
+                                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Quick Select Reason</span>
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                    {RTO_REASONS.map((item) => {
+                                      const isSelected = rtoReason === item.value;
+                                      const ItemIcon = item.icon;
+                                      return (
+                                        <button
+                                          key={item.value}
+                                          type="button"
+                                          onClick={() => {
+                                            setRtoReason(item.value);
+                                            setIsRtoReasonDropdownOpen(false);
+                                          }}
+                                          className={`p-2.5 rounded-xl border text-left transition flex items-center space-x-2.5 cursor-pointer ${isSelected
+                                            ? item.borderActiveClass
+                                            : 'border-slate-200 hover:border-slate-300 bg-slate-50/50 hover:bg-slate-50'
+                                            }`}
+                                        >
+                                          <div className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 ${item.iconBg}`}>
+                                            <ItemIcon className="w-3.5 h-3.5" />
+                                          </div>
+                                          <div className="min-w-0">
+                                            <p className={`text-[11px] font-bold truncate ${isSelected ? 'text-slate-900' : 'text-slate-700'}`}>
+                                              {item.short}
+                                            </p>
+                                            <p className="text-[9px] text-slate-400 truncate">
+                                              {item.badge}
                                             </p>
                                           </div>
-                                          {isCurrent && <Check className="w-4 h-4 text-forest-900 shrink-0" />}
-                                          {isOptionDisabled && !isCurrent && <Lock className="w-3 h-3 text-slate-400 shrink-0" />}
                                         </button>
                                       );
                                     })}
                                   </div>
                                 </div>
-                              )}
-                            </div>
-                          )}
-                        </div>
 
-                        {isSelectedOrderCod && selectedOrder.orderStatus !== 'DELIVERED' && !isSelectedOrderCancelledBeforeDel && (
-                          <div className="p-2.5 rounded-xl bg-amber-50/80 border border-amber-200/80 text-amber-900 text-[11px] leading-relaxed flex items-start space-x-2">
-                            <AlertTriangle className="w-3.5 h-3.5 text-amber-700 shrink-0 mt-0.5" />
-                            <span><strong>Cash on Delivery (Pending):</strong> Payment status remains <strong>Pending</strong> until courier delivers parcel at doorstep and collects cash.</span>
-                          </div>
-                        )}
+                                {/* Action Summary / Info Note */}
+                                <div className="p-3 bg-amber-50/70 border border-amber-200/80 rounded-2xl flex items-start space-x-2.5 text-[11px] text-amber-900 leading-relaxed">
+                                  <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                                  <div>
+                                    <p className="font-bold">Automated RTO Reverse Logistics</p>
+                                    <p className="text-amber-800/90 mt-0.5">
+                                      Order status will move to <strong className="font-semibold text-amber-950">RTO_INITIATED</strong>. When parcel returns to warehouse, quality inspection will allow restocking sellable items.
+                                    </p>
+                                  </div>
+                                </div>
 
-                        {isSelectedOrderCodCancelled && (
-                          <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80 text-slate-600 text-[11px] leading-relaxed">
-                            <strong>Cash on Delivery (₹0 Collected):</strong> This order was cancelled before doorstep delivery. Since no payment was collected from the customer, payment status is locked to <strong>Not Applicable</strong>.
-                          </div>
-                        )}
-
-                        <div className="space-y-2 pt-2 border-t border-slate-100">
-                          <div className="flex justify-between items-center">
-                            <span className="text-slate-500">Method</span>
-                            <span className="font-bold text-forest-950">
-                              {selectedOrder.paymentInfo?.method === 'COD' || selectedOrder.paymentMethod === 'COD' ? 'Cash On Delivery' : 'Online Prepaid (Razorpay)'}
-                            </span>
-                          </div>
-                          {selectedOrder.paymentInfo?.razorpayPaymentId && (
-                            <div className="flex justify-between items-center">
-                              <span className="text-slate-500">Payment ID</span>
-                              <span className="font-mono text-slate-700 text-[11px]">{selectedOrder.paymentInfo.razorpayPaymentId}</span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })()}
-
-                {/* DEDICATED REFUND MANAGEMENT CARD */}
-                {(() => {
-                  const isSelectedOrderCod = selectedOrder.paymentInfo?.method === 'COD' || selectedOrder.paymentMethod === 'COD';
-                  const isSelectedOrderCancelledBeforeDel = ['CANCELLED', 'CANCELLATION_REQUESTED', 'RTO_COMPLETED', 'RETURNED_TO_SELLER'].includes(selectedOrder.orderStatus);
-                  const isSelectedOrderCodCancelled = isSelectedOrderCod && isSelectedOrderCancelledBeforeDel && selectedOrder.orderStatus !== 'DELIVERED';
-
-                  return (
-                    <div className="bg-white p-6 rounded-3xl border border-slate-200/90 shadow-sm space-y-4">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-2">
-                          <DollarSign className="w-4 h-4 text-emerald-700" />
-                          <h4 className="font-serif text-base font-bold text-forest-950">Refund Tracking</h4>
-                        </div>
-                        {isSelectedOrderCodCancelled ? (
-                          <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-100 text-slate-700 border border-slate-200 uppercase">
-                            NOT APPLICABLE
-                          </span>
-                        ) : selectedOrder.refundInfo?.status && selectedOrder.refundInfo.status !== 'NONE' ? (
-                          <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold uppercase border ${getRefundStatusBadgeClass(selectedOrder.refundInfo.status)}`}>
-                            {selectedOrder.refundInfo.status.replace(/_/g, ' ')}
-                          </span>
-                        ) : (
-                          <span className="text-xs text-slate-400">No active refund</span>
-                        )}
-                      </div>
-
-                      <div className="border-t border-slate-100 pt-3 space-y-3 text-xs">
-                        {isSelectedOrderCodCancelled ? (
-                          <div className="space-y-3">
-                            <div className="p-3.5 rounded-2xl bg-amber-50/70 border border-amber-200/80 space-y-1.5">
-                              <div className="flex items-center space-x-2 text-amber-900 font-bold text-xs">
-                                <ShieldAlert className="w-4 h-4 text-amber-700 shrink-0" />
-                                <span>No Refund Applicable (Cash on Delivery)</span>
+                                {/* Modal Footer */}
+                                <div className="flex items-center justify-end space-x-2.5 pt-3 border-t border-slate-100">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setShowRTOModal(false);
+                                      setIsRtoReasonDropdownOpen(false);
+                                    }}
+                                    className="px-4 py-2 border border-slate-200 rounded-xl font-bold text-slate-600 hover:bg-slate-50 transition cursor-pointer"
+                                  >
+                                    Cancel
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={handleInitiateRTO}
+                                    disabled={isProcessingAction}
+                                    className="px-5 py-2 bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-700 hover:to-amber-700 text-white font-bold rounded-xl shadow-md shadow-orange-600/20 flex items-center space-x-2 transition disabled:opacity-50 cursor-pointer"
+                                  >
+                                    {isProcessingAction ? (
+                                      <>
+                                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                        <span>Initiating...</span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Truck className="w-3.5 h-3.5" />
+                                        <span>Confirm & Initiate RTO</span>
+                                      </>
+                                    )}
+                                  </button>
+                                </div>
                               </div>
-                              <p className="text-[11px] text-amber-800 leading-relaxed">
-                                This order was cancelled before doorstep delivery. Because the order was Cash on Delivery, <strong>no cash was collected (₹0)</strong>. Customer paid ₹0, so no refund is due or permitted.
-                              </p>
-                            </div>
-                            <div className="flex justify-between text-slate-500 pt-1">
-                              <span>Amount Collected from Customer</span>
-                              <span className="font-bold text-slate-800">₹0</span>
-                            </div>
-                            <div className="flex justify-between text-slate-500">
-                              <span>Refund Amount Required</span>
-                              <span className="font-bold text-slate-800">₹0 (Not Applicable)</span>
-                            </div>
-                            <div className="pt-1">
-                              <button
-                                disabled
-                                className="w-full py-2 bg-slate-100 text-slate-400 font-bold rounded-xl text-xs cursor-not-allowed flex items-center justify-center space-x-1.5"
-                              >
-                                <Lock className="w-3.5 h-3.5" />
-                                <span>Refund Locked (₹0 Collected)</span>
-                              </button>
-                            </div>
-                          </div>
-                        ) : selectedOrder.refundInfo && selectedOrder.refundInfo.status !== 'NONE' ? (
-                          <div className="space-y-2">
-                            <div className="flex justify-between">
-                              <span className="text-slate-500">Refund Amount</span>
-                              <span className="font-bold text-forest-950">₹{selectedOrder.refundInfo.amount}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-slate-500">Settlement Destination</span>
-                              <span className="font-semibold text-slate-800">
-                                {selectedOrder.refundInfo.method || (selectedOrder.paymentMethod === 'COD' ? 'Bank Account / UPI' : 'Original Source')}
-                              </span>
-                            </div>
-                            {selectedOrder.refundInfo.transactionId && (
-                              <div className="flex justify-between">
-                                <span className="text-slate-500">Transaction Ref</span>
-                                <span className="font-mono text-slate-800">{selectedOrder.refundInfo.transactionId}</span>
-                              </div>
-                            )}
-                            {selectedOrder.refundInfo.failureReason && (
-                              <p className="text-rose-700 bg-rose-50 p-2 rounded-lg text-[11px]">
-                                Failure: {selectedOrder.refundInfo.failureReason}
-                              </p>
-                            )}
-                            <div className="pt-2">
-                              <button
-                                onClick={() => setShowRefundModal(true)}
-                                className="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold rounded-xl text-xs transition"
-                              >
-                                Update Refund Status / Reference
-                              </button>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="space-y-2">
-                            <p className="text-slate-500 text-[11px]">
-                              Refunds are automatically triggered upon Order Cancellation or approved transit damage claim.
-                            </p>
-                            <div className="pt-2">
-                              <button
-                                onClick={() => setShowRefundModal(true)}
-                                className="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold rounded-xl text-xs transition"
-                              >
-                                Update Refund Status / Reference
-                              </button>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })()}
-
-                {/* Customer Profile Card */}
-                <div className="bg-white p-6 rounded-3xl border border-slate-200/90 shadow-sm space-y-4">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-10 h-10 rounded-2xl bg-forest-900 text-gold-400 font-bold flex items-center justify-center text-sm shadow-xs border border-gold-500/30">
-                      {selectedOrder.customerDetails?.fullName?.charAt(0)?.toUpperCase() || 'C'}
-                    </div>
-                    <div>
-                      <h4 className="font-serif text-base font-bold text-forest-950">Customer Profile</h4>
-                      <p className="text-xs text-slate-400 font-mono">Verified Customer</p>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2.5 text-xs border-t border-slate-100 pt-3">
-                    <div>
-                      <span className="text-slate-400 font-semibold block text-[10px] uppercase">Full Name</span>
-                      <p className="font-bold text-slate-800 text-sm mt-0.5">{selectedOrder.customerDetails?.fullName}</p>
-                    </div>
-                    <div>
-                      <span className="text-slate-400 font-semibold block text-[10px] uppercase">Email Address</span>
-                      <p className="font-medium text-slate-700 mt-0.5">{selectedOrder.customerDetails?.email}</p>
-                    </div>
-                    <div>
-                      <span className="text-slate-400 font-semibold block text-[10px] uppercase">Phone Number</span>
-                      <p className="font-medium text-slate-700 mt-0.5 font-mono">{selectedOrder.customerDetails?.phone}</p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Delivery Address Card */}
-                <div className="bg-white p-6 rounded-3xl border border-slate-200/90 shadow-sm space-y-4">
-                  <div className="flex items-center space-x-2.5">
-                    <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-800 flex items-center justify-center border border-emerald-200/80">
-                      <MapPin className="w-4 h-4" />
-                    </div>
-                    <h4 className="font-serif text-base font-bold text-forest-950">Delivery Destination</h4>
-                  </div>
-
-                  <div className="space-y-1.5 text-xs border-t border-slate-100 pt-3 text-slate-700">
-                    <p className="font-bold text-slate-900 text-sm">
-                      {selectedOrder.shippingAddress?.fullName}
-                    </p>
-                    <p className="text-slate-500 text-[11px] font-mono">
-                      Phone: {selectedOrder.shippingAddress?.phone}
-                    </p>
-                    <p className="text-slate-600 leading-relaxed mt-1">
-                      {selectedOrder.shippingAddress?.addressLine1}
-                      {selectedOrder.shippingAddress?.addressLine2 && `, ${selectedOrder.shippingAddress.addressLine2}`}
-                      {selectedOrder.shippingAddress?.landmark && ` (Near ${selectedOrder.shippingAddress.landmark})`}
-                    </p>
-                    <p className="font-bold text-forest-950">
-                      {selectedOrder.shippingAddress?.city}, {selectedOrder.shippingAddress?.state} - {selectedOrder.shippingAddress?.pincode}
-                    </p>
-                    <p className="text-slate-400 text-[11px]">{selectedOrder.shippingAddress?.country || 'India'}</p>
-                  </div>
-                </div>
-
-              </div>
-            </div>
-          </div>
-        )
-      ) : (
-        /* ====================================================================
-           ORDERS TABLE LIST VIEW
-           ==================================================================== */
-        <>
-          {/* Title Header */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div>
-              <h2 className="font-serif text-2xl font-bold text-slate-800">
-                Order Lifecycle & Logistics Fulfillment
-              </h2>
-              <p className="text-xs text-slate-500">
-                Manage order workflow, courier tracking, cancellation reviews, customer damage claims & refunds, and RTO processing.
-              </p>
-            </div>
-          </div>
-
-          {/* 1. Date & Time Selection Toolbar */}
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 bg-white p-3.5 sm:p-4 rounded-3xl border border-slate-200/90 shadow-2xs">
-            <div className="flex items-center space-x-1.5 overflow-x-auto no-scrollbar text-xs">
-              <span className="text-slate-400 font-bold text-[11px] uppercase mr-1 hidden sm:inline">Time Range:</span>
-              {(
-                [
-                  { id: 'ALL', label: 'All Time' },
-                  { id: 'TODAY', label: 'Today' },
-                  { id: 'THIS_WEEK', label: 'This Week' },
-                  { id: 'THIS_MONTH', label: 'This Month' },
-                  { id: 'THIS_YEAR', label: 'This Year' },
-                ] as { id: DatePeriod; label: string }[]
-              ).map((tab) => (
-                <button
-                  key={tab.id}
-                  type="button"
-                  onClick={() => {
-                    setSelectedPeriod(tab.id);
-                    setCustomStartDate('');
-                    setCustomEndDate('');
-                  }}
-                  className={`px-3 py-1.5 rounded-xl font-bold transition whitespace-nowrap cursor-pointer text-xs ${selectedPeriod === tab.id
-                    ? 'bg-forest-900 text-gold-400 shadow-xs'
-                    : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
-                    }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
-
-              <button
-                type="button"
-                onClick={() => setShowCustomDateModal(true)}
-                className={`px-3 py-1.5 rounded-xl font-bold transition whitespace-nowrap flex items-center space-x-1.5 cursor-pointer text-xs ${selectedPeriod === 'CUSTOM'
-                  ? 'bg-forest-900 text-gold-400 shadow-xs'
-                  : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
-                  }`}
-              >
-                <Calendar className="w-3.5 h-3.5" />
-                <span>
-                  {selectedPeriod === 'CUSTOM' && (customStartDate || customEndDate)
-                    ? `${customStartDate || '...'} - ${customEndDate || '...'}`
-                    : 'Custom Range'}
-                </span>
-              </button>
-            </div>
-
-            {/* Global Actions: Download PDF Report & Refresh */}
-            <div className="flex items-center space-x-2 shrink-0 self-start lg:self-auto">
-              <button
-                type="button"
-                onClick={() => setIsReportModalOpen(true)}
-                className="inline-flex items-center space-x-2 px-3.5 py-2 bg-gradient-to-r from-forest-900 to-forest-950 hover:from-forest-950 hover:to-black text-gold-400 font-bold text-xs rounded-xl shadow-xs transition group cursor-pointer border border-gold-400/20"
-                title="Generate & Download Formatted PDF Report"
-              >
-                <Download className="w-4 h-4 text-gold-300 group-hover:scale-110 transition" />
-                <span>Download PDF Report</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => fetchOrders()}
-                className="p-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl transition cursor-pointer"
-                title="Refresh Orders Data"
-              >
-                <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
-              </button>
-            </div>
-          </div>
-
-          {/* 2. Top Metric / Stat KPI Small Boxes */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
-            {/* Card 1: Total Orders */}
-            <div className="bg-white p-4 rounded-2xl border border-slate-200/90 shadow-2xs hover:shadow-xs transition">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Orders</span>
-                <div className="w-8 h-8 rounded-xl bg-forest-900/10 text-forest-900 flex items-center justify-center">
-                  <Package className="w-4 h-4" />
-                </div>
-              </div>
-              <p className="font-serif text-2xl font-black text-forest-950">
-                {orderSummary.totalOrders}
-              </p>
-              <p className="text-[11px] font-semibold text-emerald-700 mt-1 truncate">
-                ₹{orderSummary.totalRevenue.toLocaleString('en-IN')} gross sales
-              </p>
-            </div>
-
-            {/* Card 2: Delivered */}
-            <div className="bg-white p-4 rounded-2xl border border-slate-200/90 shadow-2xs hover:shadow-xs transition">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Delivered</span>
-                <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center">
-                  <CheckCircle2 className="w-4 h-4" />
-                </div>
-              </div>
-              <p className="font-serif text-2xl font-black text-emerald-900">
-                {orderSummary.deliveredCount}
-              </p>
-              <p className="text-[11px] font-semibold text-slate-500 mt-1">
-                {orderSummary.totalOrders > 0
-                  ? `${Math.round((orderSummary.deliveredCount / orderSummary.totalOrders) * 100)}% Fulfilled`
-                  : '0% Fulfilled'}
-              </p>
-            </div>
-
-            {/* Card 3: In Logistics / In Transit */}
-            <div className="bg-white p-4 rounded-2xl border border-slate-200/90 shadow-2xs hover:shadow-xs transition">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">In Logistics</span>
-                <div className="w-8 h-8 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center">
-                  <Truck className="w-4 h-4" />
-                </div>
-              </div>
-              <p className="font-serif text-2xl font-black text-blue-900">
-                {orderSummary.inTransitCount}
-              </p>
-              <p className="text-[11px] font-semibold text-blue-600 mt-1">
-                In Transit & Delivery
-              </p>
-            </div>
-
-            {/* Card 4: Cancelled */}
-            <div className="bg-white p-4 rounded-2xl border border-slate-200/90 shadow-2xs hover:shadow-xs transition">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Cancelled</span>
-                <div className="w-8 h-8 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center">
-                  <Ban className="w-4 h-4" />
-                </div>
-              </div>
-              <p className="font-serif text-2xl font-black text-rose-900">
-                {orderSummary.cancelledCount}
-              </p>
-              <p className="text-[11px] font-semibold text-rose-600 mt-1">
-                {orderSummary.totalOrders > 0
-                  ? `${Math.round((orderSummary.cancelledCount / orderSummary.totalOrders) * 100)}% Cancelled`
-                  : '0% Cancelled'}
-              </p>
-            </div>
-
-            {/* Card 5: RTO (Return to Origin) */}
-            <div className="bg-white p-4 rounded-2xl border border-slate-200/90 shadow-2xs hover:shadow-xs transition col-span-2 sm:col-span-1">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">RTO / Failed</span>
-                <div className="w-8 h-8 rounded-xl bg-orange-100 text-orange-700 flex items-center justify-center">
-                  <RotateCcw className="w-4 h-4" />
-                </div>
-              </div>
-              <p className="font-serif text-2xl font-black text-orange-900">
-                {orderSummary.rtoCount}
-              </p>
-              <p className="text-[11px] font-semibold text-orange-600 mt-1">
-                Courier delivery failed
-              </p>
-            </div>
-          </div>
-
-          {/* Quick Filter Tabs */}
-          <div className="flex items-center space-x-2 overflow-x-auto no-scrollbar pb-1 text-xs">
-            <button
-              onClick={() => { setActiveTab('ALL'); setSelectedStatus('ALL'); }}
-              className={`px-3.5 py-2 rounded-xl font-bold whitespace-nowrap transition ${activeTab === 'ALL'
-                ? 'bg-forest-900 text-gold-400 shadow-sm'
-                : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
-                }`}
-            >
-              All Orders ({orders.length})
-            </button>
-
-            <button
-              onClick={() => { setActiveTab('CANCELLATIONS'); setSelectedStatus('CANCELLATION_REQUESTED'); }}
-              className={`px-3.5 py-2 rounded-xl font-bold whitespace-nowrap transition flex items-center space-x-1.5 ${activeTab === 'CANCELLATIONS'
-                ? 'bg-amber-600 text-white shadow-sm'
-                : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
-                }`}
-            >
-              <AlertTriangle className="w-3.5 h-3.5" />
-              <span>Cancellation Requests</span>
-            </button>
-
-            <button
-              onClick={() => { setActiveTab('COMPLAINTS'); setSelectedStatus('ALL'); }}
-              className={`px-3.5 py-2 rounded-xl font-bold whitespace-nowrap transition flex items-center space-x-1.5 ${activeTab === 'COMPLAINTS'
-                ? 'bg-rose-700 text-white shadow-sm'
-                : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
-                }`}
-            >
-              <ShieldAlert className="w-3.5 h-3.5" />
-              <span>Customer Damage Claims</span>
-            </button>
-
-            <button
-              onClick={() => { setActiveTab('RTO'); setSelectedStatus('ALL'); }}
-              className={`px-3.5 py-2 rounded-xl font-bold whitespace-nowrap transition flex items-center space-x-1.5 ${activeTab === 'RTO'
-                ? 'bg-orange-600 text-white shadow-sm'
-                : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
-                }`}
-            >
-              <Truck className="w-3.5 h-3.5" />
-              <span>RTO (Return to Origin)</span>
-            </button>
-
-            <button
-              onClick={() => { setActiveTab('DELIVERED'); setSelectedStatus('DELIVERED'); }}
-              className={`px-3.5 py-2 rounded-xl font-bold whitespace-nowrap transition ${activeTab === 'DELIVERED'
-                ? 'bg-emerald-700 text-white shadow-sm'
-                : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
-                }`}
-            >
-              Delivered
-            </button>
-
-            <button
-              onClick={() => { setActiveTab('CANCELLED'); setSelectedStatus('CANCELLED'); }}
-              className={`px-3.5 py-2 rounded-xl font-bold whitespace-nowrap transition ${activeTab === 'CANCELLED'
-                ? 'bg-rose-700 text-white shadow-sm'
-                : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
-                }`}
-            >
-              Cancelled
-            </button>
-          </div>
-
-          {/* Filter and Search Bar */}
-          <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4 text-xs">
-            <div className="relative w-full md:w-80">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                placeholder="Search Order ID, AWB, Customer..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-full pl-10 pr-3.5 py-2 border border-slate-200 rounded-xl bg-[#FAF8F5] focus:outline-none focus:ring-1 focus:ring-forest-900"
-              />
-            </div>
-
-            <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-2 w-full md:w-auto relative" ref={filterStatusDropdownRef}>
-              <div className="flex items-center justify-between sm:justify-start">
-                <span className="text-slate-500 font-semibold text-xs whitespace-nowrap">Filter Status:</span>
-                {selectedStatus !== 'ALL' && (
-                  <button
-                    type="button"
-                    onClick={() => setSelectedStatus('ALL')}
-                    className="text-[11px] text-emerald-800 font-bold hover:underline sm:hidden"
-                  >
-                    Reset Filter
-                  </button>
-                )}
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsFilterStatusOpen(!isFilterStatusOpen)}
-                className={`w-full sm:w-auto inline-flex items-center justify-between space-x-2.5 px-3.5 py-2.5 sm:py-2 rounded-xl border transition-all shadow-2xs hover:shadow-xs cursor-pointer min-w-0 sm:min-w-[240px] bg-[#FAF8F5] ${isFilterStatusOpen
-                  ? 'border-forest-900 ring-2 ring-forest-900/10 bg-white'
-                  : 'border-slate-200 hover:border-slate-300'
-                  }`}
-              >
-                <div className="flex items-center space-x-2 truncate">
-                  <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${selectedStatus === 'ALL'
-                    ? 'bg-slate-400'
-                    : (ALL_ORDER_STATUSES.find(s => s.value === selectedStatus)?.dot || 'bg-slate-400')
-                    }`} />
-                  <span className="font-semibold text-xs text-slate-800 truncate">
-                    {selectedStatus === 'ALL'
-                      ? 'All Statuses (12 Lifecycle Steps)'
-                      : (ALL_ORDER_STATUSES.find(s => s.value === selectedStatus)?.label || selectedStatus)}
-                  </span>
-                </div>
-                <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-200 shrink-0 ${isFilterStatusOpen ? 'rotate-180 text-forest-900' : ''}`} />
-              </button>
-
-              {/* MOBILE VIEW: Luxury Bottom Sheet Drawer (Screen < sm) */}
-              {isFilterStatusOpen && typeof document !== 'undefined' && createPortal(
-                <div
-                  className="fixed inset-0 z-[9999] bg-slate-950/70 backdrop-blur-xs flex items-end justify-center p-0 sm:hidden animate-in fade-in duration-200"
-                  onClick={() => setIsFilterStatusOpen(false)}
-                >
-                  <div
-                    className="bg-white w-full max-w-lg rounded-t-3xl max-h-[82vh] flex flex-col shadow-2xl border-t border-slate-200 overflow-hidden animate-in slide-in-from-bottom duration-250"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    {/* Pull Bar */}
-                    <div className="pt-3 pb-1 flex justify-center">
-                      <div className="w-12 h-1.5 bg-slate-200 rounded-full" />
-                    </div>
-
-                    {/* Sheet Header */}
-                    <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
-                      <div>
-                        <h3 className="font-bold text-slate-900 text-sm">Filter by Order Status</h3>
-                        <p className="text-[11px] text-slate-400">Tap a lifecycle stage to filter orders</p>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <span className="text-[10px] text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full font-semibold">
-                          12 Steps
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => setIsFilterStatusOpen(false)}
-                          className="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 transition"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Scrollable Status Options */}
-                    <div className="flex-1 overflow-y-auto overscroll-contain py-1 divide-y divide-slate-100 px-3 pb-8">
-                      {/* ALL STATUSES OPTION */}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSelectedStatus('ALL');
-                          setIsFilterStatusOpen(false);
-                        }}
-                        className={`w-full text-left px-3.5 py-3 rounded-xl flex items-center justify-between text-xs transition my-1 ${selectedStatus === 'ALL'
-                          ? 'bg-[#FAF8F5] text-forest-950 font-bold border-l-4 border-forest-900 shadow-2xs'
-                          : 'hover:bg-slate-50 text-slate-800 font-medium'
-                          }`}
-                      >
-                        <div className="flex items-center space-x-3 min-w-0 pr-2">
-                          <span className="w-3 h-3 rounded-full bg-slate-400 shrink-0" />
-                          <div className="truncate">
-                            <p className={`truncate text-sm ${selectedStatus === 'ALL' ? 'font-bold text-forest-950' : 'font-semibold text-slate-800'}`}>
-                              All Statuses
-                            </p>
-                            <p className="text-[11px] text-slate-400 truncate">Show all orders across all 12 stages</p>
-                          </div>
-                        </div>
-
-                        <div className="shrink-0 flex items-center space-x-1.5">
-                          {selectedStatus === 'ALL' ? (
-                            <span className="px-3 py-1 rounded-full text-xs font-bold bg-forest-900 text-gold-400 shadow-2xs">
-                              Selected
-                            </span>
-                          ) : (
-                            <span className="px-3 py-1 rounded-full text-xs font-bold bg-[#0B3B24] text-[#ECC94B] shadow-2xs">
-                              Select
-                            </span>
+                            </div>,
+                            document.body
                           )}
-                        </div>
-                      </button>
 
-                      {/* 12 LIFECYCLE STEPS */}
-                      {ALL_ORDER_STATUSES.map((item) => {
-                        const isSelected = selectedStatus === item.value;
-                        return (
-                          <button
-                            key={item.value}
-                            type="button"
-                            onClick={() => {
-                              setSelectedStatus(item.value);
-                              setIsFilterStatusOpen(false);
-                            }}
-                            className={`w-full text-left px-3.5 py-3 rounded-xl flex items-center justify-between text-xs transition my-1 ${isSelected
-                              ? 'bg-[#FAF8F5] text-forest-950 font-bold border-l-4 border-forest-900 shadow-2xs'
-                              : 'hover:bg-slate-50 text-slate-800 font-medium'
-                              }`}
-                          >
-                            <div className="flex items-center space-x-3 min-w-0 pr-2">
-                              <span className={`w-3 h-3 rounded-full ${item.dot} shrink-0`} />
-                              <div className="truncate">
-                                <p className={`truncate text-sm ${isSelected ? 'font-bold text-forest-950' : 'font-semibold text-slate-800'}`}>
-                                  {item.label}
-                                </p>
-                                <p className="text-[11px] text-slate-400 truncate">{item.stage}</p>
+                          {/* 6. Refund Update Modal */}
+                          {showRefundModal && typeof document !== 'undefined' && createPortal(
+                            <div className="fixed inset-0 z-[9999] bg-slate-950/75 backdrop-blur-md flex items-center justify-center p-4">
+                              <div className="bg-white rounded-3xl max-w-md w-full p-5 sm:p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-200 text-xs">
+                                <div className="flex justify-between items-center pb-3 border-b border-slate-100">
+                                  <div className="flex items-center space-x-2.5">
+                                    <div className="w-9 h-9 rounded-2xl bg-purple-100 flex items-center justify-center text-purple-700 shrink-0">
+                                      <DollarSign className="w-4 h-4" />
+                                    </div>
+                                    <div>
+                                      <h3 className="font-serif text-base sm:text-lg font-bold text-slate-900 leading-tight">Update Refund Status</h3>
+                                      <p className="text-[11px] text-slate-500 mt-0.5">Order #{selectedOrder?.orderId}</p>
+                                    </div>
+                                  </div>
+                                  <button
+                                    onClick={() => {
+                                      setShowRefundModal(false);
+                                      setIsRefundStatusOpen(false);
+                                    }}
+                                    className="p-1.5 hover:bg-slate-100 rounded-full text-slate-400 hover:text-slate-600 transition cursor-pointer"
+                                  >
+                                    <X className="w-4 h-4" />
+                                  </button>
+                                </div>
+
+                                <div className="space-y-3">
+                                  <div>
+                                    <label className="font-bold text-slate-700 block mb-1">Refund Status *</label>
+                                    <div className="relative" ref={refundStatusDropdownRef}>
+                                      {(() => {
+                                        const activeRefund = REFUND_STATUS_OPTIONS.find(r => r.value === refundStatus) || REFUND_STATUS_OPTIONS[2];
+                                        return (
+                                          <>
+                                            <button
+                                              type="button"
+                                              onClick={() => setIsRefundStatusOpen(!isRefundStatusOpen)}
+                                              className={`w-full flex items-center justify-between p-3 rounded-2xl border transition-all shadow-xs cursor-pointer bg-white text-left ${isRefundStatusOpen
+                                                ? 'border-purple-600 ring-2 ring-purple-600/20'
+                                                : 'border-slate-200 hover:border-slate-300'
+                                                }`}
+                                            >
+                                              <div className="flex items-center space-x-2.5 min-w-0 pr-2">
+                                                <span className={`w-2.5 h-2.5 rounded-full ${activeRefund.dot} shrink-0`}></span>
+                                                <span className="font-bold text-slate-900 text-xs sm:text-sm truncate">
+                                                  {activeRefund.label}
+                                                </span>
+                                                <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold border hidden sm:inline-block ${activeRefund.badgeClass}`}>
+                                                  {activeRefund.value}
+                                                </span>
+                                              </div>
+                                              <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${isRefundStatusOpen ? 'rotate-180 text-purple-600' : ''}`} />
+                                            </button>
+
+                                            {isRefundStatusOpen && (
+                                              <div className="absolute left-0 right-0 mt-2 z-50 bg-white rounded-2xl shadow-2xl border border-slate-200/90 py-1.5 animate-fadeIn overflow-hidden">
+                                                <div className="px-3.5 py-1.5 border-b border-slate-100 flex items-center justify-between text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                                                  <span>Select Refund State</span>
+                                                  <span className="text-[10px] text-purple-700 bg-purple-50 px-2 py-0.5 rounded-full font-semibold">
+                                                    5 States
+                                                  </span>
+                                                </div>
+
+                                                <div className="max-h-60 overflow-y-auto no-scrollbar py-1 divide-y divide-slate-50">
+                                                  {REFUND_STATUS_OPTIONS.map((item) => {
+                                                    const isSelected = refundStatus === item.value;
+                                                    return (
+                                                      <button
+                                                        key={item.value}
+                                                        type="button"
+                                                        onClick={() => {
+                                                          setRefundStatus(item.value as any);
+                                                          setIsRefundStatusOpen(false);
+                                                        }}
+                                                        className={`w-full text-left px-3.5 py-2.5 flex items-start justify-between text-xs transition cursor-pointer ${isSelected
+                                                          ? 'bg-purple-50/70 border-l-4 border-purple-600 text-purple-950 font-medium'
+                                                          : 'hover:bg-slate-50 text-slate-700 hover:text-slate-900'
+                                                          }`}
+                                                      >
+                                                        <div className="flex items-start space-x-2.5 min-w-0 pr-2">
+                                                          <span className={`w-2 h-2 rounded-full ${item.dot} shrink-0 mt-1.5`}></span>
+                                                          <div className="min-w-0">
+                                                            <div className="flex items-center space-x-2">
+                                                              <p className={`text-xs ${isSelected ? 'font-bold text-slate-900' : 'font-semibold text-slate-800'}`}>
+                                                                {item.label}
+                                                              </p>
+                                                              <span className={`px-2 py-0.5 rounded-md text-[9px] font-bold border shrink-0 ${item.badgeClass}`}>
+                                                                {item.value}
+                                                              </span>
+                                                            </div>
+                                                            <p className="text-[11px] text-slate-500 mt-0.5 leading-snug">
+                                                              {item.desc}
+                                                            </p>
+                                                          </div>
+                                                        </div>
+
+                                                        <div className="shrink-0 pt-1">
+                                                          {isSelected ? (
+                                                            <div className="w-5 h-5 rounded-full bg-purple-600 text-white flex items-center justify-center shadow-xs">
+                                                              <Check className="w-3 h-3 stroke-[3]" />
+                                                            </div>
+                                                          ) : (
+                                                            <div className="w-4 h-4 rounded-full border border-slate-300" />
+                                                          )}
+                                                        </div>
+                                                      </button>
+                                                    );
+                                                  })}
+                                                </div>
+                                              </div>
+                                            )}
+                                          </>
+                                        );
+                                      })()}
+                                    </div>
+                                  </div>
+
+                                  {refundStatus === 'REFUNDED' && (
+                                    <div>
+                                      <label className="font-bold text-slate-700 block mb-1">Bank / Gateway Transaction Reference ID *</label>
+                                      <input
+                                        type="text"
+                                        placeholder="e.g. RZPY_REF_84920492 or UTR..."
+                                        value={refundTransactionId}
+                                        onChange={(e) => setRefundTransactionId(e.target.value)}
+                                        className="w-full p-2.5 border border-slate-200 rounded-xl bg-slate-50 font-mono focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-600/20"
+                                      />
+                                    </div>
+                                  )}
+
+                                  <div>
+                                    <label className="font-bold text-slate-700 block mb-1">
+                                      {refundStatus === 'FAILED' ? 'Failure Reason *' : 'Resolution Notes'}
+                                    </label>
+                                    <textarea
+                                      rows={2}
+                                      placeholder={refundStatus === 'FAILED' ? 'e.g. Beneficiary IFSC invalid or bank account closed...' : 'Internal notes...'}
+                                      value={refundNotes}
+                                      onChange={(e) => setRefundNotes(e.target.value)}
+                                      className="w-full p-2.5 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-600/20"
+                                    />
+                                  </div>
+                                </div>
+
+                                <div className="flex items-center justify-end space-x-2 pt-3 border-t border-slate-100">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setShowRefundModal(false);
+                                      setIsRefundStatusOpen(false);
+                                    }}
+                                    className="px-4 py-2 border border-slate-200 rounded-xl font-bold text-slate-600 hover:bg-slate-50 transition cursor-pointer"
+                                  >
+                                    Cancel
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={handleUpdateRefund}
+                                    disabled={isProcessingAction}
+                                    className="px-5 py-2 bg-purple-700 hover:bg-purple-800 text-white font-bold rounded-xl transition cursor-pointer disabled:opacity-50"
+                                  >
+                                    Update Refund
+                                  </button>
+                                </div>
                               </div>
-                            </div>
-
-                            <div className="shrink-0 flex items-center space-x-1.5">
-                              {isSelected ? (
-                                <span className="px-3 py-1 rounded-full text-xs font-bold bg-forest-900 text-gold-400 shadow-2xs">
-                                  Selected
-                                </span>
-                              ) : (
-                                <span className="px-3 py-1 rounded-full text-xs font-bold bg-[#0B3B24] text-[#ECC94B] shadow-2xs">
-                                  Select
-                                </span>
-                              )}
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>,
-                document.body
-              )}
-
-              {/* DESKTOP VIEW: Anchored Floating Dropdown (Screen >= sm) */}
-              {isFilterStatusOpen && (
-                <div className="hidden sm:block absolute right-0 top-full mt-2 z-50 w-84 bg-white rounded-2xl shadow-2xl border border-slate-200/90 py-2 animate-fadeIn overflow-hidden">
-                  <div className="px-4 py-2 border-b border-slate-100 flex items-center justify-between text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                    <span>Filter Order Status</span>
-                    <span className="text-[10px] text-emerald-800 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full font-semibold">
-                      12 Lifecycle Steps
-                    </span>
-                  </div>
-
-                  <div className="max-h-80 overflow-y-auto no-scrollbar py-1 divide-y divide-slate-50">
-                    {/* ALL STATUSES OPTION */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSelectedStatus('ALL');
-                        setIsFilterStatusOpen(false);
-                      }}
-                      className={`w-full text-left px-4 py-2.5 flex items-center justify-between text-xs transition ${selectedStatus === 'ALL'
-                        ? 'bg-[#FAF8F5] text-forest-950 font-bold border-l-4 border-forest-900'
-                        : 'hover:bg-[#FAF8F5] text-slate-800 hover:text-forest-950 font-medium cursor-pointer group'
-                        }`}
-                    >
-                      <div className="flex items-center space-x-3 min-w-0 pr-2">
-                        <span className="w-2.5 h-2.5 rounded-full bg-slate-400 shrink-0" />
-                        <div className="truncate">
-                          <p className={`truncate text-xs ${selectedStatus === 'ALL' ? 'font-bold text-forest-950' : 'font-semibold text-slate-800'}`}>
-                            All Statuses
-                          </p>
-                          <p className="text-[10px] text-slate-400 truncate">All 12 lifecycle stages</p>
-                        </div>
-                      </div>
-
-                      <div className="shrink-0 flex items-center space-x-1.5">
-                        {selectedStatus === 'ALL' ? (
-                          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-forest-900 text-gold-400 shadow-2xs">
-                            Selected
-                          </span>
-                        ) : (
-                          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#0B3B24] text-[#ECC94B] group-hover:brightness-110 transition shadow-2xs">
-                            Select
-                          </span>
-                        )}
-                      </div>
-                    </button>
-
-                    {/* 12 LIFECYCLE STEPS */}
-                    {ALL_ORDER_STATUSES.map((item) => {
-                      const isSelected = selectedStatus === item.value;
-                      return (
-                        <button
-                          key={item.value}
-                          type="button"
-                          onClick={() => {
-                            setSelectedStatus(item.value);
-                            setIsFilterStatusOpen(false);
-                          }}
-                          className={`w-full text-left px-4 py-2.5 flex items-center justify-between text-xs transition ${isSelected
-                            ? 'bg-[#FAF8F5] text-forest-950 font-bold border-l-4 border-forest-900'
-                            : 'hover:bg-[#FAF8F5] text-slate-800 hover:text-forest-950 font-medium cursor-pointer group'
-                            }`}
-                        >
-                          <div className="flex items-center space-x-3 min-w-0 pr-2">
-                            <span className={`w-2.5 h-2.5 rounded-full ${item.dot} shrink-0`} />
-                            <div className="truncate">
-                              <p className={`truncate text-xs ${isSelected ? 'font-bold text-forest-950' : 'font-semibold text-slate-800'}`}>
-                                {item.label}
-                              </p>
-                              <p className="text-[10px] text-slate-400 truncate">{item.stage}</p>
-                            </div>
-                          </div>
-
-                          <div className="shrink-0 flex items-center space-x-1.5">
-                            {isSelected ? (
-                              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-forest-900 text-gold-400 shadow-2xs">
-                                Selected
-                              </span>
-                            ) : (
-                              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#0B3B24] text-[#ECC94B] group-hover:brightness-110 transition shadow-2xs">
-                                Select
-                              </span>
-                            )}
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Orders Table */}
-          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead className="bg-[#FAF8F5] text-slate-500 uppercase text-xs font-bold border-b border-slate-100">
-                  <tr>
-                    <th className="p-4">Order ID / Date</th>
-                    <th className="p-4">Customer Details</th>
-                    <th className="p-4">Amount / Payment</th>
-                    <th className="p-4">Delivery Status</th>
-                    <th className="p-4">Carrier & AWB</th>
-                    <th className="p-4 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {isLoading ? (
-                    <tr>
-                      <td colSpan={6} className="p-8 text-center text-slate-400">Loading orders...</td>
-                    </tr>
-                  ) : filteredOrders.length === 0 ? (
-                    <tr>
-                      <td colSpan={6} className="p-8 text-center text-slate-400">No matching orders found.</td>
-                    </tr>
-                  ) : (
-                    paginatedOrders.map((order) => (
-                      <tr
-                        key={order._id}
-                        onClick={() => handleSelectOrder(order)}
-                        className="hover:bg-slate-50/80 transition cursor-pointer group"
-                      >
-                        <td className="p-4">
-                          <p className="font-mono font-bold text-forest-900 group-hover:text-gold-600 transition flex items-center space-x-1.5">
-                            <span>{order.orderId}</span>
-                            <Eye className="w-3.5 h-3.5 text-slate-400 group-hover:text-forest-900" />
-                          </p>
-                          <p className="text-[10px] text-slate-400 mt-0.5">{new Date(order.createdAt).toLocaleDateString()}</p>
-                        </td>
-
-                        <td className="p-4">
-                          <p className="font-bold text-slate-800">{order.customerDetails?.fullName}</p>
-                          <p className="text-[10px] text-slate-400">{order.shippingAddress?.city}, {order.shippingAddress?.pincode}</p>
-                        </td>
-
-                        <td className="p-4">
-                          {(() => {
-                            const sub = Number(order.pricing?.subtotal) || 0;
-                            const disc = Number(order.pricing?.discountAmount) || 0;
-                            const ship = Number(order.pricing?.shippingFee) || 0;
-                            const tax = Number(order.pricing?.taxAmount) || (sub > 0 ? Math.round((sub - disc) * 0.05) : 0);
-                            const total = (order.pricing?.totalAmount && order.pricing.totalAmount > (sub - disc))
-                              ? order.pricing.totalAmount
-                              : ((sub - disc) + ship + tax);
-                            return <p className="font-bold text-slate-900">₹{total}</p>;
-                          })()}
-                          <div className="flex items-center space-x-1 mt-0.5" onClick={(e) => e.stopPropagation()}>
-                            <span className="text-[10px] font-semibold text-slate-500">
-                              {order.paymentInfo?.method || order.paymentMethod || 'ONLINE'}:
-                            </span>
-                            {(() => {
-                              const isCod = order.paymentInfo?.method === 'COD' || order.paymentMethod === 'COD';
-                              const isCancelledBeforeDelivery = ['CANCELLED', 'CANCELLATION_REQUESTED', 'RTO_COMPLETED', 'RETURNED_TO_SELLER'].includes(order.orderStatus);
-                              const isCodCancelled = isCod && isCancelledBeforeDelivery && order.orderStatus !== 'DELIVERED';
-                              let displayStatus = order.paymentInfo?.status || order.paymentStatus || 'PENDING';
-                              if (isCod) {
-                                if (isCodCancelled) {
-                                  displayStatus = 'NOT_APPLICABLE';
-                                } else if (order.orderStatus !== 'DELIVERED') {
-                                  displayStatus = 'PENDING';
-                                }
-                              }
-                              return (
-                                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${getPaymentStatusBadgeClass(displayStatus)}`}>
-                                  {displayStatus.replace(/_/g, ' ')}
-                                </span>
-                              );
-                            })()}
-                          </div>
-                        </td>
-
-                        <td className="p-4">
-                          <span className={`px-2.5 py-1 rounded-full text-xs font-bold border uppercase tracking-wider ${getOrderStatusBadgeClass(order.orderStatus)}`}>
-                            {formatStatusName(order.orderStatus)}
-                          </span>
-                        </td>
-
-                        <td className="p-4 font-mono">
-                          {order.shipment?.awbCode ? (
-                            <div>
-                              <p className="font-bold text-forest-900 text-xs">{order.shipment.awbCode}</p>
-                              <p className="text-[10px] text-slate-400">{order.shipment.courierName}</p>
-                            </div>
-                          ) : (
-                            <span className="text-xs text-slate-400 italic">Awaiting Booking</span>
+                            </div>,
+                            document.body
                           )}
-                        </td>
 
-                        <td className="p-4 text-right" onClick={(e) => e.stopPropagation()}>
-                          <div className="flex items-center justify-end space-x-2">
-                            {order.orderStatus === 'CANCELLATION_REQUESTED' ? (
-                              <button
-                                onClick={() => handleSelectOrder(order)}
-                                className="px-2.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-lg text-xs transition"
-                              >
-                                Review Cancel
-                              </button>
-                            ) : order.complaint?.hasComplaint && order.complaint?.status === 'SUBMITTED' ? (
-                              <button
-                                onClick={() => handleSelectOrder(order)}
-                                className="px-2.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-lg text-xs transition"
-                              >
-                                Review Claim
-                              </button>
-                            ) : (
-                              <button
-                                onClick={() => handleSelectOrder(order)}
-                                className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg text-xs transition"
-                              >
-                                Manage
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
+                          {/* 7. Custom Date Range Selection Modal */}
+                          {showCustomDateModal && typeof document !== 'undefined' && createPortal(
+                            <div className="fixed inset-0 z-[9999] bg-slate-950/75 backdrop-blur-md flex items-center justify-center p-4">
+                              <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-200 text-xs">
+                                <div className="flex justify-between items-center pb-3 border-b border-slate-100">
+                                  <div className="flex items-center space-x-2">
+                                    <div className="w-8 h-8 rounded-xl bg-forest-900/10 text-forest-900 flex items-center justify-center">
+                                      <Calendar className="w-4 h-4" />
+                                    </div>
+                                    <div>
+                                      <h3 className="font-serif text-base font-bold text-slate-900">Custom Date Range Filter</h3>
+                                      <p className="text-[11px] text-slate-500">Filter orders & analytics by custom dates</p>
+                                    </div>
+                                  </div>
+                                  <button
+                                    onClick={() => setShowCustomDateModal(false)}
+                                    className="p-1 hover:bg-slate-100 rounded-full text-slate-400 hover:text-slate-600 transition"
+                                  >
+                                    <X className="w-4 h-4" />
+                                  </button>
+                                </div>
 
-            {/* Pagination Controls */}
-            {filteredOrders.length > 0 && (
-              <AdminPagination
-                currentPage={currentPage}
-                totalItems={filteredOrders.length}
-                pageSize={pageSize}
-                onPageChange={setCurrentPage}
-                onPageSizeChange={setPageSize}
-                itemLabel="orders"
-              />
-            )}
-          </div>
-        </>
-      )
-      }
+                                {/* Quick Presets */}
+                                <div>
+                                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">
+                                    Quick Presets
+                                  </span>
+                                  <div className="grid grid-cols-3 gap-2">
+                                    {[
+                                      { label: 'Last 7 Days', days: 7 },
+                                      { label: 'Last 30 Days', days: 30 },
+                                      { label: 'Last 90 Days', days: 90 },
+                                    ].map((preset) => (
+                                      <button
+                                        key={preset.days}
+                                        type="button"
+                                        onClick={() => {
+                                          const end = new Date();
+                                          const start = new Date();
+                                          start.setDate(end.getDate() - preset.days);
+                                          setCustomStartDate(start.toISOString().split('T')[0]);
+                                          setCustomEndDate(end.toISOString().split('T')[0]);
+                                          setSelectedPeriod('CUSTOM');
+                                          setShowCustomDateModal(false);
+                                        }}
+                                        className="p-2 rounded-xl border border-slate-200 hover:border-forest-900 bg-slate-50 hover:bg-forest-900/5 text-slate-700 font-semibold text-[11px] transition text-center cursor-pointer"
+                                      >
+                                        {preset.label}
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
 
-      {/* ====================================================================
-         MODALS & DIALOGS
-         ==================================================================== */}
+                                {/* Date Inputs */}
+                                <div className="space-y-3 pt-2">
+                                  <div>
+                                    <label className="font-bold text-slate-700 block mb-1">Start Date (From) *</label>
+                                    <input
+                                      type="date"
+                                      value={customStartDate}
+                                      onChange={(e) => setCustomStartDate(e.target.value)}
+                                      className="w-full p-2.5 border border-slate-200 rounded-xl bg-slate-50 font-medium text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-forest-900/20"
+                                    />
+                                  </div>
 
-      {/* 1. Cancellation Rejection Modal */}
-      {showCancelRejectModal && typeof document !== 'undefined' && createPortal(
-        <div className="fixed inset-0 z-[9999] bg-slate-950/75 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-200 text-xs">
-            <div className="flex justify-between items-center pb-3 border-b border-slate-100">
-              <h3 className="font-serif text-lg font-bold text-slate-900">Reject Cancellation Request</h3>
-              <button onClick={() => setShowCancelRejectModal(false)} className="p-1 hover:bg-slate-100 rounded-full text-slate-400">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
+                                  <div>
+                                    <label className="font-bold text-slate-700 block mb-1">End Date (To) *</label>
+                                    <input
+                                      type="date"
+                                      value={customEndDate}
+                                      onChange={(e) => setCustomEndDate(e.target.value)}
+                                      className="w-full p-2.5 border border-slate-200 rounded-xl bg-slate-50 font-medium text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-forest-900/20"
+                                    />
+                                  </div>
+                                </div>
 
-            <p className="text-slate-600">
-              The order will revert to its fulfillment status (Packed / Shipment Booked) and continue forward.
-            </p>
+                                <div className="flex items-center justify-between pt-3 border-t border-slate-100">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setCustomStartDate('');
+                                      setCustomEndDate('');
+                                      setSelectedPeriod('ALL');
+                                      setShowCustomDateModal(false);
+                                    }}
+                                    className="text-xs font-semibold text-rose-600 hover:underline cursor-pointer"
+                                  >
+                                    Reset to All Time
+                                  </button>
 
-            <div>
-              <label className="font-bold text-slate-700 block mb-1">Reason for Rejection *</label>
-              <textarea
-                rows={3}
-                placeholder="e.g. Parcel has already been handed over to courier dispatch..."
-                value={cancelRejectionReason}
-                onChange={(e) => setCancelRejectionReason(e.target.value)}
-                className="w-full p-2.5 border border-slate-200 rounded-xl bg-slate-50 focus:outline-none focus:ring-1 focus:ring-forest-900"
-              />
-            </div>
-
-            <div className="flex items-center justify-end space-x-2 pt-3 border-t border-slate-100">
-              <button
-                type="button"
-                onClick={() => setShowCancelRejectModal(false)}
-                className="px-4 py-2 border border-slate-200 rounded-xl font-bold text-slate-600 hover:bg-slate-50"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleRejectCancellation}
-                disabled={isProcessingAction}
-                className="px-5 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl"
-              >
-                Confirm Rejection
-              </button>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
-
-      {/* 2. Customer Damage Claim Rejection Modal */}
-      {showComplaintRejectModal && typeof document !== 'undefined' && createPortal(
-        <div className="fixed inset-0 z-[9999] bg-slate-950/75 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-200 text-xs">
-            <div className="flex justify-between items-center pb-3 border-b border-slate-100">
-              <h3 className="font-serif text-lg font-bold text-slate-900">Reject Customer Claim</h3>
-              <button onClick={() => setShowComplaintRejectModal(false)} className="p-1 hover:bg-slate-100 rounded-full text-slate-400">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <p className="text-slate-600">
-              Explain why this damage/defect claim is being rejected (e.g. proof images indicate user mishandling, seal was broken post-delivery, or report exceeded 48-hour window).
-            </p>
-
-            <div>
-              <label className="font-bold text-slate-700 block mb-1">Reason for Rejection *</label>
-              <textarea
-                rows={3}
-                placeholder="State rejection reason clearly for customer..."
-                value={complaintRejectionReason}
-                onChange={(e) => setComplaintRejectionReason(e.target.value)}
-                className="w-full p-2.5 border border-slate-200 rounded-xl bg-slate-50 focus:outline-none focus:ring-1 focus:ring-forest-900"
-              />
-            </div>
-
-            <div className="flex items-center justify-end space-x-2 pt-3 border-t border-slate-100">
-              <button
-                type="button"
-                onClick={() => setShowComplaintRejectModal(false)}
-                className="px-4 py-2 border border-slate-200 rounded-xl font-bold text-slate-600 hover:bg-slate-50"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => handleReviewComplaint('REJECT')}
-                disabled={isProcessingAction}
-                className="px-5 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl"
-              >
-                Confirm Rejection
-              </button>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
-
-      {/* 3. Customer Damage Claim Resolution Modal */}
-      {showComplaintResolveModal && typeof document !== 'undefined' && createPortal(
-        <div className="fixed inset-0 z-[9999] bg-slate-950/75 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-200 text-xs">
-            <div className="flex justify-between items-center pb-3 border-b border-slate-100">
-              <h3 className="font-serif text-lg font-bold text-slate-900">Resolve Customer Claim</h3>
-              <button onClick={() => setShowComplaintResolveModal(false)} className="p-1 hover:bg-slate-100 rounded-full text-slate-400">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="space-y-3">
-              <div>
-                <label className="font-bold text-slate-700 block mb-1">Resolution *</label>
-                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center space-x-2 text-emerald-950 font-bold text-xs">
-                  <ShieldCheck className="w-4 h-4 text-emerald-700 shrink-0" />
-                  <span>Approved Direct Refund (Items are strictly Non-Returnable & Non-Replaceable)</span>
-                </div>
-              </div>
-
-              <div>
-                <label className="font-bold text-slate-700 block mb-1">Resolution Notes</label>
-                <textarea
-                  rows={2}
-                  placeholder="e.g. Approved 100% refund for verified transit leakage..."
-                  value={complaintResolutionNotes}
-                  onChange={(e) => setComplaintResolutionNotes(e.target.value)}
-                  className="w-full p-2.5 border border-slate-200 rounded-xl bg-slate-50 focus:outline-none"
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center justify-end space-x-2 pt-3 border-t border-slate-100">
-              <button
-                type="button"
-                onClick={() => setShowComplaintResolveModal(false)}
-                className="px-4 py-2 border border-slate-200 rounded-xl font-bold text-slate-600 hover:bg-slate-50"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => handleReviewComplaint('RESOLVE')}
-                disabled={isProcessingAction}
-                className="px-5 py-2 bg-forest-900 hover:bg-forest-800 text-gold-400 font-bold rounded-xl"
-              >
-                Confirm Resolution
-              </button>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
+                                  <div className="flex items-center space-x-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => setShowCustomDateModal(false)}
+                                      className="px-4 py-2 border border-slate-200 rounded-xl font-bold text-slate-600 hover:bg-slate-50 transition cursor-pointer"
+                                    >
+                                      Cancel
+                                    </button>
+                                    <button
+                                      type="button"
+                                      disabled={!customStartDate && !customEndDate}
+                                      onClick={() => {
+                                        setSelectedPeriod('CUSTOM');
+                                        setShowCustomDateModal(false);
+                                      }}
+                                      className="px-5 py-2 bg-forest-900 hover:bg-forest-950 text-gold-400 font-bold rounded-xl transition cursor-pointer disabled:opacity-50"
+                                    >
+                                      Apply Filter
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>,
+                            document.body
+                          )}
 
 
 
-      {/* 4. RTO Product Warehouse Inspection Modal */}
-      {showRTOInspectionModal && typeof document !== 'undefined' && createPortal(
-        <div className="fixed inset-0 z-[9999] bg-slate-950/75 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-200 text-xs">
-            <div className="flex justify-between items-center pb-3 border-b border-slate-100">
-              <div className="flex items-center space-x-2">
-                <ShieldCheck className="w-5 h-5 text-indigo-700" />
-                <h3 className="font-serif text-lg font-bold text-slate-900">Inspect Returned RTO Parcel</h3>
-              </div>
-              <button onClick={() => setShowRTOInspectionModal(false)} className="p-1 hover:bg-slate-100 rounded-full text-slate-400">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
 
-            <p className="text-slate-600">
-              Verify the condition of the personal care products in this returned parcel. Personal care items may only be restocked if sealed and undamaged.
-            </p>
 
-            <div className="space-y-3">
-              <div>
-                <label className="font-bold text-slate-700 block mb-1">Product Condition *</label>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setRtoCondition('SELLABLE')}
-                    className={`p-3 rounded-xl border text-left transition ${rtoCondition === 'SELLABLE'
-                      ? 'border-emerald-500 bg-emerald-50 text-emerald-950 ring-2 ring-emerald-500/20'
-                      : 'border-slate-200 text-slate-600 hover:bg-slate-50'
-                      }`}
-                  >
-                    <p className="font-bold text-emerald-900">Sellable Condition</p>
-                    <p className="text-[10px] text-emerald-700 mt-0.5">Seals intact. Automatically restock inventory.</p>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setRtoCondition('DAMAGED_UNSELLABLE')}
-                    className={`p-3 rounded-xl border text-left transition ${rtoCondition === 'DAMAGED_UNSELLABLE'
-                      ? 'border-rose-500 bg-rose-50 text-rose-950 ring-2 ring-rose-500/20'
-                      : 'border-slate-200 text-slate-600 hover:bg-slate-50'
-                      }`}
-                  >
-                    <p className="font-bold text-rose-900">Damaged / Unsellable</p>
-                    <p className="text-[10px] text-rose-700 mt-0.5">Broken seal or leaked. Do NOT restock.</p>
-                  </button>
-                </div>
-              </div>
-
-              <div>
-                <label className="font-bold text-slate-700 block mb-1">Inspection Notes</label>
-                <textarea
-                  rows={2}
-                  placeholder="e.g. Outer cardboard box bent, bottles intact with tamper seal..."
-                  value={rtoNotes}
-                  onChange={(e) => setRtoNotes(e.target.value)}
-                  className="w-full p-2.5 border border-slate-200 rounded-xl bg-slate-50 focus:outline-none"
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center justify-end space-x-2 pt-3 border-t border-slate-100">
-              <button
-                type="button"
-                onClick={() => setShowRTOInspectionModal(false)}
-                className="px-4 py-2 border border-slate-200 rounded-xl font-bold text-slate-600 hover:bg-slate-50"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleCompleteRTO}
-                disabled={isProcessingAction}
-                className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-xs"
-              >
-                Complete RTO & Finalize
-              </button>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
-
-      {/* 5. RTO Initiation Modal */}
-      {showRTOModal && typeof document !== 'undefined' && createPortal(
-        <div className="fixed inset-0 z-[9999] bg-slate-950/75 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-5 sm:p-6 shadow-2xl space-y-4 sm:space-y-5 animate-in fade-in zoom-in-95 duration-200 text-xs">
-            {/* Header */}
-            <div className="flex items-center justify-between pb-3.5 border-b border-slate-100">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 rounded-2xl bg-orange-100 flex items-center justify-center text-orange-600 shrink-0">
-                  <RotateCcw className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="font-serif text-base sm:text-lg font-bold text-slate-900 leading-tight">
-                    Initiate Return to Origin (RTO)
-                  </h3>
-                  <p className="text-[11px] text-slate-500 mt-0.5">
-                    Order #{selectedOrder?.orderId} &bull; Non-deliverable shipment return
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowRTOModal(false);
-                  setIsRtoReasonDropdownOpen(false);
-                }}
-                className="p-1.5 hover:bg-slate-100 rounded-full text-slate-400 hover:text-slate-600 transition cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Dropdown Selector Area */}
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-700 flex items-center justify-between">
-                <span>Reason for Return to Origin (RTO) *</span>
-                <span className="text-[10px] font-semibold text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full border border-orange-200/60">
-                  Required for Courier
-                </span>
-              </label>
-
-              {/* Luxury Custom Dropdown */}
-              <div className="relative" ref={rtoReasonDropdownRef}>
-                {(() => {
-                  const activeReason = RTO_REASONS.find(r => r.value === rtoReason) || RTO_REASONS[0];
-                  const ActiveIcon = activeReason.icon;
-                  return (
-                    <>
-                      <button
-                        type="button"
-                        onClick={() => setIsRtoReasonDropdownOpen(!isRtoReasonDropdownOpen)}
-                        className={`w-full flex items-center justify-between p-3 sm:p-3.5 rounded-2xl border transition-all shadow-xs cursor-pointer bg-white text-left ${isRtoReasonDropdownOpen
-                          ? 'border-orange-500 ring-2 ring-orange-500/20 shadow-md'
-                          : 'border-slate-200 hover:border-slate-300'
-                          }`}
-                      >
-                        <div className="flex items-center space-x-3 min-w-0 pr-2">
-                          <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${activeReason.iconBg}`}>
-                            <ActiveIcon className="w-4 h-4" />
-                          </div>
-                          <div className="min-w-0">
-                            <p className="font-bold text-slate-900 text-xs sm:text-sm truncate">
-                              {activeReason.label}
-                            </p>
-                            <div className="flex items-center space-x-2 mt-0.5">
-                              <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold border ${activeReason.badgeClass}`}>
-                                {activeReason.badge}
-                              </span>
-                              <span className="text-[10px] text-slate-400 truncate hidden sm:inline">
-                                {activeReason.short}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="shrink-0 flex items-center pl-2">
-                          <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${isRtoReasonDropdownOpen ? 'rotate-180 text-orange-600' : ''}`} />
-                        </div>
-                      </button>
-
-                      {/* Dropdown Options Popover */}
-                      {isRtoReasonDropdownOpen && (
-                        <div className="absolute left-0 right-0 mt-2 z-50 bg-white rounded-2xl shadow-2xl border border-slate-200/90 py-1.5 animate-fadeIn overflow-hidden">
-                          <div className="px-3.5 py-1.5 border-b border-slate-100 flex items-center justify-between text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                            <span>Select Exact Failure Reason</span>
-                            <span className="text-[10px] text-orange-700 bg-orange-50 px-2 py-0.5 rounded-full font-semibold">
-                              4 Options Available
-                            </span>
-                          </div>
-
-                          <div className="max-h-64 sm:max-h-72 overflow-y-auto no-scrollbar py-1 divide-y divide-slate-50">
-                            {RTO_REASONS.map((item) => {
-                              const isSelected = rtoReason === item.value;
-                              const ItemIcon = item.icon;
-                              return (
-                                <button
-                                  key={item.value}
-                                  type="button"
-                                  onClick={() => {
-                                    setRtoReason(item.value);
-                                    setIsRtoReasonDropdownOpen(false);
-                                  }}
-                                  className={`w-full text-left px-3.5 py-2.5 sm:py-3 flex items-start justify-between text-xs transition cursor-pointer ${isSelected
-                                    ? 'bg-orange-50/70 border-l-4 border-orange-600 text-orange-950 font-medium'
-                                    : 'hover:bg-slate-50 text-slate-700 hover:text-slate-900'
-                                    }`}
-                                >
-                                  <div className="flex items-start space-x-3 min-w-0 pr-2">
-                                    <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${item.iconBg}`}>
-                                      <ItemIcon className="w-3.5 h-3.5" />
+                          {/* 7. Consignment & Delivery Tracking Modal (India Post / Courier) */}
+                          {showTrackingModal && selectedOrder && typeof document !== 'undefined' && createPortal(
+                            <div className="fixed inset-0 z-[9999] bg-slate-950/75 backdrop-blur-md flex items-center justify-center p-3 sm:p-5 overflow-y-auto">
+                              <div className="bg-white rounded-3xl max-w-3xl w-full max-h-[92vh] flex flex-col shadow-2xl border border-slate-100 animate-in fade-in zoom-in-95 duration-200 overflow-hidden my-auto">
+                                {/* Modal Header */}
+                                <div className="px-5 sm:px-7 py-4 sm:py-5 bg-gradient-to-r from-forest-900 via-forest-950 to-slate-900 text-white flex justify-between items-center shrink-0">
+                                  <div className="flex items-center space-x-3 min-w-0">
+                                    <div className="w-10 h-10 rounded-2xl bg-gold-400/20 border border-gold-400/30 flex items-center justify-center text-gold-400 shrink-0 shadow-inner">
+                                      <Truck className="w-5 h-5 text-gold-400" />
                                     </div>
                                     <div className="min-w-0">
-                                      <div className="flex items-center space-x-2">
-                                        <p className={`text-xs ${isSelected ? 'font-bold text-slate-900' : 'font-semibold text-slate-800'}`}>
-                                          {item.label}
-                                        </p>
-                                        <span className={`px-2 py-0.5 rounded-md text-[9px] font-bold border shrink-0 ${item.badgeClass}`}>
-                                          {item.badge}
-                                        </span>
-                                      </div>
-                                      <p className="text-[11px] text-slate-500 mt-0.5 leading-snug">
-                                        {item.desc}
+                                      <h3 className="font-serif text-base sm:text-lg font-bold text-white tracking-wide truncate">
+                                        Update Delivery & Consignment Tracking
+                                      </h3>
+                                      <p className="text-xs text-gold-300/90 font-mono mt-0.5 truncate">
+                                        Order #{selectedOrder.orderId} • <span className="text-white font-sans font-medium">{selectedOrder.shippingAddress?.fullName}</span>
                                       </p>
                                     </div>
                                   </div>
-
-                                  <div className="shrink-0 pt-1">
-                                    {isSelected ? (
-                                      <div className="w-5 h-5 rounded-full bg-orange-600 text-white flex items-center justify-center shadow-xs">
-                                        <Check className="w-3 h-3 stroke-[3]" />
-                                      </div>
-                                    ) : (
-                                      <div className="w-4 h-4 rounded-full border border-slate-300" />
-                                    )}
-                                  </div>
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      )}
-                    </>
-                  );
-                })()}
-              </div>
-            </div>
-
-            {/* Quick-Select Cards (Responsive 2x2 grid for instant 1-tap switching) */}
-            <div className="space-y-1.5">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Quick Select Reason</span>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {RTO_REASONS.map((item) => {
-                  const isSelected = rtoReason === item.value;
-                  const ItemIcon = item.icon;
-                  return (
-                    <button
-                      key={item.value}
-                      type="button"
-                      onClick={() => {
-                        setRtoReason(item.value);
-                        setIsRtoReasonDropdownOpen(false);
-                      }}
-                      className={`p-2.5 rounded-xl border text-left transition flex items-center space-x-2.5 cursor-pointer ${isSelected
-                        ? item.borderActiveClass
-                        : 'border-slate-200 hover:border-slate-300 bg-slate-50/50 hover:bg-slate-50'
-                        }`}
-                    >
-                      <div className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 ${item.iconBg}`}>
-                        <ItemIcon className="w-3.5 h-3.5" />
-                      </div>
-                      <div className="min-w-0">
-                        <p className={`text-[11px] font-bold truncate ${isSelected ? 'text-slate-900' : 'text-slate-700'}`}>
-                          {item.short}
-                        </p>
-                        <p className="text-[9px] text-slate-400 truncate">
-                          {item.badge}
-                        </p>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Action Summary / Info Note */}
-            <div className="p-3 bg-amber-50/70 border border-amber-200/80 rounded-2xl flex items-start space-x-2.5 text-[11px] text-amber-900 leading-relaxed">
-              <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-              <div>
-                <p className="font-bold">Automated RTO Reverse Logistics</p>
-                <p className="text-amber-800/90 mt-0.5">
-                  Order status will move to <strong className="font-semibold text-amber-950">RTO_INITIATED</strong>. When parcel returns to warehouse, quality inspection will allow restocking sellable items.
-                </p>
-              </div>
-            </div>
-
-            {/* Modal Footer */}
-            <div className="flex items-center justify-end space-x-2.5 pt-3 border-t border-slate-100">
-              <button
-                type="button"
-                onClick={() => {
-                  setShowRTOModal(false);
-                  setIsRtoReasonDropdownOpen(false);
-                }}
-                className="px-4 py-2 border border-slate-200 rounded-xl font-bold text-slate-600 hover:bg-slate-50 transition cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleInitiateRTO}
-                disabled={isProcessingAction}
-                className="px-5 py-2 bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-700 hover:to-amber-700 text-white font-bold rounded-xl shadow-md shadow-orange-600/20 flex items-center space-x-2 transition disabled:opacity-50 cursor-pointer"
-              >
-                {isProcessingAction ? (
-                  <>
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    <span>Initiating...</span>
-                  </>
-                ) : (
-                  <>
-                    <Truck className="w-3.5 h-3.5" />
-                    <span>Confirm & Initiate RTO</span>
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
-
-      {/* 6. Refund Update Modal */}
-      {showRefundModal && typeof document !== 'undefined' && createPortal(
-        <div className="fixed inset-0 z-[9999] bg-slate-950/75 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-md w-full p-5 sm:p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-200 text-xs">
-            <div className="flex justify-between items-center pb-3 border-b border-slate-100">
-              <div className="flex items-center space-x-2.5">
-                <div className="w-9 h-9 rounded-2xl bg-purple-100 flex items-center justify-center text-purple-700 shrink-0">
-                  <DollarSign className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="font-serif text-base sm:text-lg font-bold text-slate-900 leading-tight">Update Refund Status</h3>
-                  <p className="text-[11px] text-slate-500 mt-0.5">Order #{selectedOrder?.orderId}</p>
-                </div>
-              </div>
-              <button
-                onClick={() => {
-                  setShowRefundModal(false);
-                  setIsRefundStatusOpen(false);
-                }}
-                className="p-1.5 hover:bg-slate-100 rounded-full text-slate-400 hover:text-slate-600 transition cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="space-y-3">
-              <div>
-                <label className="font-bold text-slate-700 block mb-1">Refund Status *</label>
-                <div className="relative" ref={refundStatusDropdownRef}>
-                  {(() => {
-                    const activeRefund = REFUND_STATUS_OPTIONS.find(r => r.value === refundStatus) || REFUND_STATUS_OPTIONS[2];
-                    return (
-                      <>
-                        <button
-                          type="button"
-                          onClick={() => setIsRefundStatusOpen(!isRefundStatusOpen)}
-                          className={`w-full flex items-center justify-between p-3 rounded-2xl border transition-all shadow-xs cursor-pointer bg-white text-left ${isRefundStatusOpen
-                            ? 'border-purple-600 ring-2 ring-purple-600/20'
-                            : 'border-slate-200 hover:border-slate-300'
-                            }`}
-                        >
-                          <div className="flex items-center space-x-2.5 min-w-0 pr-2">
-                            <span className={`w-2.5 h-2.5 rounded-full ${activeRefund.dot} shrink-0`}></span>
-                            <span className="font-bold text-slate-900 text-xs sm:text-sm truncate">
-                              {activeRefund.label}
-                            </span>
-                            <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold border hidden sm:inline-block ${activeRefund.badgeClass}`}>
-                              {activeRefund.value}
-                            </span>
-                          </div>
-                          <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${isRefundStatusOpen ? 'rotate-180 text-purple-600' : ''}`} />
-                        </button>
-
-                        {isRefundStatusOpen && (
-                          <div className="absolute left-0 right-0 mt-2 z-50 bg-white rounded-2xl shadow-2xl border border-slate-200/90 py-1.5 animate-fadeIn overflow-hidden">
-                            <div className="px-3.5 py-1.5 border-b border-slate-100 flex items-center justify-between text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                              <span>Select Refund State</span>
-                              <span className="text-[10px] text-purple-700 bg-purple-50 px-2 py-0.5 rounded-full font-semibold">
-                                5 States
-                              </span>
-                            </div>
-
-                            <div className="max-h-60 overflow-y-auto no-scrollbar py-1 divide-y divide-slate-50">
-                              {REFUND_STATUS_OPTIONS.map((item) => {
-                                const isSelected = refundStatus === item.value;
-                                return (
                                   <button
-                                    key={item.value}
                                     type="button"
-                                    onClick={() => {
-                                      setRefundStatus(item.value as any);
-                                      setIsRefundStatusOpen(false);
-                                    }}
-                                    className={`w-full text-left px-3.5 py-2.5 flex items-start justify-between text-xs transition cursor-pointer ${isSelected
-                                      ? 'bg-purple-50/70 border-l-4 border-purple-600 text-purple-950 font-medium'
-                                      : 'hover:bg-slate-50 text-slate-700 hover:text-slate-900'
-                                      }`}
+                                    onClick={() => setShowTrackingModal(false)}
+                                    className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition cursor-pointer shrink-0 ml-3"
+                                    title="Close modal"
                                   >
-                                    <div className="flex items-start space-x-2.5 min-w-0 pr-2">
-                                      <span className={`w-2 h-2 rounded-full ${item.dot} shrink-0 mt-1.5`}></span>
-                                      <div className="min-w-0">
-                                        <div className="flex items-center space-x-2">
-                                          <p className={`text-xs ${isSelected ? 'font-bold text-slate-900' : 'font-semibold text-slate-800'}`}>
-                                            {item.label}
-                                          </p>
-                                          <span className={`px-2 py-0.5 rounded-md text-[9px] font-bold border shrink-0 ${item.badgeClass}`}>
-                                            {item.value}
-                                          </span>
-                                        </div>
-                                        <p className="text-[11px] text-slate-500 mt-0.5 leading-snug">
-                                          {item.desc}
+                                    <X className="w-4 h-4" />
+                                  </button>
+                                </div>
+
+                                {/* Scrollable Form Body */}
+                                <form onSubmit={handleSaveTrackingDetails} className="flex flex-col flex-1 overflow-hidden">
+                                  <div className="p-5 sm:p-7 overflow-y-auto space-y-4 sm:space-y-5 flex-1 text-xs">
+
+                                    {/* Row 1: Courier Partner & Tracking Number (2 columns on tablet/desktop) */}
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5">
+                                      <div>
+                                        <label className="block text-slate-700 font-bold mb-1.5 uppercase tracking-wider text-[10px]">
+                                          Courier Partner Name *
+                                        </label>
+                                        <select
+                                          value={selectedCourierOption}
+                                          onChange={(e) => handleCourierSelectChange(e.target.value)}
+                                          className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl bg-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-forest-900 cursor-pointer shadow-2xs"
+                                        >
+                                          <option value="India Post">India Post (Speed Post / Parcel)</option>
+                                          <option value="Speed Post">Speed Post</option>
+                                          <option value="Delhivery">Delhivery</option>
+                                          <option value="DTDC">DTDC</option>
+                                          <option value="Blue Dart">Blue Dart</option>
+                                          <option value="Trackon">Trackon</option>
+                                          <option value="The Professional Couriers">The Professional Couriers</option>
+                                          <option value="Shree Maruti Courier">Shree Maruti Courier</option>
+                                          <option value="Shree Tirupati Courier">Shree Tirupati Courier</option>
+                                          <option value="Shree Anjani Courier">Shree Anjani Courier</option>
+                                          <option value="Shadowfax">Shadowfax</option>
+                                          <option value="Other">Other Courier Partner (Manual Entry)</option>
+                                        </select>
+                                      </div>
+
+                                      <div>
+                                        <label className="block text-slate-700 font-bold mb-1.5 uppercase tracking-wider text-[10px]">
+                                          Consignment / Tracking Number *
+                                        </label>
+                                        <input
+                                          type="text"
+                                          required
+                                          placeholder="e.g. CP123456789IN or Tracking ID"
+                                          value={trackingNumber}
+                                          onChange={(e) => setTrackingNumber(e.target.value.toUpperCase())}
+                                          className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white text-xs font-mono font-bold tracking-wider focus:outline-none focus:ring-2 focus:ring-forest-900 uppercase shadow-2xs"
+                                        />
+                                        <p className="text-[10px] text-slate-500 mt-1">
+                                          Enter the tracking number from your courier booking receipt.
                                         </p>
                                       </div>
                                     </div>
 
-                                    <div className="shrink-0 pt-1">
-                                      {isSelected ? (
-                                        <div className="w-5 h-5 rounded-full bg-purple-600 text-white flex items-center justify-center shadow-xs">
-                                          <Check className="w-3 h-3 stroke-[3]" />
-                                        </div>
-                                      ) : (
-                                        <div className="w-4 h-4 rounded-full border border-slate-300" />
-                                      )}
+                                    {/* Custom Courier Input (if Other selected) */}
+                                    {selectedCourierOption === 'Other' && (
+                                      <div className="p-4 bg-amber-50/80 border border-amber-200 rounded-2xl space-y-1.5 animate-in fade-in duration-150">
+                                        <label className="block text-amber-950 font-bold uppercase tracking-wider text-[10px]">
+                                          Specify Custom Courier Partner Name *
+                                        </label>
+                                        <input
+                                          type="text"
+                                          required
+                                          placeholder="e.g. Shadowfax, Shree Tirupati Courier, Maruti Courier, Local Courier, etc."
+                                          value={customCourierName}
+                                          onChange={(e) => {
+                                            setCustomCourierName(e.target.value);
+                                            setTrackingCourierName(e.target.value);
+                                          }}
+                                          className="w-full px-3.5 py-2.5 border border-amber-300 rounded-xl bg-white text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500 shadow-2xs"
+                                          autoFocus
+                                        />
+                                        <p className="text-[10px] text-amber-800">
+                                          This custom courier name will appear on the customer's order tracking card and in their WhatsApp dispatch notification.
+                                        </p>
+                                      </div>
+                                    )}
+
+                                    {/* Row 2: Official Courier Tracking Portal URL */}
+                                    <div>
+                                      <div className="flex items-center justify-between mb-1.5">
+                                        <label className="block text-slate-700 font-bold uppercase tracking-wider text-[10px]">
+                                          Official Courier Tracking Portal URL
+                                        </label>
+                                        <button
+                                          type="button"
+                                          onClick={() => setTrackingPortalUrl(systemDefaultTrackingUrl)}
+                                          className="text-[11px] text-forest-800 hover:text-forest-950 font-semibold underline cursor-pointer"
+                                        >
+                                          Reset to Default
+                                        </button>
+                                      </div>
+                                      <div className="flex items-center space-x-2">
+                                        <input
+                                          type="url"
+                                          value={trackingPortalUrl}
+                                          onChange={(e) => setTrackingPortalUrl(e.target.value)}
+                                          placeholder={systemDefaultTrackingUrl}
+                                          className="flex-1 px-3.5 py-2.5 border border-slate-200 rounded-xl bg-white text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-forest-900 font-mono shadow-2xs"
+                                        />
+                                        {trackingPortalUrl && (
+                                          <a
+                                            href={trackingPortalUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-xs flex items-center space-x-1 transition shrink-0"
+                                            title="Test link in new tab"
+                                          >
+                                            <span>Test</span>
+                                            <ExternalLink className="w-3.5 h-3.5" />
+                                          </a>
+                                        )}
+                                      </div>
+                                      <p className="text-[10px] text-slate-500 mt-1">
+                                        Auto-loaded from system <code className="bg-slate-100 px-1 py-0.5 rounded font-mono text-[10px]">DEFAULT_TRACKING_PORTAL</code>. Customer clicks this to track their parcel.
+                                      </p>
                                     </div>
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        )}
-                      </>
-                    );
-                  })()}
-                </div>
-              </div>
 
-              {refundStatus === 'REFUNDED' && (
-                <div>
-                  <label className="font-bold text-slate-700 block mb-1">Bank / Gateway Transaction Reference ID *</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. RZPY_REF_84920492 or UTR..."
-                    value={refundTransactionId}
-                    onChange={(e) => setRefundTransactionId(e.target.value)}
-                    className="w-full p-2.5 border border-slate-200 rounded-xl bg-slate-50 font-mono focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-600/20"
-                  />
-                </div>
-              )}
+                                    {/* Row 3: Dispatch Date & Dispatch Notes (2 columns) */}
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
+                                      <div>
+                                        <label className="block text-slate-700 font-bold mb-1.5 uppercase tracking-wider text-[10px]">
+                                          Dispatch Date
+                                        </label>
+                                        <input
+                                          type="date"
+                                          value={trackingDispatchDate}
+                                          onChange={(e) => setTrackingDispatchDate(e.target.value)}
+                                          className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl bg-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-forest-900 shadow-2xs"
+                                        />
+                                      </div>
 
-              <div>
-                <label className="font-bold text-slate-700 block mb-1">
-                  {refundStatus === 'FAILED' ? 'Failure Reason *' : 'Resolution Notes'}
-                </label>
-                <textarea
-                  rows={2}
-                  placeholder={refundStatus === 'FAILED' ? 'e.g. Beneficiary IFSC invalid or bank account closed...' : 'Internal notes...'}
-                  value={refundNotes}
-                  onChange={(e) => setRefundNotes(e.target.value)}
-                  className="w-full p-2.5 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-600/20"
-                />
-              </div>
-            </div>
+                                      <div>
+                                        <label className="block text-slate-700 font-bold mb-1.5 uppercase tracking-wider text-[10px]">
+                                          Dispatch Notes (Optional)
+                                        </label>
+                                        <input
+                                          type="text"
+                                          value={trackingNotes}
+                                          onChange={(e) => setTrackingNotes(e.target.value)}
+                                          placeholder="e.g. Handed over at Market Yard Branch"
+                                          className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl bg-white text-xs focus:outline-none focus:ring-2 focus:ring-forest-900 shadow-2xs"
+                                        />
+                                      </div>
+                                    </div>
 
-            <div className="flex items-center justify-end space-x-2 pt-3 border-t border-slate-100">
-              <button
-                type="button"
-                onClick={() => {
-                  setShowRefundModal(false);
-                  setIsRefundStatusOpen(false);
-                }}
-                className="px-4 py-2 border border-slate-200 rounded-xl font-bold text-slate-600 hover:bg-slate-50 transition cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleUpdateRefund}
-                disabled={isProcessingAction}
-                className="px-5 py-2 bg-purple-700 hover:bg-purple-800 text-white font-bold rounded-xl transition cursor-pointer disabled:opacity-50"
-              >
-                Update Refund
-              </button>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
+                                    {/* Row 4: Status Checkbox */}
+                                    <div className="p-3.5 bg-slate-50 border border-slate-200/80 rounded-2xl">
+                                      <label className="flex items-center space-x-2.5 text-xs text-slate-700 font-medium cursor-pointer">
+                                        <input
+                                          type="checkbox"
+                                          checked={trackingUpdateStatus}
+                                          onChange={(e) => setTrackingUpdateStatus(e.target.checked)}
+                                          className="rounded text-forest-900 focus:ring-forest-900 w-4 h-4 cursor-pointer"
+                                        />
+                                        <span>Automatically set Order Status to <strong className="text-forest-950">"Dispatched (With Courier)"</strong></span>
+                                      </label>
+                                    </div>
+                                  </div>
 
-      {/* 7. Custom Date Range Selection Modal */}
-      {showCustomDateModal && typeof document !== 'undefined' && createPortal(
-        <div className="fixed inset-0 z-[9999] bg-slate-950/75 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-200 text-xs">
-            <div className="flex justify-between items-center pb-3 border-b border-slate-100">
-              <div className="flex items-center space-x-2">
-                <div className="w-8 h-8 rounded-xl bg-forest-900/10 text-forest-900 flex items-center justify-center">
-                  <Calendar className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="font-serif text-base font-bold text-slate-900">Custom Date Range Filter</h3>
-                  <p className="text-[11px] text-slate-500">Filter orders & analytics by custom dates</p>
-                </div>
-              </div>
-              <button
-                onClick={() => setShowCustomDateModal(false)}
-                className="p-1 hover:bg-slate-100 rounded-full text-slate-400 hover:text-slate-600 transition"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
+                                  {/* Fixed Footer */}
+                                  <div className="px-5 sm:px-7 py-3.5 sm:py-4 bg-slate-50/90 border-t border-slate-100 flex items-center justify-between gap-3 shrink-0">
+                                    <span className="text-[11px] text-slate-400 hidden sm:inline">
+                                      Updates sync in real-time to customer order details & WhatsApp
+                                    </span>
+                                    <div className="flex items-center space-x-2.5 ml-auto w-full sm:w-auto justify-end">
+                                      <button
+                                        type="button"
+                                        onClick={() => setShowTrackingModal(false)}
+                                        className="w-1/2 sm:w-auto px-4 py-2.5 border border-slate-200 rounded-xl font-bold text-slate-600 hover:bg-white hover:border-slate-300 transition cursor-pointer"
+                                      >
+                                        Cancel
+                                      </button>
+                                      <button
+                                        type="submit"
+                                        disabled={isProcessingAction || !trackingNumber.trim()}
+                                        className="w-1/2 sm:w-auto px-5 py-2.5 bg-forest-900 hover:bg-forest-950 text-gold-400 font-bold rounded-xl shadow-md transition disabled:opacity-50 flex items-center justify-center space-x-2 cursor-pointer"
+                                      >
+                                        {isProcessingAction ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                                        <span>Save Tracking & Dispatch</span>
+                                      </button>
+                                    </div>
+                                  </div>
+                                </form>
+                              </div>
+                            </div>,
+                            document.body
+                          )}
 
-            {/* Quick Presets */}
-            <div>
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">
-                Quick Presets
-              </span>
-              <div className="grid grid-cols-3 gap-2">
-                {[
-                  { label: 'Last 7 Days', days: 7 },
-                  { label: 'Last 30 Days', days: 30 },
-                  { label: 'Last 90 Days', days: 90 },
-                ].map((preset) => (
-                  <button
-                    key={preset.days}
-                    type="button"
-                    onClick={() => {
-                      const end = new Date();
-                      const start = new Date();
-                      start.setDate(end.getDate() - preset.days);
-                      setCustomStartDate(start.toISOString().split('T')[0]);
-                      setCustomEndDate(end.toISOString().split('T')[0]);
-                      setSelectedPeriod('CUSTOM');
-                      setShowCustomDateModal(false);
-                    }}
-                    className="p-2 rounded-xl border border-slate-200 hover:border-forest-900 bg-slate-50 hover:bg-forest-900/5 text-slate-700 font-semibold text-[11px] transition text-center cursor-pointer"
-                  >
-                    {preset.label}
-                  </button>
-                ))}
-              </div>
-            </div>
+                          {/* Centered Luxury Action Confirmation Modal */}
+                          <AdminConfirmModal
+                            isOpen={!!actionConfirm}
+                            title={actionConfirm?.title || 'Confirm Action'}
+                            itemBadge={actionConfirm?.itemBadge}
+                            itemName={actionConfirm?.itemName}
+                            message={actionConfirm?.message || 'Are you sure you want to proceed with this action?'}
+                            confirmLabel={actionConfirm?.confirmLabel || 'Confirm'}
+                            cancelLabel="Cancel"
+                            variant={actionConfirm?.variant || 'warning'}
+                            isLoading={isExecutingActionConfirm}
+                            onClose={() => setActionConfirm(null)}
+                            onConfirm={handleExecuteActionConfirm}
+                          />
 
-            {/* Date Inputs */}
-            <div className="space-y-3 pt-2">
-              <div>
-                <label className="font-bold text-slate-700 block mb-1">Start Date (From) *</label>
-                <input
-                  type="date"
-                  value={customStartDate}
-                  onChange={(e) => setCustomStartDate(e.target.value)}
-                  className="w-full p-2.5 border border-slate-200 rounded-xl bg-slate-50 font-medium text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-forest-900/20"
-                />
-              </div>
-
-              <div>
-                <label className="font-bold text-slate-700 block mb-1">End Date (To) *</label>
-                <input
-                  type="date"
-                  value={customEndDate}
-                  onChange={(e) => setCustomEndDate(e.target.value)}
-                  className="w-full p-2.5 border border-slate-200 rounded-xl bg-slate-50 font-medium text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-forest-900/20"
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between pt-3 border-t border-slate-100">
-              <button
-                type="button"
-                onClick={() => {
-                  setCustomStartDate('');
-                  setCustomEndDate('');
-                  setSelectedPeriod('ALL');
-                  setShowCustomDateModal(false);
-                }}
-                className="text-xs font-semibold text-rose-600 hover:underline cursor-pointer"
-              >
-                Reset to All Time
-              </button>
-
-              <div className="flex items-center space-x-2">
-                <button
-                  type="button"
-                  onClick={() => setShowCustomDateModal(false)}
-                  className="px-4 py-2 border border-slate-200 rounded-xl font-bold text-slate-600 hover:bg-slate-50 transition cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  disabled={!customStartDate && !customEndDate}
-                  onClick={() => {
-                    setSelectedPeriod('CUSTOM');
-                    setShowCustomDateModal(false);
-                  }}
-                  className="px-5 py-2 bg-forest-900 hover:bg-forest-950 text-gold-400 font-bold rounded-xl transition cursor-pointer disabled:opacity-50"
-                >
-                  Apply Filter
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
-
-
-
-
-
-      {/* 7. Consignment & Delivery Tracking Modal (India Post / Courier) */}
-      {showTrackingModal && selectedOrder && typeof document !== 'undefined' && createPortal(
-        <div className="fixed inset-0 z-[9999] bg-slate-950/75 backdrop-blur-md flex items-center justify-center p-3 sm:p-5 overflow-y-auto">
-          <div className="bg-white rounded-3xl max-w-3xl w-full max-h-[92vh] flex flex-col shadow-2xl border border-slate-100 animate-in fade-in zoom-in-95 duration-200 overflow-hidden my-auto">
-            {/* Modal Header */}
-            <div className="px-5 sm:px-7 py-4 sm:py-5 bg-gradient-to-r from-forest-900 via-forest-950 to-slate-900 text-white flex justify-between items-center shrink-0">
-              <div className="flex items-center space-x-3 min-w-0">
-                <div className="w-10 h-10 rounded-2xl bg-gold-400/20 border border-gold-400/30 flex items-center justify-center text-gold-400 shrink-0 shadow-inner">
-                  <Truck className="w-5 h-5 text-gold-400" />
-                </div>
-                <div className="min-w-0">
-                  <h3 className="font-serif text-base sm:text-lg font-bold text-white tracking-wide truncate">
-                    Update Delivery & Consignment Tracking
-                  </h3>
-                  <p className="text-xs text-gold-300/90 font-mono mt-0.5 truncate">
-                    Order #{selectedOrder.orderId} • <span className="text-white font-sans font-medium">{selectedOrder.shippingAddress?.fullName}</span>
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowTrackingModal(false)}
-                className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition cursor-pointer shrink-0 ml-3"
-                title="Close modal"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Scrollable Form Body */}
-            <form onSubmit={handleSaveTrackingDetails} className="flex flex-col flex-1 overflow-hidden">
-              <div className="p-5 sm:p-7 overflow-y-auto space-y-4 sm:space-y-5 flex-1 text-xs">
-
-                {/* Row 1: Courier Partner & Tracking Number (2 columns on tablet/desktop) */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5">
-                  <div>
-                    <label className="block text-slate-700 font-bold mb-1.5 uppercase tracking-wider text-[10px]">
-                      Courier Partner Name *
-                    </label>
-                    <select
-                      value={selectedCourierOption}
-                      onChange={(e) => handleCourierSelectChange(e.target.value)}
-                      className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl bg-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-forest-900 cursor-pointer shadow-2xs"
-                    >
-                      <option value="India Post">India Post (Speed Post / Parcel)</option>
-                      <option value="Speed Post">Speed Post</option>
-                      <option value="Delhivery">Delhivery</option>
-                      <option value="DTDC">DTDC</option>
-                      <option value="Blue Dart">Blue Dart</option>
-                      <option value="Trackon">Trackon</option>
-                      <option value="The Professional Couriers">The Professional Couriers</option>
-                      <option value="Shree Maruti Courier">Shree Maruti Courier</option>
-                      <option value="Shree Tirupati Courier">Shree Tirupati Courier</option>
-                      <option value="Shree Anjani Courier">Shree Anjani Courier</option>
-                      <option value="Shadowfax">Shadowfax</option>
-                      <option value="Other">Other Courier Partner (Manual Entry)</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-slate-700 font-bold mb-1.5 uppercase tracking-wider text-[10px]">
-                      Consignment / Tracking Number *
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="e.g. CP123456789IN or Tracking ID"
-                      value={trackingNumber}
-                      onChange={(e) => setTrackingNumber(e.target.value.toUpperCase())}
-                      className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white text-xs font-mono font-bold tracking-wider focus:outline-none focus:ring-2 focus:ring-forest-900 uppercase shadow-2xs"
-                    />
-                    <p className="text-[10px] text-slate-500 mt-1">
-                      Enter the tracking number from your courier booking receipt.
-                    </p>
-                  </div>
-                </div>
-
-                {/* Custom Courier Input (if Other selected) */}
-                {selectedCourierOption === 'Other' && (
-                  <div className="p-4 bg-amber-50/80 border border-amber-200 rounded-2xl space-y-1.5 animate-in fade-in duration-150">
-                    <label className="block text-amber-950 font-bold uppercase tracking-wider text-[10px]">
-                      Specify Custom Courier Partner Name *
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="e.g. Shadowfax, Shree Tirupati Courier, Maruti Courier, Local Courier, etc."
-                      value={customCourierName}
-                      onChange={(e) => {
-                        setCustomCourierName(e.target.value);
-                        setTrackingCourierName(e.target.value);
-                      }}
-                      className="w-full px-3.5 py-2.5 border border-amber-300 rounded-xl bg-white text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500 shadow-2xs"
-                      autoFocus
-                    />
-                    <p className="text-[10px] text-amber-800">
-                      This custom courier name will appear on the customer's order tracking card and in their WhatsApp dispatch notification.
-                    </p>
-                  </div>
-                )}
-
-                {/* Row 2: Official Courier Tracking Portal URL */}
-                <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <label className="block text-slate-700 font-bold uppercase tracking-wider text-[10px]">
-                      Official Courier Tracking Portal URL
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => setTrackingPortalUrl(systemDefaultTrackingUrl)}
-                      className="text-[11px] text-forest-800 hover:text-forest-950 font-semibold underline cursor-pointer"
-                    >
-                      Reset to Default
-                    </button>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <input
-                      type="url"
-                      value={trackingPortalUrl}
-                      onChange={(e) => setTrackingPortalUrl(e.target.value)}
-                      placeholder={systemDefaultTrackingUrl}
-                      className="flex-1 px-3.5 py-2.5 border border-slate-200 rounded-xl bg-white text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-forest-900 font-mono shadow-2xs"
-                    />
-                    {trackingPortalUrl && (
-                      <a
-                        href={trackingPortalUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-xs flex items-center space-x-1 transition shrink-0"
-                        title="Test link in new tab"
-                      >
-                        <span>Test</span>
-                        <ExternalLink className="w-3.5 h-3.5" />
-                      </a>
-                    )}
-                  </div>
-                  <p className="text-[10px] text-slate-500 mt-1">
-                    Auto-loaded from system <code className="bg-slate-100 px-1 py-0.5 rounded font-mono text-[10px]">DEFAULT_TRACKING_PORTAL</code>. Customer clicks this to track their parcel.
-                  </p>
-                </div>
-
-                {/* Row 3: Dispatch Date & Dispatch Notes (2 columns) */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
-                  <div>
-                    <label className="block text-slate-700 font-bold mb-1.5 uppercase tracking-wider text-[10px]">
-                      Dispatch Date
-                    </label>
-                    <input
-                      type="date"
-                      value={trackingDispatchDate}
-                      onChange={(e) => setTrackingDispatchDate(e.target.value)}
-                      className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl bg-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-forest-900 shadow-2xs"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-slate-700 font-bold mb-1.5 uppercase tracking-wider text-[10px]">
-                      Dispatch Notes (Optional)
-                    </label>
-                    <input
-                      type="text"
-                      value={trackingNotes}
-                      onChange={(e) => setTrackingNotes(e.target.value)}
-                      placeholder="e.g. Handed over at Market Yard Branch"
-                      className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl bg-white text-xs focus:outline-none focus:ring-2 focus:ring-forest-900 shadow-2xs"
-                    />
-                  </div>
-                </div>
-
-                {/* Row 4: Status Checkbox */}
-                <div className="p-3.5 bg-slate-50 border border-slate-200/80 rounded-2xl">
-                  <label className="flex items-center space-x-2.5 text-xs text-slate-700 font-medium cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={trackingUpdateStatus}
-                      onChange={(e) => setTrackingUpdateStatus(e.target.checked)}
-                      className="rounded text-forest-900 focus:ring-forest-900 w-4 h-4 cursor-pointer"
-                    />
-                    <span>Automatically set Order Status to <strong className="text-forest-950">"Dispatched (With Courier)"</strong></span>
-                  </label>
-                </div>
-              </div>
-
-              {/* Fixed Footer */}
-              <div className="px-5 sm:px-7 py-3.5 sm:py-4 bg-slate-50/90 border-t border-slate-100 flex items-center justify-between gap-3 shrink-0">
-                <span className="text-[11px] text-slate-400 hidden sm:inline">
-                  Updates sync in real-time to customer order details & WhatsApp
-                </span>
-                <div className="flex items-center space-x-2.5 ml-auto w-full sm:w-auto justify-end">
-                  <button
-                    type="button"
-                    onClick={() => setShowTrackingModal(false)}
-                    className="w-1/2 sm:w-auto px-4 py-2.5 border border-slate-200 rounded-xl font-bold text-slate-600 hover:bg-white hover:border-slate-300 transition cursor-pointer"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={isProcessingAction || !trackingNumber.trim()}
-                    className="w-1/2 sm:w-auto px-5 py-2.5 bg-forest-900 hover:bg-forest-950 text-gold-400 font-bold rounded-xl shadow-md transition disabled:opacity-50 flex items-center justify-center space-x-2 cursor-pointer"
-                  >
-                    {isProcessingAction ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
-                    <span>Save Tracking & Dispatch</span>
-                  </button>
-                </div>
-              </div>
-            </form>
-          </div>
-        </div>,
-        document.body
-      )}
-
-      {/* Centered Luxury Action Confirmation Modal */}
-      <AdminConfirmModal
-        isOpen={!!actionConfirm}
-        title={actionConfirm?.title || 'Confirm Action'}
-        itemBadge={actionConfirm?.itemBadge}
-        itemName={actionConfirm?.itemName}
-        message={actionConfirm?.message || 'Are you sure you want to proceed with this action?'}
-        confirmLabel={actionConfirm?.confirmLabel || 'Confirm'}
-        cancelLabel="Cancel"
-        variant={actionConfirm?.variant || 'warning'}
-        isLoading={isExecutingActionConfirm}
-        onClose={() => setActionConfirm(null)}
-        onConfirm={handleExecuteActionConfirm}
-      />
-
-    </div >
-  );
+                        </div >
+                        );
 };

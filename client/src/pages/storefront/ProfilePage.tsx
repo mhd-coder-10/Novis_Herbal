@@ -28,11 +28,16 @@ import {
   ChevronRight,
   Star,
   ExternalLink,
-  Bell
+  Bell,
+  ShoppingBag,
+  Sparkles,
+  Truck,
+  CheckCircle,
+  CheckCheck
 } from 'lucide-react';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useWishlistStore } from '../../store/useWishlistStore';
-import { useNotificationStore } from '../../store/useNotificationStore';
+import { useNotificationStore, isNotificationActive } from '../../store/useNotificationStore';
 import api, { getFullImageUrl } from '../../services/api';
 import { AddressItem, Review, ReviewMedia } from '../../types';
 import { toast } from '../../store/useToastStore';
@@ -41,6 +46,56 @@ import { ReviewCard } from '../../components/storefront/ReviewCard';
 import { ReviewModal } from '../../components/storefront/ReviewModal';
 import { MediaLightbox } from '../../components/storefront/MediaLightbox';
 
+const formatNotifTimeAgo = (dateStr: string) => {
+  try {
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffSec = Math.floor(diffMs / 1000);
+    const diffMin = Math.floor(diffSec / 60);
+    const diffHour = Math.floor(diffMin / 60);
+    const diffDay = Math.floor(diffHour / 24);
+
+    if (diffSec < 60) return 'Just now';
+    if (diffMin < 60) return `${diffMin}m ago`;
+    if (diffHour < 24) return `${diffHour}h ago`;
+    if (diffDay === 1) return 'Yesterday';
+    if (diffDay < 7) return `${diffDay}d ago`;
+    return date.toLocaleDateString('en-IN', { month: 'short', day: 'numeric' });
+  } catch {
+    return 'Recently';
+  }
+};
+
+const getNotifIcon = (type: string) => {
+  switch (type) {
+    case 'STOCK_UPDATE':
+    case 'BACK_IN_STOCK':
+      return <ShoppingBag className="w-4 h-4 text-emerald-600" />;
+    case 'PRODUCT_LAUNCH':
+    case 'NEW_PRODUCT':
+    case 'PROMOTION':
+      return <Sparkles className="w-4 h-4 text-gold-500" />;
+    case 'ORDER_DISPATCHED':
+      return <Truck className="w-4 h-4 text-amber-600" />;
+    case 'ORDER_DELIVERED':
+      return <CheckCircle className="w-4 h-4 text-emerald-600" />;
+    case 'ORDER_CONFIRMED':
+    case 'ORDER_PACKED':
+    case 'ORDER_PLACED':
+      return <Package className="w-4 h-4 text-forest-800" />;
+    case 'ORDER_CANCELLED':
+    case 'CANCEL_REQUEST_APPROVED':
+    case 'CANCEL_REQUEST_REJECTED':
+      return <AlertCircle className="w-4 h-4 text-rose-600" />;
+    case 'COMPLAINT_UPDATE':
+    case 'COMPLAINT_SUBMITTED':
+      return <AlertTriangle className="w-4 h-4 text-amber-600" />;
+    default:
+      return <Bell className="w-4 h-4 text-forest-700" />;
+  }
+};
+
 interface ProfilePageProps {
   onNavigate: (page: string, param?: string) => void;
 }
@@ -48,9 +103,24 @@ interface ProfilePageProps {
 export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate }) => {
   const { user, isAuthenticated, updateUser, logout } = useAuthStore();
   const { items: wishlistItems } = useWishlistStore();
-  const { unreadCount, openDrawer } = useNotificationStore();
+  const {
+    notifications,
+    unreadCount,
+    markUserRead,
+    markAllUserRead,
+    removeUserNotification,
+    clearAllUserNotifications,
+    openDrawer,
+    fetchUserNotifications
+  } = useNotificationStore();
 
-  const [activeTab, setActiveTab] = useState<'details' | 'security' | 'addresses' | 'reviews'>('details');
+  const [activeTab, setActiveTab] = useState<'details' | 'security' | 'addresses' | 'reviews' | 'notifications'>('details');
+
+  const filteredProfileNotifications = notifications.filter(isNotificationActive);
+
+  useEffect(() => {
+    fetchUserNotifications(user?.email);
+  }, [fetchUserNotifications, user?.email]);
 
   // Customer reviews state
   const [myReviews, setMyReviews] = useState<Review[]>([]);
@@ -644,8 +714,8 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate }) => {
         {/* Floating Toast Notification */}
         {feedback && (
           <div className={`p-4 rounded-2xl flex items-center space-x-3 border shadow-md animate-fadeIn transition max-w-3xl mx-auto ${feedback.type === 'success'
-              ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
-              : 'bg-rose-50 border-rose-200 text-rose-900'
+            ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
+            : 'bg-rose-50 border-rose-200 text-rose-900'
             }`}>
             {feedback.type === 'success' ? (
               <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
@@ -782,8 +852,8 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate }) => {
               <button
                 onClick={() => setActiveTab('details')}
                 className={`w-full text-left px-4 py-3 rounded-2xl text-xs sm:text-sm font-bold transition flex items-center justify-between ${activeTab === 'details'
-                    ? 'bg-forest-900 text-gold-400 shadow-sm'
-                    : 'text-slate-700 hover:bg-slate-50'
+                  ? 'bg-forest-900 text-gold-400 shadow-sm'
+                  : 'text-slate-700 hover:bg-slate-50'
                   }`}
               >
                 <div className="flex items-center space-x-3">
@@ -796,8 +866,8 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate }) => {
               <button
                 onClick={() => setActiveTab('security')}
                 className={`w-full text-left px-4 py-3 rounded-2xl text-xs sm:text-sm font-bold transition flex items-center justify-between ${activeTab === 'security'
-                    ? 'bg-forest-900 text-gold-400 shadow-sm'
-                    : 'text-slate-700 hover:bg-slate-50'
+                  ? 'bg-forest-900 text-gold-400 shadow-sm'
+                  : 'text-slate-700 hover:bg-slate-50'
                   }`}
               >
                 <div className="flex items-center space-x-3">
@@ -810,8 +880,8 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate }) => {
               <button
                 onClick={() => setActiveTab('addresses')}
                 className={`w-full text-left px-4 py-3 rounded-2xl text-xs sm:text-sm font-bold transition flex items-center justify-between ${activeTab === 'addresses'
-                    ? 'bg-forest-900 text-gold-400 shadow-sm'
-                    : 'text-slate-700 hover:bg-slate-50'
+                  ? 'bg-forest-900 text-gold-400 shadow-sm'
+                  : 'text-slate-700 hover:bg-slate-50'
                   }`}
               >
                 <div className="flex items-center space-x-3">
@@ -827,8 +897,8 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate }) => {
               <button
                 onClick={() => setActiveTab('reviews')}
                 className={`w-full text-left px-4 py-3 rounded-2xl text-xs sm:text-sm font-bold transition flex items-center justify-between ${activeTab === 'reviews'
-                    ? 'bg-forest-900 text-gold-400 shadow-sm'
-                    : 'text-slate-700 hover:bg-slate-50'
+                  ? 'bg-forest-900 text-gold-400 shadow-sm'
+                  : 'text-slate-700 hover:bg-slate-50'
                   }`}
               >
                 <div className="flex items-center space-x-3">
@@ -839,6 +909,28 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate }) => {
                   }`}>
                   {myReviews.length}
                 </span>
+              </button>
+
+              <button
+                onClick={() => setActiveTab('notifications')}
+                className={`w-full text-left px-4 py-3 rounded-2xl text-xs sm:text-sm font-bold transition flex items-center justify-between ${activeTab === 'notifications'
+                  ? 'bg-forest-900 text-gold-400 shadow-sm'
+                  : 'text-slate-700 hover:bg-slate-50'
+                  }`}
+              >
+                <div className="flex items-center space-x-3">
+                  <Bell className="w-4 h-4" />
+                  <span>In-App Notifications</span>
+                </div>
+                {unreadCount > 0 ? (
+                  <span className="text-[10px] bg-amber-600 text-white font-extrabold px-2 py-0.5 rounded-full shadow-xs">
+                    {unreadCount} new
+                  </span>
+                ) : (
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${activeTab === 'notifications' ? 'bg-gold-400/20 text-gold-300' : 'bg-slate-100 text-slate-600'}`}>
+                    {notifications.length}
+                  </span>
+                )}
               </button>
 
               {/* Storefront Shortcuts */}
@@ -863,23 +955,6 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate }) => {
                     <span>Saved Wishlist ({wishlistItems.length})</span>
                   </div>
                   <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
-                </button>
-
-                <button
-                  onClick={openDrawer}
-                  className="w-full text-left px-4 py-2.5 rounded-2xl text-xs font-semibold text-slate-600 hover:bg-slate-50 flex items-center justify-between transition"
-                >
-                  <div className="flex items-center space-x-3">
-                    <Bell className="w-4 h-4 text-forest-800" />
-                    <span>In-App Notifications</span>
-                  </div>
-                  {unreadCount > 0 ? (
-                    <span className="text-[10px] bg-amber-600 text-white font-extrabold px-2 py-0.5 rounded-full shadow-xs">
-                      {unreadCount} new
-                    </span>
-                  ) : (
-                    <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
-                  )}
                 </button>
 
                 <button
@@ -1512,6 +1587,153 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate }) => {
                         </div>
                       );
                     })}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* TAB 5: IN-APP NOTIFICATIONS CENTER */}
+            {activeTab === 'notifications' && (
+              <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/80 shadow-sm animate-fadeIn space-y-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+                  <div>
+                    <h3 className="font-serif text-xl sm:text-2xl font-bold text-forest-950 flex items-center space-x-2.5">
+                      <span>Store & Order Notifications</span>
+                      {unreadCount > 0 && (
+                        <span className="text-xs bg-amber-600 text-white font-extrabold px-2.5 py-0.5 rounded-full">
+                          {unreadCount} unread
+                        </span>
+                      )}
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-1">
+                      Real-time updates regarding your dispatch status, tracking consignment numbers, refunds, and botanical announcements.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center space-x-2 self-start sm:self-auto">
+                    {unreadCount > 0 && (
+                      <button
+                        onClick={markAllUserRead}
+                        className="px-3.5 py-2 bg-forest-900/10 hover:bg-forest-900/20 text-forest-950 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 cursor-pointer"
+                      >
+                        <CheckCheck className="w-3.5 h-3.5" />
+                        <span>Mark all as read</span>
+                      </button>
+                    )}
+                    {notifications.length > 0 && (
+                      <button
+                        onClick={clearAllUserNotifications}
+                        className="px-3.5 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200/60 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 cursor-pointer"
+                        title="Clear all notifications"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Clear all</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Notifications List */}
+                {filteredProfileNotifications.length === 0 ? (
+                  <div className="py-16 text-center px-4">
+                    <div className="w-14 h-14 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-3 text-slate-400">
+                      <Bell className="w-6 h-6 text-slate-400" />
+                    </div>
+                    <h4 className="font-serif text-base font-bold text-slate-800">No notifications found</h4>
+                    <p className="text-xs text-slate-500 max-w-sm mx-auto mt-1">
+                      When your orders are confirmed, dispatched, or out for delivery, you'll see all real-time updates here.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {filteredProfileNotifications.map((notif) => (
+                      <div
+                        key={notif._id}
+                        onClick={() => {
+                          if (!notif.isRead) markUserRead(notif._id);
+                          if (notif.actionUrl) {
+                            if (notif.actionUrl.startsWith('/my-orders')) onNavigate('my-orders');
+                            else if (notif.actionUrl.startsWith('/shop')) onNavigate('shop');
+                          }
+                        }}
+                        className={`p-4 sm:p-5 rounded-2xl border transition flex items-start space-x-3.5 cursor-pointer relative ${notif.isRead
+                          ? 'bg-white border-slate-200/90 hover:border-forest-900/40 hover:bg-slate-50/50'
+                          : 'bg-gradient-to-r from-amber-50/70 to-white border-amber-300 shadow-xs hover:shadow-md'
+                          }`}
+                      >
+                        <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center shrink-0 shadow-xs">
+                          {getNotifIcon(notif.type)}
+                        </div>
+
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-2">
+                            <h4 className={`text-xs sm:text-sm font-bold truncate ${notif.isRead ? 'text-slate-800' : 'text-forest-950 font-black'}`}>
+                              {notif.title}
+                            </h4>
+                            <div className="flex items-center space-x-2 shrink-0">
+                              {notif.priority === 'HIGH' && (
+                                <span className="text-[9px] font-bold uppercase bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full">
+                                  Important
+                                </span>
+                              )}
+                              <span className="text-[10px] text-slate-400 font-medium">
+                                {formatNotifTimeAgo(notif.createdAt)}
+                              </span>
+                            </div>
+                          </div>
+
+                          <p className="text-xs text-slate-600 mt-1.5 leading-relaxed">
+                            {notif.message}
+                          </p>
+
+                          {notif.data?.trackingNumber && (
+                            <div className="mt-3 p-2.5 bg-slate-50 border border-slate-200/80 rounded-xl flex items-center justify-between text-xs font-mono">
+                              <span className="text-slate-600">
+                                Consignment: <strong className="text-forest-950 font-sans">{notif.data.trackingNumber}</strong>
+                              </span>
+                              {notif.data.trackingUrl && (
+                                <a
+                                  href={notif.data.trackingUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="text-forest-900 hover:text-gold-700 font-bold font-sans flex items-center space-x-1"
+                                >
+                                  <span>Track Parcel</span>
+                                  <ExternalLink className="w-3 h-3" />
+                                </a>
+                              )}
+                            </div>
+                          )}
+
+                          <div className="mt-3 flex items-center justify-between text-xs pt-2 border-t border-slate-100">
+                            <span className="text-[11px] text-forest-900 font-bold hover:underline flex items-center space-x-1">
+                              <span>{notif.actionUrl ? 'Open Details' : 'View Update'}</span>
+                              <ChevronRight className="w-3.5 h-3.5" />
+                            </span>
+                            {!notif.isRead && (
+                              <span className="w-2.5 h-2.5 rounded-full bg-amber-600 shadow-xs" title="Unread" />
+                            )}
+                            <div className="flex items-center space-x-2">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  removeUserNotification(notif._id);
+                                }}
+                                className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition cursor-pointer"
+                                title="Remove notification"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                              {!notif.isRead && (
+                                <span className="w-2.5 h-2.5 rounded-full bg-amber-600 shadow-xs" title="Unread" />
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>

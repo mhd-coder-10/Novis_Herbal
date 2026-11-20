@@ -14,6 +14,7 @@ import adminRoutes from './adminRoutes.js';
 import financeRoutes from './financeRoutes.js';
 import realtimeRoutes from './realtimeRoutes.js';
 import notificationRoutes from './notificationRoutes.js';
+import marketplaceRoutes from './marketplaceRoutes.js';
 
 const router = express.Router();
 
@@ -31,5 +32,6 @@ router.use('/categories', categoryRoutes);
 router.use('/upload', uploadRoutes);
 router.use('/realtime', realtimeRoutes);
 router.use('/notifications', notificationRoutes);
+router.use('/marketplaces', marketplaceRoutes);
 
 export default router;

@@ -17,12 +17,20 @@ export const ComboOfferSection: React.FC<ComboOfferProps> = ({ onNavigate, combo
     if (propProduct) {
       setProduct(propProduct);
     } else {
-      api.get('/products').then((res) => {
-        if (res.data?.success && res.data.products?.length > 0) {
-          const match = res.data.products.find((p: Product) => p.isCombo || p.slug.includes('combo') || p.sku.includes('CMB'));
-          if (match) setProduct(match);
-        }
-      }).catch(console.error);
+      const loadProduct = () => {
+        api.get('/products').then((res) => {
+          if (res.data?.success && res.data.products?.length > 0) {
+            const match = res.data.products.find((p: Product) => p.isCombo || p.slug.includes('combo') || p.sku.includes('CMB'));
+            if (match) setProduct(match);
+          }
+        }).catch(console.error);
+      };
+      loadProduct();
+
+      window.addEventListener('novise:product-updated', loadProduct);
+      return () => {
+        window.removeEventListener('novise:product-updated', loadProduct);
+      };
     }
   }, [propProduct]);
 
@@ -86,7 +94,7 @@ export const ComboOfferSection: React.FC<ComboOfferProps> = ({ onNavigate, combo
               </h2>
 
               <p className="text-xs sm:text-base text-slate-300 leading-relaxed font-normal">
-                Why buy separately when you can achieve 3x faster results together? Novise Ayurvedic Growth Oil nourishes dormant roots overnight, while Novise Clarifying Shampoo permanently clears fungus and sebum in the morning.
+                Experience complete hair and scalp wellness with our complementary 2-step ritual. Novise Herbal Hair Oil provides deep overnight root nourishment and hydration, while Novise Clarifying Shampoo gently washes away flakes, excess sebum, and impurities in the morning.
               </p>
 
               {/* Routine Value Breakdown */}
@@ -97,7 +105,7 @@ export const ComboOfferSection: React.FC<ComboOfferProps> = ({ onNavigate, combo
                     <span>Step 1: Night Scalp Oil (200 ML)</span>
                   </div>
                   <p className="text-[11px] text-slate-300">
-                    Individual Price ₹399. Rosemary + Redensyl stops hair fall in 14 days.
+                    Individual Price ₹399. 20 cold-pressed oils nourish roots and help reduce hair fall due to breakage.
                   </p>
                 </div>
 
@@ -107,7 +115,7 @@ export const ComboOfferSection: React.FC<ComboOfferProps> = ({ onNavigate, combo
                     <span>Step 2: Morning Wash (250 ML)</span>
                   </div>
                   <p className="text-[11px] text-slate-300">
-                    Individual Price ₹350. Ketoconazole 1% + Tea Tree clears 100% flakes.
+                    Individual Price ₹350. Zinc Pyrithione & Tea Tree gently clarify scalp and soothe flaking.
                   </p>
                 </div>
               </div>
