@@ -244,4 +244,10 @@ const orderSchema = new mongoose.Schema({
   }]
 }, { timestamps: true });
 
+orderSchema.index({ createdAt: -1 });
+orderSchema.index({ orderStatus: 1, createdAt: -1 });
+orderSchema.index({ 'paymentInfo.method': 1, 'paymentInfo.status': 1 });
+orderSchema.index({ 'customerDetails.phone': 1 });
+orderSchema.index({ 'customerDetails.email': 1 });
+
 export default mongoose.model('Order', orderSchema);

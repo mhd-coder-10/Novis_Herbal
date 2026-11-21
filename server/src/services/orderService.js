@@ -484,41 +484,31 @@ export class OrderService {
     const effectiveLimit = Math.min(Number(limit) || 200, 1000);
     const skip = (Number(page) - 1) * effectiveLimit;
 
-    // Auto-normalize undelivered COD orders: payment status MUST be PENDING (cash is only collected upon delivery)
-    await Order.updateMany(
-      {
-        'paymentInfo.method': 'COD',
-        orderStatus: { $nin: ['DELIVERED', 'CANCELLED', 'RTO_COMPLETED', 'RETURNED_TO_SELLER', 'CANCELLATION_REQUESTED'] },
-        'paymentInfo.status': { $ne: 'PENDING' }
-      },
-      {
-        $set: {
-          'paymentInfo.status': 'PENDING',
-          'paymentInfo.paidAt': null
-        }
-      }
-    ).catch(() => { });
+    // Run background maintenance asynchronously without blocking the user's GET request
+    setImmediate(() => {
+      Order.updateMany(
+        {
+          'paymentInfo.method': 'COD',
+          orderStatus: { $nin: ['DELIVERED', 'CANCELLED', 'RTO_COMPLETED', 'RETURNED_TO_SELLER', 'CANCELLATION_REQUESTED'] },
+          'paymentInfo.status': { $ne: 'PENDING' }
+        },
+        { $set: { 'paymentInfo.status': 'PENDING', 'paymentInfo.paidAt': null } }
+      ).catch(() => { });
 
-    // Auto-normalize cancelled / RTO COD orders to NOT_APPLICABLE payment status
-    await Order.updateMany(
-      {
-        'paymentInfo.method': 'COD',
-        orderStatus: { $in: ['CANCELLED', 'RTO_COMPLETED', 'RETURNED_TO_SELLER'] },
-        'paymentInfo.status': { $ne: 'NOT_APPLICABLE' }
-      },
-      {
-        $set: {
-          'paymentInfo.status': 'NOT_APPLICABLE',
-          'refundInfo.status': 'NOT_APPLICABLE',
-          'refundInfo.amount': 0
-        }
-      }
-    ).catch(() => { });
+      Order.updateMany(
+        {
+          'paymentInfo.method': 'COD',
+          orderStatus: { $in: ['CANCELLED', 'RTO_COMPLETED', 'RETURNED_TO_SELLER'] },
+          'paymentInfo.status': { $ne: 'NOT_APPLICABLE' }
+        },
+        { $set: { 'paymentInfo.status': 'NOT_APPLICABLE', 'refundInfo.status': 'NOT_APPLICABLE', 'refundInfo.amount': 0 } }
+      ).catch(() => { });
+    });
 
     const [orders, total, allMatching] = await Promise.all([
-      Order.find(query).sort({ createdAt: -1 }).skip(skip).limit(effectiveLimit),
+      Order.find(query).sort({ createdAt: -1 }).skip(skip).limit(effectiveLimit).lean(),
       Order.countDocuments(query),
-      Order.find(query).select('orderStatus pricing paymentInfo')
+      Order.find(query).select('orderStatus pricing paymentInfo').lean()
     ]);
 
     for (const order of orders) {

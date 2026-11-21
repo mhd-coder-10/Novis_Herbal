@@ -412,6 +412,11 @@ export const AdminFinance: React.FC = () => {
         params.endDate = eDate;
       }
 
+      if (activeTab === 'audit_logs') {
+        setIsLoading(false);
+        return;
+      }
+
       if (activeTab === 'overview') {
         const res = await api.get('/finance/overview', { params });
         if (res.data?.success) setOverviewData(res.data);
@@ -424,8 +429,6 @@ export const AdminFinance: React.FC = () => {
       } else if (activeTab === 'operating') {
         const res = await api.get('/finance/operating', { params });
         if (res.data?.success) setOperatingData(res.data);
-      } else if (activeTab === 'audit_logs') {
-        fetchAuditLogs();
       }
     } catch (err: any) {
       console.error('Failed to load finance data:', err);
@@ -1305,6 +1308,20 @@ export const AdminFinance: React.FC = () => {
     }
   };
 
+  // Scope label for official audit report
+  const getStatementScope = () => {
+    if (activeTab === 'overview') return 'COMPLETE BUSINESS OVERVIEW (P&L)';
+    if (activeTab === 'sales') {
+      if (sellingSubTab === 'online') return 'SELLING & REVENUE (ONLINE STORE)';
+      if (sellingSubTab === 'offline') return 'SELLING & REVENUE (OFFLINE RETAIL)';
+      return 'SELLING & REVENUE (OVERALL)';
+    }
+    if (activeTab === 'manufacturing') return 'MANUFACTURING & SOURCING';
+    if (activeTab === 'operating') return 'SHOP & OPERATING OVERHEAD';
+    if (activeTab === 'audit_logs') return 'DELETION AUDIT TRAIL';
+    return 'FINANCE & ACCOUNTS';
+  };
+
   // Print Report Handler
   const handlePrintReport = () => {
     window.print();
@@ -1312,3369 +1329,3230 @@ export const AdminFinance: React.FC = () => {
 
   return (
     <div className="space-y-6 w-full animate-fadeIn pb-12">
-
-
-
-      {/* MAIN FINANCE DASHBOARD (HIDDEN WHEN ANY FULL-PAGE ACTION IS ACTIVE) */}
-      {!isAnyActionPageActive && (
-        <div className="space-y-6 animate-fadeIn">
-          {/* TOP HEADER & CONTROLS */}
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white p-5 sm:p-6 rounded-3xl border border-slate-200/90 shadow-xs">
-            <div>
-              <div className="flex items-center space-x-2">
-                <span className="p-2 bg-forest-900/10 text-forest-900 rounded-xl">
-                  <Wallet className="w-5 h-5 text-forest-900" />
-                </span>
-                <h2 className="font-serif text-2xl font-black text-forest-950">
-                  Finance & Business Accounting
-                </h2>
-              </div>
-              <p className="text-xs text-slate-500 mt-1">
-                Real-time D2C cash flow, sales revenue, product manufacturing sourcing expenses, and shop overhead accounting.
-              </p>
-            </div>
-
-            {/* Global Action: Generate Report */}
-            <div className="flex items-center space-x-2.5 self-start lg:self-auto flex-wrap">
-              <button
-                type="button"
-                onClick={handlePrintReport}
-                className="inline-flex items-center space-x-2 px-4 py-2.5 rounded-xl bg-forest-900 hover:bg-forest-950 text-gold-400 font-bold text-xs transition shadow-sm group cursor-pointer"
-                title="Download / Print Finance Audit Report"
-              >
-                <FileText className="w-4 h-4 text-gold-300 group-hover:scale-110 transition" />
-                <span>Generate Report</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => fetchData()}
-                className="p-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl transition cursor-pointer"
-                title="Refresh Finance Data"
-              >
-                <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
-              </button>
-            </div>
-          </div>
-
-          {/* TIME SELECTION BAR (Every tab has time selection filter) */}
-          <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-200/90 shadow-2xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
-            <TimeRangeDropdown
-              value={period}
-              onChange={(p) => {
-                setPeriod(p as PeriodType);
-              }}
-              customStartDate={customStartDate}
-              customEndDate={customEndDate}
-              onCustomStartDateChange={(start) => setCustomStartDate(start)}
-              onCustomEndDateChange={(end) => setCustomEndDate(end)}
-              onApplyCustom={(start, end) => {
-                setCustomStartDate(start);
-                setCustomEndDate(end);
-                setPeriod('custom');
-                fetchData('custom', start, end);
-              }}
-              onResetCustom={() => {
-                setCustomStartDate('');
-                setCustomEndDate('');
-                setPeriod('all');
-                fetchData('all');
-              }}
-            />
-
-            <div className="text-[11px] text-slate-500 font-medium">
-              Active Ledger: <strong className="text-forest-950 font-bold">{getPeriodLabel()}</strong>
-            </div>
-          </div>
-
-          {/* 4 MAIN MODULE TABS */}
-          <div className="flex items-center space-x-2 border-b border-slate-200 overflow-x-auto no-scrollbar">
-            <button
-              onClick={() => setActiveTab('overview')}
-              className={`flex items-center space-x-2 px-5 py-3 border-b-2 font-bold text-xs whitespace-nowrap transition cursor-pointer ${activeTab === 'overview'
-                ? 'border-forest-900 text-forest-900 font-black'
-                : 'border-transparent text-slate-500 hover:text-slate-900'
-                }`}
-            >
-              <TrendingUp className="w-4 h-4" />
-              <span>1. Overall Financial Overview</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab('sales')}
-              className={`flex items-center space-x-2 px-5 py-3 border-b-2 font-bold text-xs whitespace-nowrap transition cursor-pointer ${activeTab === 'sales'
-                ? 'border-forest-900 text-forest-900 font-black'
-                : 'border-transparent text-slate-500 hover:text-slate-900'
-                }`}
-            >
-              <ShoppingBag className="w-4 h-4" />
-              <span>2. Selling & Revenue</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab('manufacturing')}
-              className={`flex items-center space-x-2 px-5 py-3 border-b-2 font-bold text-xs whitespace-nowrap transition cursor-pointer ${activeTab === 'manufacturing'
-                ? 'border-forest-900 text-forest-900 font-black'
-                : 'border-transparent text-slate-500 hover:text-slate-900'
-                }`}
-            >
-              <Factory className="w-4 h-4" />
-              <span>3. Manufacturing & Sourcing</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab('operating')}
-              className={`flex items-center space-x-2 px-5 py-3 border-b-2 font-bold text-xs whitespace-nowrap transition cursor-pointer ${activeTab === 'operating'
-                ? 'border-forest-900 text-forest-900 font-black'
-                : 'border-transparent text-slate-500 hover:text-slate-900'
-                }`}
-            >
-              <Receipt className="w-4 h-4" />
-              <span>4. Shop & Overhead</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab('audit_logs')}
-              className={`flex items-center space-x-2 px-5 py-3 border-b-2 font-bold text-xs whitespace-nowrap transition cursor-pointer ${activeTab === 'audit_logs'
-                ? 'border-forest-900 text-forest-900 font-black'
-                : 'border-transparent text-slate-500 hover:text-slate-900'
-                }`}
-            >
-              <Trash2 className="w-4 h-4 text-rose-600" />
-              <span>5. Deletion Logs</span>
-              {auditData?.metrics?.totalDeletions ? (
-                <span className="ml-1 px-2 py-0.5 rounded-full text-[10px] bg-rose-100 text-rose-800 font-mono font-bold">
-                  {auditData.metrics.totalDeletions}
-                </span>
-              ) : null}
-            </button>
-          </div>
-
-          {/* ====================================================================
-          TAB 1: OVERALL FINANCIAL OVERVIEW & CONSOLIDATED P&L
+      {/* 1. PRINTABLE REPORT CONTAINER (HIDDEN ON SCREEN, ACTIVE ONLY IN PRINT/PDF) */}
+      {/* ====================================================================
+          PRINTABLE REPORT CONTAINER (HIDDEN ON SCREEN, ACTIVE IN PRINT/PDF)
+          Direct print trigger matching Order & Courier Dispatch module
           ==================================================================== */}
-          {
-            activeTab === 'overview' && (
-              <div className="space-y-6">
-                {/* Executive P&L Scorecard Cards */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="hidden print:block printable-report font-serif space-y-6">
 
-                  {/* Card 1: Total Inflow (Revenue from Selling) */}
-                  <div className="p-5 bg-white rounded-3xl border border-slate-200/90 shadow-xs relative overflow-hidden">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider font-mono">
-                        Total Sales Inflow
-                      </span>
-                      <span className="p-2 bg-emerald-50 text-emerald-700 rounded-xl">
-                        <ArrowUpRight className="w-4 h-4" />
-                      </span>
-                    </div>
-                    <div className="mt-3">
-                      <span className="text-2xl sm:text-3xl font-black text-forest-950 font-mono">
-                        {formatCurrency(overviewData?.summary?.netSalesInflow)}
-                      </span>
-                      <p className="text-[11px] text-emerald-700 font-semibold mt-1 flex items-center space-x-1">
-                        <span>
-                          {(overviewData?.summary?.sellingSummary?.offlineSalesCount || 0) > 0
-                            ? `From ${overviewData?.summary?.sellingSummary?.totalOrdersCount || 0} online + ${overviewData?.summary?.sellingSummary?.offlineSalesCount} offline sales`
-                            : `From ${overviewData?.summary?.sellingSummary?.totalOrdersCount || 0} customer orders`}
-                        </span>
-                      </p>
-                    </div>
-                  </div>
+        {/* 1. Document Header (Matches PDF Exact Layout Across All Tabs) */}
+        <div className="border-b border-slate-300 pb-4 flex flex-col sm:flex-row justify-between items-start sm:items-start gap-4">
+          <div>
+            <span className="font-serif text-2xl font-black text-forest-950 tracking-wider block">NOVIS HERBAL</span>
+            <p className="text-xs text-slate-600 font-sans mt-0.5">
+              Official Merchant Financial & Management Accounting Statement
+            </p>
+            <p className="text-[11px] text-slate-500 font-sans mt-0.5">
+              GSTIN: 27AAAAA0000A1A2 • support@novise.in
+            </p>
+          </div>
 
-                  {/* Card 2: Total COGS (Manufacturing Outflow) */}
-                  <div className="p-5 bg-white rounded-3xl border border-slate-200/90 shadow-xs relative overflow-hidden">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider font-mono">
-                        COGS (Manufacturing)
-                      </span>
-                      <span className="p-2 bg-amber-50 text-amber-700 rounded-xl">
-                        <Factory className="w-4 h-4" />
-                      </span>
-                    </div>
-                    <div className="mt-3">
-                      <span className="text-2xl sm:text-3xl font-black text-slate-900 font-mono">
-                        {formatCurrency(overviewData?.summary?.manufacturingSummary?.netManufacturingExpense)}
-                      </span>
-                      <p className="text-[11px] text-slate-500 font-semibold mt-1">
-                        Net sourcing for {overviewData?.summary?.manufacturingSummary?.totalBatches || 0} production batches
-                      </p>
-                    </div>
-                  </div>
+          <div className="text-left sm:text-right font-sans text-xs space-y-0.5">
+            <p className="text-slate-900">
+              Statement Scope: <span className="font-bold text-forest-950">{getStatementScope()}</span>
+            </p>
+            <p className="text-slate-600">Period: <strong className="text-slate-900">{getPeriodLabel()}</strong></p>
+            <p className="text-slate-500 text-[11px]">{new Date().toLocaleString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })}</p>
+          </div>
+        </div>
 
-                  {/* Card 3: Total Operating Overhead */}
-                  <div className="p-5 bg-white rounded-3xl border border-slate-200/90 shadow-xs relative overflow-hidden">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider font-mono">
-                        Operating Overhead
-                      </span>
-                      <span className="p-2 bg-rose-50 text-rose-700 rounded-xl">
-                        <Receipt className="w-4 h-4" />
-                      </span>
-                    </div>
-                    <div className="mt-3">
-                      <span className="text-2xl sm:text-3xl font-black text-slate-900 font-mono">
-                        {formatCurrency(overviewData?.summary?.operatingSummary?.totalOperatingExpense)}
-                      </span>
-                      <p className="text-[11px] text-slate-500 font-semibold mt-1">
-                        Rent, power bills, salaries & tea/pantry
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Card 4: Net Business Profit */}
-                  <div className={`p-5 rounded-3xl border shadow-xs relative overflow-hidden ${(overviewData?.summary?.netProfit || 0) >= 0
-                    ? 'bg-gradient-to-br from-[#07190F] to-forest-900 text-white border-forest-800'
-                    : 'bg-rose-900 text-white border-rose-800'
-                    }`}>
-                    <div className="flex items-center justify-between">
-                      <span className="text-[11px] font-bold text-gold-300 uppercase tracking-wider font-mono">
-                        Net Business Profit
-                      </span>
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-black uppercase bg-gold-400 text-forest-950">
-                        {overviewData?.summary?.netProfitMargin || 0}% Margin
-                      </span>
-                    </div>
-                    <div className="mt-3">
-                      <span className="text-2xl sm:text-3xl font-black text-gold-400 font-mono">
-                        {formatCurrency(overviewData?.summary?.netProfit)}
-                      </span>
-                      <p className="text-[11px] text-slate-200 font-medium mt-1">
-                        Inflow minus manufacturing & overhead
-                      </p>
-                    </div>
-                  </div>
-
-                </div>
-
-                {/* Outstanding Receivables vs Payables */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-
-                  {/* Pending Due: Customer COD in-transit */}
-                  <div className="p-5 bg-white rounded-3xl border border-slate-200/90 shadow-xs flex items-center justify-between">
-                    <div>
-                      <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 font-mono block">
-                        Outstanding Receivables (Pending COD)
-                      </span>
-                      <span className="text-xl sm:text-2xl font-black text-amber-700 font-mono mt-1 block">
-                        {formatCurrency(overviewData?.summary?.pendingReceivables)}
-                      </span>
-                      <span className="text-[11px] text-slate-500">
-                        Awaiting courier delivery & cash collection from buyers
-                      </span>
-                    </div>
-                    <div className="p-3 bg-amber-50 rounded-2xl border border-amber-200/60">
-                      <Clock className="w-6 h-6 text-amber-600" />
-                    </div>
-                  </div>
-
-                  {/* Outstanding Payables: Due to Suppliers */}
-                  <div className="p-5 bg-white rounded-3xl border border-slate-200/90 shadow-xs flex items-center justify-between">
-                    <div>
-                      <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 font-mono block">
-                        Outstanding Payables (Due to Suppliers)
-                      </span>
-                      <span className="text-xl sm:text-2xl font-black text-rose-700 font-mono mt-1 block">
-                        {formatCurrency(overviewData?.summary?.outstandingPayables)}
-                      </span>
-                      <span className="text-[11px] text-slate-500">
-                        Balance payment due for raw materials & product batches
-                      </span>
-                    </div>
-                    <div className="p-3 bg-rose-50 rounded-2xl border border-rose-200/60">
-                      <AlertCircle className="w-6 h-6 text-rose-600" />
-                    </div>
-                  </div>
-
-                </div>
-
-                {/* Consolidated P&L Breakdown Table */}
-                <div className="bg-white p-6 rounded-3xl border border-slate-200/90 shadow-xs space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h3 className="font-serif text-lg font-bold text-forest-950">
-                      Consolidated Profit & Loss Statement
-                    </h3>
-                    <span className="text-xs text-slate-400 font-mono">
-                      {getPeriodLabel()}
-                    </span>
-                  </div>
-
-                  <div className="border border-slate-200 rounded-2xl overflow-hidden divide-y divide-slate-100 text-xs font-medium">
-                    <div className="p-3.5 bg-slate-50 font-bold flex justify-between text-slate-600 uppercase tracking-wider text-[11px]">
-                      <span>Ledger Component</span>
-                      <span>Amount (₹)</span>
-                    </div>
-
-                    {/* 1. Gross Sales Revenue (Combined Online + Offline) */}
-                    <div className="p-3.5 flex justify-between items-center hover:bg-slate-50/60 transition">
-                      <div className="flex items-center space-x-2">
-                        <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                        <span className="font-semibold text-slate-800">1. Gross Order Revenue (Customer Sales)</span>
-                      </div>
-                      <span className="font-bold font-mono text-emerald-700">
-                        +{formatCurrency(
-                          overviewData?.summary?.sellingSummary?.combinedGrossSales ??
-                          ((overviewData?.summary?.sellingSummary?.grossSalesValue || 0) + (overviewData?.summary?.sellingSummary?.offlineGrossValue || 0))
-                        )}
-                      </span>
-                    </div>
-
-                    {/* Online Realized Cash */}
-                    <div className="p-3.5 pl-7 flex justify-between items-center text-slate-500 text-[11px] bg-slate-50/30">
-                      <div className="flex items-center space-x-2">
-                        <span>• Online Prepaid & Delivered COD Cash Collected</span>
-                        {(overviewData?.summary?.sellingSummary?.totalOrdersCount || 0) > 0 && (
-                          <span className="px-1.5 py-0.5 bg-blue-50 text-blue-700 font-mono text-[9px] font-bold rounded">
-                            {overviewData?.summary?.sellingSummary?.totalOrdersCount} Orders
-                          </span>
-                        )}
-                      </div>
-                      <span className="font-mono font-bold text-emerald-600">
-                        {formatCurrency(overviewData?.summary?.sellingSummary?.realizedRevenue)}
-                      </span>
-                    </div>
-
-                    {/* Offline Retail Store Counter Sales Cash */}
-                    <div className="p-3.5 pl-7 flex justify-between items-center text-slate-500 text-[11px] bg-slate-50/30">
-                      <div className="flex items-center space-x-2">
-                        <span>• Offline Retail Store Counter Cash Collected</span>
-                        {(overviewData?.summary?.sellingSummary?.offlineSalesCount || 0) > 0 && (
-                          <span className="px-1.5 py-0.5 bg-emerald-100 text-emerald-800 font-mono text-[9px] font-bold rounded">
-                            {overviewData?.summary?.sellingSummary?.offlineSalesCount} Bills
-                          </span>
-                        )}
-                      </div>
-                      <span className="font-mono font-bold text-emerald-600">
-                        {formatCurrency(overviewData?.summary?.sellingSummary?.offlineRealizedRevenue)}
-                      </span>
-                    </div>
-
-                    {/* Offline Direct Counter Outstanding Due - if any */}
-                    {(overviewData?.summary?.sellingSummary?.offlinePendingDue || 0) > 0 && (
-                      <div className="p-3.5 pl-7 flex justify-between items-center text-slate-500 text-[11px] bg-slate-50/30">
-                        <span>• Offline Store Pending Receivables (Customer Credit)</span>
-                        <span className="font-mono font-bold text-amber-700">
-                          {formatCurrency(overviewData?.summary?.sellingSummary?.offlinePendingDue)}
-                        </span>
-                      </div>
-                    )}
-
-                    {/* Refunded */}
-                    <div className="p-3.5 pl-7 flex justify-between items-center text-slate-500 text-[11px] bg-slate-50/30">
-                      <span>• Cancelled & Returned Orders Value</span>
-                      <span className="font-mono text-rose-600">
-                        -{formatCurrency(overviewData?.summary?.sellingSummary?.totalRefundedValue)}
-                      </span>
-                    </div>
-
-                    {/* 2. Manufacturing & Sourcing Costs (COGS) */}
-                    <div className="p-3.5 flex justify-between items-center hover:bg-slate-50/60 transition">
-                      <div className="flex items-center space-x-2">
-                        <span className="w-2 h-2 rounded-full bg-amber-500"></span>
-                        <span className="font-semibold text-slate-800">2. Cost of Goods Sold (Product Manufacturing & Procurement)</span>
-                      </div>
-                      <span className="font-bold font-mono text-rose-700">
-                        -{formatCurrency(overviewData?.summary?.manufacturingSummary?.netManufacturingExpense)}
-                      </span>
-                    </div>
-
-                    {/* Supplier returns */}
-                    <div className="p-3.5 pl-7 flex justify-between items-center text-slate-500 text-[11px] bg-slate-50/30">
-                      <span>• Supplier Returns & Defect Refunds Credited Back</span>
-                      <span className="font-mono text-emerald-600">
-                        +{formatCurrency(overviewData?.summary?.manufacturingSummary?.totalSupplierReturnsRefunded)}
-                      </span>
-                    </div>
-
-                    {/* Gross Profit */}
-                    <div className="p-3.5 flex justify-between items-center bg-slate-100/80 font-bold text-slate-900">
-                      <span>Gross Profit (Sales Inflow - Sourcing COGS)</span>
-                      <span className="font-mono font-black text-forest-950">
-                        {formatCurrency(overviewData?.summary?.grossProfit)}
-                      </span>
-                    </div>
-
-                    {/* 3. Operating Overhead Expenses */}
-                    <div className="p-3.5 flex justify-between items-center hover:bg-slate-50/60 transition">
-                      <div className="flex items-center space-x-2">
-                        <span className="w-2 h-2 rounded-full bg-rose-500"></span>
-                        <span className="font-semibold text-slate-800">3. Shop & Fulfillment Operational Overhead (Rent, Light, Salary, Tea)</span>
-                      </div>
-                      <span className="font-bold font-mono text-rose-700">
-                        -{formatCurrency(overviewData?.summary?.operatingSummary?.totalOperatingExpense)}
-                      </span>
-                    </div>
-
-                    {/* Net Profit Final */}
-                    <div className="p-4 flex justify-between items-center bg-forest-900 text-white font-bold text-sm">
-                      <div className="flex items-center space-x-2">
-                        <span className="font-serif text-base text-gold-400 font-black">NET BUSINESS PROFIT / LOSS</span>
-                        <span className="text-[10px] bg-gold-400 text-forest-950 px-2 py-0.5 rounded font-mono uppercase font-black">
-                          {overviewData?.summary?.netProfitMargin || 0}% MARGIN
-                        </span>
-                      </div>
-                      <span className="font-serif text-lg text-gold-400 font-mono font-black">
-                        {formatCurrency(overviewData?.summary?.netProfit)}
-                      </span>
-                    </div>
-                  </div>
-                </div>
+        {/* 2. TAB 1: OVERVIEW REPORT */}
+        {activeTab === 'overview' && (
+          <div className="space-y-4 font-sans text-xs">
+            {/* 4 Summary Metric Cards (Identical PDF Grid Layout) */}
+            <div className="grid grid-cols-4 gap-3 text-center">
+              <div className="p-3 bg-white border border-slate-300 rounded-lg">
+                <span className="text-[10px] uppercase font-bold text-slate-500 block">TOTAL SALES INFLOW</span>
+                <span className="font-mono font-bold text-base text-emerald-700 block mt-1">
+                  ₹{overviewData?.summary?.netSalesInflow || 0}
+                </span>
               </div>
-            )
-          }
+              <div className="p-3 bg-white border border-slate-300 rounded-lg">
+                <span className="text-[10px] uppercase font-bold text-slate-500 block">MANUFACTURING COGS</span>
+                <span className="font-mono font-bold text-base text-slate-900 block mt-1">
+                  ₹{overviewData?.summary?.manufacturingSummary?.netManufacturingExpense || 0}
+                </span>
+              </div>
+              <div className="p-3 bg-white border border-slate-300 rounded-lg">
+                <span className="text-[10px] uppercase font-bold text-slate-500 block">OPERATING OVERHEAD</span>
+                <span className="font-mono font-bold text-base text-slate-900 block mt-1">
+                  ₹{overviewData?.summary?.operatingSummary?.totalOperatingExpense || 0}
+                </span>
+              </div>
+              <div className="p-3 bg-white border border-slate-300 rounded-lg">
+                <span className="text-[10px] uppercase font-bold text-slate-500 block">NET BUSINESS PROFIT</span>
+                <span className="font-mono font-bold text-base text-emerald-700 block mt-1">
+                  ₹{overviewData?.summary?.netProfit || 0}
+                </span>
+              </div>
+            </div>
 
-          {/* ====================================================================
-          TAB 2: SELLING & REVENUE (3 SUB-TABS: OVERALL, ONLINE, OFFLINE)
-          ==================================================================== */}
-          {
-            activeTab === 'sales' && (
-              <div className="space-y-6">
-                {/* 3 Sub-tabs Navigation Bar */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-2.5 rounded-2xl border border-slate-200/90 shadow-2xs">
-                  <div className="flex items-center space-x-1.5 overflow-x-auto pb-1 sm:pb-0">
-                    <button
-                      onClick={() => setSellingSubTab('overall')}
-                      className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer whitespace-nowrap ${sellingSubTab === 'overall'
-                        ? 'bg-forest-900 text-gold-400 shadow-sm'
-                        : 'text-slate-600 hover:text-forest-950 hover:bg-slate-100'
-                        }`}
-                    >
-                      <Layers className="w-4 h-4" />
-                      <span>1. Overall Consolidated</span>
-                    </button>
+            {/* Profit & Loss Breakdown Table */}
+            <div className="pt-2">
+              <h4 className="font-bold text-xs uppercase tracking-wide text-slate-900 mb-2">
+                EXECUTIVE PROFIT & LOSS BREAKDOWN (CONSOLIDATED)
+              </h4>
 
-                    <button
-                      onClick={() => setSellingSubTab('online')}
-                      className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer whitespace-nowrap ${sellingSubTab === 'online'
-                        ? 'bg-forest-900 text-gold-400 shadow-sm'
-                        : 'text-slate-600 hover:text-forest-950 hover:bg-slate-100'
-                        }`}
-                    >
-                      <Globe className="w-4 h-4" />
-                      <span>2. Online Selling</span>
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-mono font-bold ${sellingSubTab === 'online' ? 'bg-gold-400 text-forest-950' : 'bg-slate-200 text-slate-700'
-                        }`}>
-                        {salesData?.online?.orders?.length || salesData?.orders?.length || 0}
+              <table className="w-full text-left border border-slate-300 divide-y divide-slate-200">
+                <thead className="bg-slate-50 text-slate-700 font-bold uppercase text-[10px] border-b border-slate-300">
+                  <tr>
+                    <th className="py-2.5 px-3 w-8 text-center text-slate-400">#</th>
+                    <th className="py-2.5 px-3">ID & DATE</th>
+                    <th className="py-2.5 px-3">CHANNEL</th>
+                    <th className="py-2.5 px-3">CUSTOMER & AREA</th>
+                    <th className="py-2.5 px-3">PAYMENT MODE</th>
+                    <th className="py-2.5 px-3">STATUS</th>
+                    <th className="py-2.5 px-3 text-right">AMOUNT</th>
+                    <th className="py-2.5 px-3 text-right">DUE</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200 font-mono text-[11px]">
+                  <tr className="hover:bg-slate-50/50">
+                    <td className="py-2.5 px-3 text-center text-slate-400 font-mono text-[10px]">1</td>
+                    <td className="py-2.5 px-3 font-bold text-slate-900">
+                      INC-SALES
+                      <span className="block text-[10px] text-slate-400 font-sans font-normal">Active Period</span>
+                    </td>
+                    <td className="py-2.5 px-3 font-sans">
+                      <span className="px-1.5 py-0.5 rounded text-[10px] font-bold border border-slate-300 text-slate-800">
+                        REVENUE
                       </span>
-                    </button>
+                    </td>
+                    <td className="py-2.5 px-3 font-sans font-medium text-slate-900">
+                      <span className="font-bold block">Consolidated Customer Sales</span>
+                      <span className="block text-[10px] text-slate-400 font-normal">Online Store ({overviewData?.summary?.sellingSummary?.totalOrdersCount || 0}) & Retail ({overviewData?.summary?.sellingSummary?.offlineSalesCount || 0})</span>
+                    </td>
+                    <td className="py-2.5 px-3 font-sans text-slate-700">ONLINE / CASH / COD</td>
+                    <td className="py-2.5 px-3 font-sans font-semibold text-emerald-700">REALIZED</td>
+                    <td className="py-2.5 px-3 text-right font-bold text-slate-900">₹{overviewData?.summary?.netSalesInflow || 0}</td>
+                    <td className="py-2.5 px-3 text-right font-bold text-rose-600">₹{overviewData?.summary?.pendingReceivables || 0}</td>
+                  </tr>
 
-                    <button
-                      onClick={() => setSellingSubTab('offline')}
-                      className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer whitespace-nowrap ${sellingSubTab === 'offline'
-                        ? 'bg-forest-900 text-gold-400 shadow-sm'
-                        : 'text-slate-600 hover:text-forest-950 hover:bg-slate-100'
-                        }`}
-                    >
-                      <Store className="w-4 h-4" />
-                      <span>3. Offline Selling</span>
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-mono font-bold ${sellingSubTab === 'offline' ? 'bg-gold-400 text-forest-950' : 'bg-slate-200 text-slate-700'
-                        }`}>
-                        {salesData?.offline?.sales?.length || salesData?.offlineSales?.length || 0}
+                  <tr className="hover:bg-slate-50/50">
+                    <td className="py-2.5 px-3 text-center text-slate-400 font-mono text-[10px]">2</td>
+                    <td className="py-2.5 px-3 font-bold text-slate-900">
+                      EXP-SOURCING
+                      <span className="block text-[10px] text-slate-400 font-sans font-normal">Active Period</span>
+                    </td>
+                    <td className="py-2.5 px-3 font-sans">
+                      <span className="px-1.5 py-0.5 rounded text-[10px] font-bold border border-slate-300 text-slate-800">
+                        MFG COGS
                       </span>
-                    </button>
-                  </div>
+                    </td>
+                    <td className="py-2.5 px-3 font-sans font-medium text-slate-900">
+                      <span className="font-bold block">Product Manufacturing & Procurements</span>
+                      <span className="block text-[10px] text-slate-400 font-normal">{overviewData?.summary?.manufacturingSummary?.totalBatches || 0} Batches Logged • Returns: ₹{overviewData?.summary?.manufacturingSummary?.totalSupplierReturnsRefunded || 0}</span>
+                    </td>
+                    <td className="py-2.5 px-3 font-sans text-slate-700">BANK TRANSFER</td>
+                    <td className="py-2.5 px-3 font-sans font-semibold text-slate-800">EXPENSE</td>
+                    <td className="py-2.5 px-3 text-right font-bold text-slate-900">₹{overviewData?.summary?.manufacturingSummary?.netManufacturingExpense || 0}</td>
+                    <td className="py-2.5 px-3 text-right font-bold text-rose-600">₹{overviewData?.summary?.outstandingPayables || 0}</td>
+                  </tr>
+
+                  <tr className="hover:bg-slate-50/50">
+                    <td className="py-2.5 px-3 text-center text-slate-400 font-mono text-[10px]">3</td>
+                    <td className="py-2.5 px-3 font-bold text-slate-900">
+                      EXP-OVERHEAD
+                      <span className="block text-[10px] text-slate-400 font-sans font-normal">Active Period</span>
+                    </td>
+                    <td className="py-2.5 px-3 font-sans">
+                      <span className="px-1.5 py-0.5 rounded text-[10px] font-bold border border-slate-300 text-slate-800">
+                        OVERHEAD
+                      </span>
+                    </td>
+                    <td className="py-2.5 px-3 font-sans font-medium text-slate-900">
+                      <span className="font-bold block">Shop & Operational Facility Overhead</span>
+                      <span className="block text-[10px] text-slate-400 font-normal">Rent, Electricity, Tea/Pantry, Staff Salaries</span>
+                    </td>
+                    <td className="py-2.5 px-3 font-sans text-slate-700">UPI / CASH</td>
+                    <td className="py-2.5 px-3 font-sans font-semibold text-slate-800">PAID</td>
+                    <td className="py-2.5 px-3 text-right font-bold text-slate-900">₹{overviewData?.summary?.operatingSummary?.totalOperatingExpense || 0}</td>
+                    <td className="py-2.5 px-3 text-right font-bold text-slate-400">₹0</td>
+                  </tr>
+
+                  <tr className="bg-slate-50 font-bold">
+                    <td colSpan={6} className="py-3 px-3 text-right font-sans font-bold text-forest-950 uppercase text-[11px]">
+                      CONSOLIDATED NET BUSINESS PROFIT (MARGIN: {overviewData?.summary?.netProfitMargin || 0}%)
+                    </td>
+                    <td colSpan={2} className="py-3 px-3 text-right font-bold text-emerald-700 text-sm font-mono">
+                      ₹{overviewData?.summary?.netProfit || 0}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            {/* Recent Key Transactions Stream */}
+            <div className="pt-2">
+              <h4 className="font-bold text-xs uppercase tracking-wide text-slate-900 mb-2">
+                RECENT EXECUTIVE TRANSACTIONS AUDIT
+              </h4>
+
+              <table className="w-full text-left border border-slate-300 divide-y divide-slate-200">
+                <thead className="bg-slate-50 text-slate-700 font-bold uppercase text-[10px] border-b border-slate-300">
+                  <tr>
+                    <th className="py-2.5 px-3 w-8 text-center text-slate-400">#</th>
+                    <th className="py-2.5 px-3">ID & DATE</th>
+                    <th className="py-2.5 px-3">CHANNEL</th>
+                    <th className="py-2.5 px-3">CUSTOMER & AREA</th>
+                    <th className="py-2.5 px-3">PAYMENT MODE</th>
+                    <th className="py-2.5 px-3">STATUS</th>
+                    <th className="py-2.5 px-3 text-right">AMOUNT</th>
+                    <th className="py-2.5 px-3 text-right">DUE</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200 font-mono text-[11px]">
+                  {(overviewData?.recentTransactions?.recentOrders || []).slice(0, 5).map((o: any, idx: number) => (
+                    <tr key={o._id} className="hover:bg-slate-50/50">
+                      <td className="py-2.5 px-3 text-center text-slate-400 font-mono text-[10px]">{idx + 1}</td>
+                      <td className="py-2.5 px-3 font-bold text-slate-900">
+                        {o.orderId}
+                        <span className="block text-[10px] text-slate-400 font-sans font-normal">{new Date(o.createdAt).toLocaleDateString('en-GB')}</span>
+                      </td>
+                      <td className="py-2.5 px-3 font-sans">
+                        <span className="px-1.5 py-0.5 rounded text-[10px] font-bold border border-slate-300 text-slate-800">
+                          ONLINE
+                        </span>
+                      </td>
+                      <td className="py-2.5 px-3 font-sans font-medium text-slate-900">
+                        <span className="font-bold block">{o.customerDetails?.fullName || 'Online Customer'}</span>
+                        <span className="block text-[10px] text-slate-400 font-normal">{o.shippingAddress?.city ? `${o.shippingAddress.city}, ${o.shippingAddress.state || ''}` : 'Direct Website'}</span>
+                      </td>
+                      <td className="py-2.5 px-3 font-sans text-slate-700">{o.paymentInfo?.method || 'ONLINE'}</td>
+                      <td className="py-2.5 px-3 font-sans font-semibold text-slate-800">{o.paymentInfo?.status || o.orderStatus}</td>
+                      <td className="py-2.5 px-3 text-right font-bold text-slate-900">₹{o.pricing?.totalAmount || 0}</td>
+                      <td className="py-2.5 px-3 text-right font-bold text-rose-600">₹{o.paymentInfo?.status === 'PAID' ? 0 : (o.pricing?.totalAmount || 0)}</td>
+                    </tr>
+                  ))}
+
+                  {(overviewData?.recentTransactions?.recentProcurements || []).slice(0, 3).map((m: any, idx: number) => (
+                    <tr key={m._id} className="hover:bg-slate-50/50">
+                      <td className="py-2.5 px-3 text-center text-slate-400 font-mono text-[10px]">{(overviewData?.recentTransactions?.recentOrders || []).length + idx + 1}</td>
+                      <td className="py-2.5 px-3 font-bold text-slate-900">
+                        {m.batchNumber}
+                        <span className="block text-[10px] text-slate-400 font-sans font-normal">{new Date(m.expenseDate).toLocaleDateString('en-GB')}</span>
+                      </td>
+                      <td className="py-2.5 px-3 font-sans">
+                        <span className="px-1.5 py-0.5 rounded text-[10px] font-bold border border-slate-300 text-slate-800">
+                          MFG BATCH
+                        </span>
+                      </td>
+                      <td className="py-2.5 px-3 font-sans font-medium text-slate-900">
+                        <span className="font-bold block">{m.productName}</span>
+                        <span className="block text-[10px] text-slate-400 font-normal">Vendor: {m.vendorName || 'Supplier'}</span>
+                      </td>
+                      <td className="py-2.5 px-3 font-sans text-slate-700">{m.paymentMode || 'BANK_TRANSFER'}</td>
+                      <td className="py-2.5 px-3 font-sans font-semibold text-slate-800">{m.paymentStatus || 'DUE'}</td>
+                      <td className="py-2.5 px-3 text-right font-bold text-slate-900">₹{m.totalCost || 0}</td>
+                      <td className="py-2.5 px-3 text-right font-bold text-rose-600">₹{m.amountDue || 0}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* 3. TAB 2: SALES & REVENUE REPORT (Matches PDF Exact Layout) */}
+        {activeTab === 'sales' && (
+          <div className="space-y-4 font-sans text-xs">
+            {/* 4 Summary Metric Cards (Identical PDF Grid Layout) */}
+            <div className="grid grid-cols-4 gap-3 text-center">
+              <div className="p-3 bg-white border border-slate-300 rounded-lg">
+                <span className="text-[10px] uppercase font-bold text-slate-500 block">
+                  {sellingSubTab === 'online' ? 'ONLINE GROSS' : sellingSubTab === 'offline' ? 'OFFLINE GROSS' : 'COMBINED GROSS'}
+                </span>
+                <span className="font-mono font-bold text-base text-slate-900 block mt-1">
+                  ₹{sellingSubTab === 'online' ? (salesData?.online?.metrics?.grossSales ?? 0) : sellingSubTab === 'offline' ? (salesData?.offline?.metrics?.grossSales ?? 0) : (salesData?.overall?.combinedGross ?? salesData?.metrics?.grossSales ?? 0)}
+                </span>
+              </div>
+              <div className="p-3 bg-white border border-slate-300 rounded-lg">
+                <span className="text-[10px] uppercase font-bold text-slate-500 block">REALIZED CASHFLOW</span>
+                <span className="font-mono font-bold text-base text-emerald-700 block mt-1">
+                  ₹{sellingSubTab === 'online' ? (salesData?.online?.metrics?.realizedEarning ?? 0) : sellingSubTab === 'offline' ? (salesData?.offline?.metrics?.realizedEarning ?? 0) : (salesData?.overall?.combinedRealized ?? salesData?.metrics?.realizedEarning ?? 0)}
+                </span>
+              </div>
+              <div className="p-3 bg-white border border-slate-300 rounded-lg">
+                <span className="text-[10px] uppercase font-bold text-slate-500 block">PENDING RECEIVABLES</span>
+                <span className="font-mono font-bold text-base text-rose-600 block mt-1">
+                  ₹{sellingSubTab === 'online' ? (salesData?.online?.metrics?.pendingDue ?? 0) : sellingSubTab === 'offline' ? (salesData?.offline?.metrics?.pendingDue ?? 0) : (salesData?.overall?.combinedPendingDue ?? salesData?.metrics?.pendingDue ?? 0)}
+                </span>
+              </div>
+              <div className="p-3 bg-white border border-slate-300 rounded-lg">
+                <span className="text-[10px] uppercase font-bold text-slate-500 block">
+                  {sellingSubTab === 'online' ? 'ORDER VOLUME' : sellingSubTab === 'offline' ? 'PAYMENT CHANNELS' : 'CHANNEL'}
+                </span>
+                <span className="font-mono font-bold text-xs text-slate-900 block mt-1.5">
+                  {sellingSubTab === 'online' ? `${salesData?.online?.orders?.length || 0} Orders • Ret: ₹${salesData?.online?.metrics?.returnedValue || 0}` :
+                    sellingSubTab === 'offline' ? `Cash: ₹${salesData?.offline?.metrics?.cashCollected || 0} • UPI: ₹${salesData?.offline?.metrics?.upiCollected || 0}` :
+                      `Web: ${salesData?.overall?.onlineSharePercent ?? 0}% • Retail: ${salesData?.overall?.offlineSharePercent ?? 0}%`}
+                </span>
+              </div>
+            </div>
+
+            <div className="pt-2">
+              <h4 className="font-bold text-xs uppercase tracking-wide text-slate-900 mb-2">
+                {sellingSubTab === 'overall' && `CONSOLIDATED SALES LEDGER (${consolidatedLedger.length} RECORDS)`}
+                {sellingSubTab === 'online' && `ONLINE E-COMMERCE ORDERS (${(salesData?.online?.orders || salesData?.orders || []).length} RECORDS)`}
+                {sellingSubTab === 'offline' && `OFFLINE LOCAL RETAIL LEDGER (${(salesData?.offline?.sales || salesData?.offlineSales || []).length} RECORDS)`}
+              </h4>
+
+              <table className="w-full text-left border border-slate-300 divide-y divide-slate-200">
+                <thead className="bg-slate-50 text-slate-700 font-bold uppercase text-[10px] border-b border-slate-300">
+                  <tr>
+                    <th className="py-2.5 px-3 w-8 text-center text-slate-400">#</th>
+                    <th className="py-2.5 px-3">ID & DATE</th>
+                    <th className="py-2.5 px-3">CHANNEL</th>
+                    <th className="py-2.5 px-3">CUSTOMER & AREA</th>
+                    <th className="py-2.5 px-3">PAYMENT MODE</th>
+                    <th className="py-2.5 px-3">STATUS</th>
+                    <th className="py-2.5 px-3 text-right">AMOUNT</th>
+                    <th className="py-2.5 px-3 text-right">DUE</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200 font-mono text-[11px]">
+                  {sellingSubTab === 'overall' && (
+                    consolidatedLedger.length === 0 ? (
+                      <tr>
+                        <td colSpan={8} className="p-4 text-center text-slate-400 italic font-sans">
+                          No customer sales logged for this period.
+                        </td>
+                      </tr>
+                    ) : (
+                      consolidatedLedger.map((tx, idx) => (
+                        <tr key={tx._id} className="hover:bg-slate-50/50">
+                          <td className="py-2.5 px-3 text-center text-slate-400 font-mono text-[10px]">
+                            {idx + 1}
+                          </td>
+                          <td className="py-2.5 px-3 font-bold text-slate-900">
+                            {tx.id}
+                            <span className="block text-[10px] text-slate-400 font-sans font-normal">
+                              {new Date(tx.date).toLocaleDateString('en-GB')}
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-3 font-sans">
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold border border-slate-300 text-slate-800">
+                              {tx.type}
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-3 font-sans font-medium text-slate-900">
+                            <span className="font-bold block">{tx.customer}</span>
+                            <span className="block text-[10px] text-slate-400 font-normal">{tx.subtitle}</span>
+                          </td>
+                          <td className="py-2.5 px-3 font-sans text-slate-700">
+                            {tx.paymentMethod}
+                          </td>
+                          <td className="py-2.5 px-3 font-sans font-semibold text-slate-800">
+                            {tx.paymentStatus}
+                          </td>
+                          <td className="py-2.5 px-3 text-right font-bold text-slate-900">
+                            ₹{tx.amount}
+                          </td>
+                          <td className="py-2.5 px-3 text-right font-bold text-rose-600">
+                            ₹{tx.due}
+                          </td>
+                        </tr>
+                      ))
+                    )
+                  )}
+
+                  {sellingSubTab === 'online' && (
+                    (!salesData?.online?.orders && !salesData?.orders) || (salesData?.online?.orders || salesData?.orders || []).length === 0 ? (
+                      <tr>
+                        <td colSpan={8} className="p-4 text-center text-slate-400 italic font-sans">
+                          No online store orders logged for this period.
+                        </td>
+                      </tr>
+                    ) : (
+                      (salesData?.online?.orders || salesData?.orders || []).map((o: any, idx: number) => (
+                        <tr key={o._id} className="hover:bg-slate-50/50">
+                          <td className="py-2.5 px-3 text-center text-slate-400 font-mono text-[10px]">
+                            {idx + 1}
+                          </td>
+                          <td className="py-2.5 px-3 font-bold text-slate-900">
+                            {o.orderId}
+                            <span className="block text-[10px] text-slate-400 font-sans font-normal">
+                              {new Date(o.createdAt).toLocaleDateString('en-GB')}
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-3 font-sans">
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold border border-slate-300 text-slate-800">
+                              ONLINE
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-3 font-sans font-medium text-slate-900">
+                            <span className="font-bold block">{o.customerDetails?.fullName || 'Online Customer'}</span>
+                            <span className="block text-[10px] text-slate-400 font-normal">{o.shippingAddress?.city ? `${o.shippingAddress.city}, ${o.shippingAddress.state || ''}` : 'Website Order'}</span>
+                          </td>
+                          <td className="py-2.5 px-3 font-sans text-slate-700">{o.paymentInfo?.method || 'ONLINE'}</td>
+                          <td className="py-2.5 px-3 font-sans font-semibold text-slate-800">{o.paymentInfo?.status || 'PENDING'}</td>
+                          <td className="py-2.5 px-3 text-right font-bold text-slate-900">₹{o.pricing?.totalAmount || 0}</td>
+                          <td className="py-2.5 px-3 text-right font-bold text-rose-600">₹{o.paymentInfo?.status === 'PAID' ? 0 : (o.pricing?.totalAmount || 0)}</td>
+                        </tr>
+                      ))
+                    )
+                  )}
 
                   {sellingSubTab === 'offline' && (
-                    <button
-                      onClick={() => setIsAddOfflineModalOpen(true)}
-                      className="inline-flex items-center justify-center space-x-1.5 px-4 py-2 bg-forest-900 hover:bg-forest-950 text-gold-400 font-bold text-xs rounded-xl transition shadow-xs cursor-pointer shrink-0"
-                    >
-                      <Plus className="w-4 h-4" />
-                      <span>Record Offline Sale</span>
-                    </button>
+                    (!salesData?.offline?.sales && !salesData?.offlineSales) || (salesData?.offline?.sales || salesData?.offlineSales || []).length === 0 ? (
+                      <tr>
+                        <td colSpan={8} className="p-4 text-center text-slate-400 italic font-sans">
+                          No offline retail sales logged for this period.
+                        </td>
+                      </tr>
+                    ) : (
+                      (salesData?.offline?.sales || salesData?.offlineSales || []).map((s: any, idx: number) => (
+                        <tr key={s._id} className="hover:bg-slate-50/50">
+                          <td className="py-2.5 px-3 text-center text-slate-400 font-mono text-[10px]">
+                            {idx + 1}
+                          </td>
+                          <td className="py-2.5 px-3 font-bold text-slate-900">
+                            {s.saleId}
+                            <span className="block text-[10px] text-slate-400 font-sans font-normal">
+                              {new Date(s.saleDate).toLocaleDateString('en-GB')}
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-3 font-sans">
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold border border-slate-300 text-slate-800">
+                              OFFLINE
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-3 font-sans font-medium text-slate-900">
+                            <span className="font-bold block">{s.customerName}</span>
+                            <span className="block text-[10px] text-slate-400 font-normal">{s.locationArea || 'Retail Store Counter'}</span>
+                          </td>
+                          <td className="py-2.5 px-3 font-sans text-slate-700">{s.paymentMode}</td>
+                          <td className="py-2.5 px-3 font-sans font-semibold text-slate-800">{s.paymentStatus}</td>
+                          <td className="py-2.5 px-3 text-right font-bold text-slate-900">₹{s.totalAmount || 0}</td>
+                          <td className="py-2.5 px-3 text-right font-bold text-rose-600">₹{s.amountDue || 0}</td>
+                        </tr>
+                      ))
+                    )
                   )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* 4. TAB 3: MANUFACTURING & SOURCING REPORT */}
+        {activeTab === 'manufacturing' && (
+          <div className="space-y-4 font-sans text-xs">
+            {/* 4 Summary Metric Cards (Identical PDF Grid Layout) */}
+            <div className="grid grid-cols-4 gap-3 text-center">
+              <div className="p-3 bg-white border border-slate-300 rounded-lg">
+                <span className="text-[10px] uppercase font-bold text-slate-500 block">TOTAL SOURCING COST</span>
+                <span className="font-mono font-bold text-base text-slate-900 block mt-1">₹{mfgData?.metrics?.totalCost || 0}</span>
+              </div>
+              <div className="p-3 bg-white border border-slate-300 rounded-lg">
+                <span className="text-[10px] uppercase font-bold text-slate-500 block">REALIZED CASHFLOW (PAID)</span>
+                <span className="font-mono font-bold text-base text-emerald-700 block mt-1">₹{mfgData?.metrics?.totalPaid || 0}</span>
+              </div>
+              <div className="p-3 bg-white border border-slate-300 rounded-lg">
+                <span className="text-[10px] uppercase font-bold text-slate-500 block">OUTSTANDING DUE</span>
+                <span className="font-mono font-bold text-base text-rose-600 block mt-1">₹{mfgData?.metrics?.totalDue || 0}</span>
+              </div>
+              <div className="p-3 bg-white border border-slate-300 rounded-lg">
+                <span className="text-[10px] uppercase font-bold text-slate-500 block">BATCHES & RETURNS</span>
+                <span className="font-mono font-bold text-xs text-slate-900 block mt-1.5">
+                  {mfgData?.metrics?.totalBatches || 0} Batches • Ref: ₹{mfgData?.metrics?.totalRefunded || 0}
+                </span>
+              </div>
+            </div>
+
+            <div className="pt-2">
+              <h4 className="font-bold text-xs uppercase tracking-wide text-slate-900 mb-2">
+                PRODUCT MANUFACTURING & SOURCING LEDGER ({(mfgData?.entries || []).length} BATCHES)
+              </h4>
+
+              <table className="w-full text-left border border-slate-300 divide-y divide-slate-200">
+                <thead className="bg-slate-50 text-slate-700 font-bold uppercase text-[10px] border-b border-slate-300">
+                  <tr>
+                    <th className="py-2.5 px-3 w-8 text-center text-slate-400">#</th>
+                    <th className="py-2.5 px-3">ID & DATE</th>
+                    <th className="py-2.5 px-3">CHANNEL</th>
+                    <th className="py-2.5 px-3">CUSTOMER & AREA</th>
+                    <th className="py-2.5 px-3">PAYMENT MODE</th>
+                    <th className="py-2.5 px-3">STATUS</th>
+                    <th className="py-2.5 px-3 text-right">AMOUNT</th>
+                    <th className="py-2.5 px-3 text-right">DUE</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200 font-mono text-[11px]">
+                  {(!mfgData?.entries || mfgData.entries.length === 0) ? (
+                    <tr>
+                      <td colSpan={8} className="p-4 text-center text-slate-400 italic font-sans">
+                        No manufacturing procurement batches logged for this period.
+                      </td>
+                    </tr>
+                  ) : (
+                    mfgData.entries.map((e: any, idx: number) => (
+                      <tr key={e._id} className="hover:bg-slate-50/50">
+                        <td className="py-2.5 px-3 text-center text-slate-400 font-mono text-[10px]">{idx + 1}</td>
+                        <td className="py-2.5 px-3 font-bold text-slate-900">
+                          {e.batchNumber}
+                          <span className="block text-[10px] text-slate-400 font-sans font-normal">
+                            {new Date(e.expenseDate).toLocaleDateString('en-GB')}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3 font-sans">
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-bold border border-slate-300 text-slate-800">
+                            MFG BATCH
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3 font-sans font-medium text-slate-900">
+                          <span className="font-bold block">{e.productName}</span>
+                          <span className="block text-[10px] text-slate-400 font-normal">Vendor: {e.vendorName || 'Supplier'} ({e.quantity} Units)</span>
+                        </td>
+                        <td className="py-2.5 px-3 font-sans text-slate-700">{e.paymentMode || 'BANK_TRANSFER'}</td>
+                        <td className="py-2.5 px-3 font-sans font-semibold text-slate-800">{e.paymentStatus || 'DUE'}</td>
+                        <td className="py-2.5 px-3 text-right font-bold text-slate-900">₹{e.totalCost || 0}</td>
+                        <td className="py-2.5 px-3 text-right font-bold text-rose-600">₹{e.amountDue || 0}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* 5. TAB 4: OPERATING OVERHEAD REPORT */}
+        {activeTab === 'operating' && (
+          <div className="space-y-4 font-sans text-xs">
+            {/* 4 Summary Metric Cards (Identical PDF Grid Layout) */}
+            <div className="grid grid-cols-4 gap-3 text-center">
+              <div className="p-3 bg-white border border-slate-300 rounded-lg">
+                <span className="text-[10px] uppercase font-bold text-slate-500 block">TOTAL OVERHEAD</span>
+                <span className="font-mono font-bold text-base text-slate-900 block mt-1">₹{operatingData?.metrics?.totalOperatingExpense || 0}</span>
+              </div>
+              <div className="p-3 bg-white border border-slate-300 rounded-lg">
+                <span className="text-[10px] uppercase font-bold text-slate-500 block">RENT & FACILITIES</span>
+                <span className="font-mono font-bold text-base text-slate-900 block mt-1">₹{operatingData?.metrics?.categoryBreakdown?.RENT || 0}</span>
+              </div>
+              <div className="p-3 bg-white border border-slate-300 rounded-lg">
+                <span className="text-[10px] uppercase font-bold text-slate-500 block">ELECTRICITY & UTILITIES</span>
+                <span className="font-mono font-bold text-base text-slate-900 block mt-1">₹{operatingData?.metrics?.categoryBreakdown?.ELECTRICITY_BILL || 0}</span>
+              </div>
+              <div className="p-3 bg-white border border-slate-300 rounded-lg">
+                <span className="text-[10px] uppercase font-bold text-slate-500 block">STAFF & PANTRY</span>
+                <span className="font-mono font-bold text-xs text-slate-900 block mt-1.5">
+                  ₹{(operatingData?.metrics?.categoryBreakdown?.TEA_REFRESHMENTS || 0) + (operatingData?.metrics?.categoryBreakdown?.STAFF_SALARY || 0) + (operatingData?.metrics?.categoryBreakdown?.MISCELLANEOUS || 0) + (operatingData?.metrics?.categoryBreakdown?.MARKETING_ADS || 0) + (operatingData?.metrics?.categoryBreakdown?.OTHER || 0)} • {operatingData?.metrics?.totalEntries || 0} Vouchers
+                </span>
+              </div>
+            </div>
+
+            <div className="pt-2">
+              <h4 className="font-bold text-xs uppercase tracking-wide text-slate-900 mb-2">
+                SHOP & OPERATING OVERHEAD LEDGER ({(operatingData?.entries || []).length} RECORDS)
+              </h4>
+
+              <table className="w-full text-left border border-slate-300 divide-y divide-slate-200">
+                <thead className="bg-slate-50 text-slate-700 font-bold uppercase text-[10px] border-b border-slate-300">
+                  <tr>
+                    <th className="py-2.5 px-3 w-8 text-center text-slate-400">#</th>
+                    <th className="py-2.5 px-3">ID & DATE</th>
+                    <th className="py-2.5 px-3">CHANNEL</th>
+                    <th className="py-2.5 px-3">CUSTOMER & AREA</th>
+                    <th className="py-2.5 px-3">PAYMENT MODE</th>
+                    <th className="py-2.5 px-3">STATUS</th>
+                    <th className="py-2.5 px-3 text-right">AMOUNT</th>
+                    <th className="py-2.5 px-3 text-right">DUE</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200 font-mono text-[11px]">
+                  {(!operatingData?.entries || operatingData.entries.length === 0) ? (
+                    <tr>
+                      <td colSpan={8} className="p-4 text-center text-slate-400 italic font-sans">
+                        No operating overhead expenses logged for this period.
+                      </td>
+                    </tr>
+                  ) : (
+                    operatingData.entries.map((e: any, idx: number) => {
+                      const ovhId = e.expenseId || `OVH-${new Date(e.expenseDate).getFullYear()}-${e._id.slice(-4).toUpperCase()}`;
+                      return (
+                        <tr key={e._id} className="hover:bg-slate-50/50">
+                          <td className="py-2.5 px-3 text-center text-slate-400 font-mono text-[10px]">{idx + 1}</td>
+                          <td className="py-2.5 px-3 font-bold text-slate-900">
+                            {ovhId}
+                            <span className="block text-[10px] text-slate-400 font-sans font-normal">{new Date(e.expenseDate).toLocaleDateString('en-GB')}</span>
+                          </td>
+                          <td className="py-2.5 px-3 font-sans">
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold border border-slate-300 text-slate-800">
+                              {e.category}
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-3 font-sans font-medium text-slate-900">
+                            <span className="font-bold block">{e.title || 'Overhead Expense'}</span>
+                            <span className="block text-[10px] text-slate-400 font-normal">{e.paidTo ? `Paid to: ${e.paidTo}` : 'Operating Expense'} {e.billNumber ? `• Bill #${e.billNumber}` : ''}</span>
+                          </td>
+                          <td className="py-2.5 px-3 font-sans text-slate-700">{e.paymentMode || 'UPI'}</td>
+                          <td className="py-2.5 px-3 font-sans font-semibold text-emerald-700">PAID</td>
+                          <td className="py-2.5 px-3 text-right font-bold text-slate-900">₹{e.amount || 0}</td>
+                          <td className="py-2.5 px-3 text-right font-bold text-slate-400">₹0</td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* 6. TAB 5: DELETION AUDIT TRAIL REPORT */}
+        {activeTab === 'audit_logs' && (
+          <div className="space-y-4 font-sans text-xs">
+            {/* 4 Summary Metric Cards (Identical PDF Grid Layout) */}
+            <div className="grid grid-cols-4 gap-3 text-center">
+              <div className="p-3 bg-white border border-slate-300 rounded-lg">
+                <span className="text-[10px] uppercase font-bold text-slate-500 block">TOTAL PURGED RECORDS</span>
+                <span className="font-mono font-bold text-base text-slate-900 block mt-1">{auditData?.metrics?.totalDeletions || 0}</span>
+              </div>
+              <div className="p-3 bg-white border border-slate-300 rounded-lg">
+                <span className="text-[10px] uppercase font-bold text-slate-500 block">DELETED OFFLINE SALES</span>
+                <span className="font-mono font-bold text-base text-emerald-700 block mt-1">{auditData?.metrics?.offlineSalesDeleted || 0}</span>
+              </div>
+              <div className="p-3 bg-white border border-slate-300 rounded-lg">
+                <span className="text-[10px] uppercase font-bold text-slate-500 block">DELETED MFG & OVERHEAD</span>
+                <span className="font-mono font-bold text-xs text-slate-900 block mt-1.5">
+                  Mfg: {auditData?.metrics?.mfgBatchesDeleted || 0} • Ovh: {auditData?.metrics?.operatingExpensesDeleted || 0}
+                </span>
+              </div>
+              <div className="p-3 bg-white border border-slate-300 rounded-lg">
+                <span className="text-[10px] uppercase font-bold text-slate-500 block">PURGED FINANCIAL VALUE</span>
+                <span className="font-mono font-bold text-base text-rose-600 block mt-1">
+                  ₹{Number(auditData?.metrics?.totalDeletedValue || 0).toLocaleString('en-IN')}
+                </span>
+              </div>
+            </div>
+
+            <div className="pt-2">
+              <h4 className="font-bold text-xs uppercase tracking-wide text-slate-900 mb-2">
+                PURGED DELETION AUDIT TRAIL ({(auditData?.logs || []).length} LOGS)
+              </h4>
+
+              <table className="w-full text-left border border-slate-300 divide-y divide-slate-200">
+                <thead className="bg-slate-50 text-slate-700 font-bold uppercase text-[10px] border-b border-slate-300">
+                  <tr>
+                    <th className="py-2.5 px-3 w-8 text-center text-slate-400">#</th>
+                    <th className="py-2.5 px-3">ID & DATE</th>
+                    <th className="py-2.5 px-3">CHANNEL</th>
+                    <th className="py-2.5 px-3">CUSTOMER & AREA</th>
+                    <th className="py-2.5 px-3">PAYMENT MODE</th>
+                    <th className="py-2.5 px-3">STATUS</th>
+                    <th className="py-2.5 px-3 text-right">AMOUNT</th>
+                    <th className="py-2.5 px-3 text-right">DUE</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200 font-mono text-[11px]">
+                  {(!auditData?.logs || auditData.logs.length === 0) ? (
+                    <tr>
+                      <td colSpan={8} className="p-4 text-center text-slate-400 italic font-sans">
+                        No deleted records found in audit log.
+                      </td>
+                    </tr>
+                  ) : (
+                    auditData.logs.map((log: any, idx: number) => {
+                      const cleanTitle = (log.entityTitle || 'Untitled Record')
+                        .replace(/\s*\((?:Bill\s*#?|OFF-)[^)]+\)/gi, '')
+                        .replace(/\s*-\s*Batch\s+[^\s(]+/gi, '')
+                        .replace(/#OFF-[0-9-]+/gi, '')
+                        .trim();
+                      let id = log.entityId;
+                      if (log.entityType === 'OPERATING' && id && /^[0-9a-fA-F]{24}$/.test(id)) {
+                        const year = new Date(log.createdAt || Date.now()).getFullYear();
+                        id = `OVH-${year}-${id.slice(-4).toUpperCase()}`;
+                      }
+                      return (
+                        <tr key={log._id} className="hover:bg-slate-50/50">
+                          <td className="py-2.5 px-3 text-center text-slate-400 font-mono text-[10px]">{idx + 1}</td>
+                          <td className="py-2.5 px-3 font-bold text-slate-900">
+                            {id}
+                            <span className="block text-[10px] text-slate-400 font-sans font-normal">
+                              {new Date(log.createdAt).toLocaleDateString('en-GB')} {new Date(log.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-3 font-sans">
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold border border-slate-300 text-slate-800">
+                              {log.entityType}
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-3 font-sans font-medium text-slate-900">
+                            <span className="font-bold block">{cleanTitle}</span>
+                            <span className="block text-[10px] text-slate-400 font-normal">Purged from {log.entityType}</span>
+                          </td>
+                          <td className="py-2.5 px-3 font-sans text-slate-700">AUDIT LOG</td>
+                          <td className="py-2.5 px-3 font-sans font-semibold text-rose-700">PURGED</td>
+                          <td className="py-2.5 px-3 text-right font-bold text-rose-600">₹{Number(log.amount || 0).toLocaleString('en-IN')}</td>
+                          <td className="py-2.5 px-3 text-right font-bold text-slate-400">-</td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* 7. Verification & Sign-off Footer (Matches PDF Exact Layout Across All Tabs) */}
+        <div className="pt-8 border-t border-slate-300 font-sans text-xs flex justify-between items-end print-avoid-break">
+          <div>
+            <p className="font-bold text-forest-950">Novise Herbal Finance & Accounting Cell</p>
+            <p className="text-[11px] text-slate-500">Computer generated audit voucher • Valid without physical signature</p>
+          </div>
+          <div className="text-right">
+            <div className="border-b border-slate-400 w-44 pb-1 mb-1"></div>
+            <p className="font-bold text-slate-800">Authorized Signatory</p>
+            <p className="text-[10px] text-slate-400 font-mono">{user?.name || 'Administrator'} ({user?.role || 'Admin'})</p>
+          </div>
+        </div>
+
+      </div>
+
+      {/* 2. ON-SCREEN VIEWS & MODALS (STRICTLY HIDDEN IN PRINT/PDF) */}
+      <div className="print:hidden space-y-6 w-full">
+        {/* MAIN FINANCE DASHBOARD (HIDDEN WHEN ANY FULL-PAGE ACTION IS ACTIVE) */}
+        {!isAnyActionPageActive && (
+          <div className="space-y-6 animate-fadeIn">
+            {/* TOP HEADER & CONTROLS */}
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white p-5 sm:p-6 rounded-3xl border border-slate-200/90 shadow-xs">
+              <div>
+                <div className="flex items-center space-x-2">
+                  <span className="p-2 bg-forest-900/10 text-forest-900 rounded-xl">
+                    <Wallet className="w-5 h-5 text-forest-900" />
+                  </span>
+                  <h2 className="font-serif text-2xl font-black text-forest-950">
+                    Finance & Business Accounting
+                  </h2>
                 </div>
+                <p className="text-xs text-slate-500 mt-1">
+                  Real-time D2C cash flow, sales revenue, product manufacturing sourcing expenses, and shop overhead accounting.
+                </p>
+              </div>
 
-                {/* ==========================================
-                SUB-TAB 1: OVERALL CONSOLIDATED
-                ========================================== */}
-                {sellingSubTab === 'overall' && (
-                  <div className="space-y-6">
-                    {/* Consolidated Scorecards */}
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                      <div className="p-4 bg-white rounded-2xl border border-slate-200/90 shadow-2xs">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono block">
-                          Total Combined Gross Sales
+              {/* Global Action: Generate Report */}
+              <div className="flex items-center space-x-2.5 self-start lg:self-auto flex-wrap">
+                <button
+                  type="button"
+                  onClick={handlePrintReport}
+                  className="inline-flex items-center space-x-2 px-4 py-2.5 rounded-xl bg-forest-900 hover:bg-forest-950 text-gold-400 font-bold text-xs transition shadow-sm group cursor-pointer"
+                  title="Generate & Print Finance Report"
+                >
+                  <FileText className="w-4 h-4 text-gold-300 group-hover:scale-110 transition" />
+                  <span>Generate Report</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (activeTab === 'audit_logs') fetchAuditLogs();
+                    else fetchData();
+                  }}
+                  className="p-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl transition cursor-pointer"
+                  title="Refresh Finance Data"
+                >
+                  <RefreshCw className={`w-4 h-4 ${(isLoading || (activeTab === 'audit_logs' && isLoadingAudit)) ? 'animate-spin' : ''}`} />
+                </button>
+              </div>
+            </div>
+
+            {/* TIME SELECTION BAR (Every tab has time selection filter) */}
+            <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-200/90 shadow-2xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+              <TimeRangeDropdown
+                value={period}
+                onChange={(p) => {
+                  setPeriod(p as PeriodType);
+                }}
+                customStartDate={customStartDate}
+                customEndDate={customEndDate}
+                onCustomStartDateChange={(start) => setCustomStartDate(start)}
+                onCustomEndDateChange={(end) => setCustomEndDate(end)}
+                onApplyCustom={(start, end) => {
+                  setCustomStartDate(start);
+                  setCustomEndDate(end);
+                  setPeriod('custom');
+                  fetchData('custom', start, end);
+                }}
+                onResetCustom={() => {
+                  setCustomStartDate('');
+                  setCustomEndDate('');
+                  setPeriod('all');
+                  fetchData('all');
+                }}
+              />
+
+              <div className="text-[11px] text-slate-500 font-medium">
+                Active Ledger: <strong className="text-forest-950 font-bold">{getPeriodLabel()}</strong>
+              </div>
+            </div>
+
+            {/* 4 MAIN MODULE TABS */}
+            <div className="flex items-center space-x-2 border-b border-slate-200 overflow-x-auto no-scrollbar">
+              <button
+                onClick={() => setActiveTab('overview')}
+                className={`flex items-center space-x-2 px-5 py-3 border-b-2 font-bold text-xs whitespace-nowrap transition cursor-pointer ${activeTab === 'overview'
+                  ? 'border-forest-900 text-forest-900 font-black'
+                  : 'border-transparent text-slate-500 hover:text-slate-900'
+                  }`}
+              >
+                <TrendingUp className="w-4 h-4" />
+                <span>1. Overall Financial Overview</span>
+              </button>
+
+              <button
+                onClick={() => setActiveTab('sales')}
+                className={`flex items-center space-x-2 px-5 py-3 border-b-2 font-bold text-xs whitespace-nowrap transition cursor-pointer ${activeTab === 'sales'
+                  ? 'border-forest-900 text-forest-900 font-black'
+                  : 'border-transparent text-slate-500 hover:text-slate-900'
+                  }`}
+              >
+                <ShoppingBag className="w-4 h-4" />
+                <span>2. Selling & Revenue</span>
+              </button>
+
+              <button
+                onClick={() => setActiveTab('manufacturing')}
+                className={`flex items-center space-x-2 px-5 py-3 border-b-2 font-bold text-xs whitespace-nowrap transition cursor-pointer ${activeTab === 'manufacturing'
+                  ? 'border-forest-900 text-forest-900 font-black'
+                  : 'border-transparent text-slate-500 hover:text-slate-900'
+                  }`}
+              >
+                <Factory className="w-4 h-4" />
+                <span>3. Manufacturing & Sourcing</span>
+              </button>
+
+              <button
+                onClick={() => setActiveTab('operating')}
+                className={`flex items-center space-x-2 px-5 py-3 border-b-2 font-bold text-xs whitespace-nowrap transition cursor-pointer ${activeTab === 'operating'
+                  ? 'border-forest-900 text-forest-900 font-black'
+                  : 'border-transparent text-slate-500 hover:text-slate-900'
+                  }`}
+              >
+                <Receipt className="w-4 h-4" />
+                <span>4. Shop & Overhead</span>
+              </button>
+
+              <button
+                onClick={() => setActiveTab('audit_logs')}
+                className={`flex items-center space-x-2 px-5 py-3 border-b-2 font-bold text-xs whitespace-nowrap transition cursor-pointer ${activeTab === 'audit_logs'
+                  ? 'border-forest-900 text-forest-900 font-black'
+                  : 'border-transparent text-slate-500 hover:text-slate-900'
+                  }`}
+              >
+                <Trash2 className="w-4 h-4 text-rose-600" />
+                <span>5. Deletion Logs</span>
+                {auditData?.metrics?.totalDeletions ? (
+                  <span className="ml-1 px-2 py-0.5 rounded-full text-[10px] bg-rose-100 text-rose-800 font-mono font-bold">
+                    {auditData.metrics.totalDeletions}
+                  </span>
+                ) : null}
+              </button>
+            </div>
+
+            {/* ====================================================================
+          TAB 1: OVERALL FINANCIAL OVERVIEW & CONSOLIDATED P&L
+          ==================================================================== */}
+            {
+              activeTab === 'overview' && (
+                <div className="space-y-6">
+                  {/* Executive P&L Scorecard Cards */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+
+                    {/* Card 1: Total Inflow (Revenue from Selling) */}
+                    <div className="p-5 bg-white rounded-3xl border border-slate-200/90 shadow-xs relative overflow-hidden">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider font-mono">
+                          Total Sales Inflow
                         </span>
-                        <span className="text-xl sm:text-2xl font-black text-forest-950 font-mono mt-1 block">
-                          {formatCurrency(salesData?.overall?.combinedGross ?? salesData?.metrics?.grossSales)}
+                        <span className="p-2 bg-emerald-50 text-emerald-700 rounded-xl">
+                          <ArrowUpRight className="w-4 h-4" />
                         </span>
-                        <span className="text-[10px] text-slate-500 font-medium">Online Web + Offline Retail</span>
                       </div>
-
-                      <div className="p-4 bg-white rounded-2xl border border-slate-200/90 shadow-2xs">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono block">
-                          Realized Cashflow (Paid)
+                      <div className="mt-3">
+                        <span className="text-2xl sm:text-3xl font-black text-forest-950 font-mono">
+                          {formatCurrency(overviewData?.summary?.netSalesInflow)}
                         </span>
-                        <span className="text-xl sm:text-2xl font-black text-emerald-700 font-mono mt-1 block">
-                          {formatCurrency(salesData?.overall?.combinedRealized ?? salesData?.metrics?.realizedEarning)}
-                        </span>
-                        <span className="text-[10px] text-emerald-600 font-semibold">In Hand & Bank Inflow</span>
-                      </div>
-
-                      <div className="p-4 bg-white rounded-2xl border border-slate-200/90 shadow-2xs">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono block">
-                          Total Pending Receivables
-                        </span>
-                        <span className="text-xl sm:text-2xl font-black text-amber-700 font-mono mt-1 block">
-                          {formatCurrency(salesData?.overall?.combinedPendingDue ?? salesData?.metrics?.pendingDue)}
-                        </span>
-                        <span className="text-[10px] text-amber-600 font-semibold">COD In-Transit + Offline Credit</span>
-                      </div>
-
-                      <div className="p-4 bg-white rounded-2xl border border-slate-200/90 shadow-2xs">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono block">
-                          Total Transactions
-                        </span>
-                        <span className="text-xl sm:text-2xl font-black text-forest-950 font-mono mt-1 block">
-                          {salesData?.overall?.totalTransactions || 0}
-                        </span>
-                        <span className="text-[10px] text-slate-500 font-medium">
-                          {salesData?.overall?.onlineOrdersCount || 0} Online + {salesData?.overall?.offlineSalesCount || 0} Offline
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Channel Comparison Cards (Online vs Offline) */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {/* Online Channel Card */}
-                      <div className="p-5 bg-white rounded-3xl border border-slate-200/90 shadow-xs space-y-4">
-                        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                          <div className="flex items-center space-x-2.5">
-                            <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center font-bold">
-                              <Globe className="w-5 h-5" />
-                            </div>
-                            <div>
-                              <h4 className="font-serif font-bold text-forest-950 text-sm">Online E-Commerce Channel</h4>
-                              <p className="text-[11px] text-slate-400">Direct Store Orders & Courier Logistics</p>
-                            </div>
-                          </div>
-                          <span className="px-2.5 py-1 bg-blue-50 text-blue-800 border border-blue-200 text-xs font-black font-mono rounded-lg">
-                            {salesData?.overall?.onlineSharePercent ?? 0}%
+                        <p className="text-[11px] text-emerald-700 font-semibold mt-1 flex items-center space-x-1">
+                          <span>
+                            {(overviewData?.summary?.sellingSummary?.offlineSalesCount || 0) > 0
+                              ? `From ${overviewData?.summary?.sellingSummary?.totalOrdersCount || 0} online + ${overviewData?.summary?.sellingSummary?.offlineSalesCount} offline sales`
+                              : `From ${overviewData?.summary?.sellingSummary?.totalOrdersCount || 0} customer orders`}
                           </span>
-                        </div>
-
-                        <div className="grid grid-cols-3 gap-2 text-center pt-1">
-                          <div className="p-2.5 bg-[#FAF8F5] rounded-xl border border-slate-100">
-                            <span className="text-[10px] text-slate-400 uppercase font-mono block font-bold">Gross Sales</span>
-                            <span className="font-mono font-black text-sm text-forest-950 block mt-0.5">
-                              ₹{salesData?.overall?.onlineGross || 0}
-                            </span>
-                          </div>
-                          <div className="p-2.5 bg-emerald-50/60 rounded-xl border border-emerald-100">
-                            <span className="text-[10px] text-emerald-600 uppercase font-mono block font-bold">Realized Cash</span>
-                            <span className="font-mono font-black text-sm text-emerald-800 block mt-0.5">
-                              ₹{salesData?.overall?.onlineRealized || 0}
-                            </span>
-                          </div>
-                          <div className="p-2.5 bg-amber-50/60 rounded-xl border border-amber-100">
-                            <span className="text-[10px] text-amber-600 uppercase font-mono block font-bold">Pending COD</span>
-                            <span className="font-mono font-black text-sm text-amber-800 block mt-0.5">
-                              ₹{salesData?.overall?.onlinePendingDue || 0}
-                            </span>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center justify-between text-xs text-slate-500 pt-1">
-                          <span>Orders Placed: <strong className="text-forest-950 font-mono">{salesData?.overall?.onlineOrdersCount || 0}</strong></span>
-                          <button
-                            onClick={() => setSellingSubTab('online')}
-                            className="text-forest-900 font-bold hover:underline flex items-center space-x-1 cursor-pointer"
-                          >
-                            <span>View Online Orders</span>
-                            <ChevronRight className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Offline Channel Card */}
-                      <div className="p-5 bg-white rounded-3xl border border-slate-200/90 shadow-xs space-y-4">
-                        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                          <div className="flex items-center space-x-2.5">
-                            <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold">
-                              <Store className="w-5 h-5" />
-                            </div>
-                            <div>
-                              <h4 className="font-serif font-bold text-forest-950 text-sm">Offline Local Retail & Direct</h4>
-                              <p className="text-[11px] text-slate-400">Local Area, Counter Sales & Retailers</p>
-                            </div>
-                          </div>
-                          <span className="px-2.5 py-1 bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-black font-mono rounded-lg">
-                            {salesData?.overall?.offlineSharePercent ?? 0}%
-                          </span>
-                        </div>
-
-                        <div className="grid grid-cols-3 gap-2 text-center pt-1">
-                          <div className="p-2.5 bg-[#FAF8F5] rounded-xl border border-slate-100">
-                            <span className="text-[10px] text-slate-400 uppercase font-mono block font-bold">Gross Sales</span>
-                            <span className="font-mono font-black text-sm text-forest-950 block mt-0.5">
-                              ₹{salesData?.overall?.offlineGross || 0}
-                            </span>
-                          </div>
-                          <div className="p-2.5 bg-emerald-50/60 rounded-xl border border-emerald-100">
-                            <span className="text-[10px] text-emerald-600 uppercase font-mono block font-bold">Cash/UPI Paid</span>
-                            <span className="font-mono font-black text-sm text-emerald-800 block mt-0.5">
-                              ₹{salesData?.overall?.offlineRealized || 0}
-                            </span>
-                          </div>
-                          <div className="p-2.5 bg-rose-50/60 rounded-xl border border-rose-100">
-                            <span className="text-[10px] text-rose-600 uppercase font-mono block font-bold">Pending / Due</span>
-                            <span className="font-mono font-black text-sm text-rose-800 block mt-0.5">
-                              ₹{salesData?.overall?.offlineDue || 0}
-                            </span>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center justify-between text-xs text-slate-500 pt-1">
-                          <span>Offline Bills: <strong className="text-forest-950 font-mono">{salesData?.overall?.offlineSalesCount || 0}</strong></span>
-                          <button
-                            onClick={() => setSellingSubTab('offline')}
-                            className="text-forest-900 font-bold hover:underline flex items-center space-x-1 cursor-pointer"
-                          >
-                            <span>View Offline Sales</span>
-                            <ChevronRight className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
+                        </p>
                       </div>
                     </div>
 
-                    {/* Consolidated Activity Stream / Combined Ledger Table */}
-                    <div className="bg-white rounded-3xl border border-slate-200/90 shadow-xs overflow-hidden">
-                      <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                        <div>
-                          <h3 className="font-serif text-sm font-bold text-forest-950 flex items-center space-x-1.5">
-                            <Layers className="w-4 h-4 text-forest-800" />
-                            <span>Combined Sales Ledger ({consolidatedLedger.length} Total Records)</span>
-                          </h3>
-                          <p className="text-[11px] text-slate-400">Consolidated chronological timeline of Online and Offline sales</p>
-                        </div>
-                        <div className="relative w-full sm:w-72">
-                          <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                          <input
-                            type="text"
-                            placeholder="Search combined transactions..."
-                            value={salesSearch}
-                            onChange={(e) => setSalesSearch(e.target.value)}
-                            className="w-full pl-8 pr-3 py-1.5 bg-[#FAF8F5] border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-forest-900"
-                          />
-                        </div>
+                    {/* Card 2: Total COGS (Manufacturing Outflow) */}
+                    <div className="p-5 bg-white rounded-3xl border border-slate-200/90 shadow-xs relative overflow-hidden">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider font-mono">
+                          COGS (Manufacturing)
+                        </span>
+                        <span className="p-2 bg-amber-50 text-amber-700 rounded-xl">
+                          <Factory className="w-4 h-4" />
+                        </span>
                       </div>
-
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-left text-xs">
-                          <thead className="bg-[#FAF8F5] text-slate-500 font-bold uppercase tracking-wider text-[10px] border-b border-slate-200">
-                            <tr>
-                              <th className="py-3 px-4">Transaction ID & Date</th>
-                              <th className="py-3 px-4">Channel</th>
-                              <th className="py-3 px-4">Customer & Location</th>
-                              <th className="py-3 px-4">Payment Method</th>
-                              <th className="py-3 px-4">Payment Status</th>
-                              <th className="py-3 px-4 text-right">Amount</th>
-                              <th className="py-3 px-4 text-right">Due / Outstanding</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-100 font-medium">
-                            {filteredConsolidated.length === 0 ? (
-                              <tr>
-                                <td colSpan={7} className="py-10 text-center text-slate-400 italic">
-                                  No sales transactions recorded during {getPeriodLabel().toLowerCase()}.
-                                </td>
-                              </tr>
-                            ) : (
-                              paginatedConsolidated.map((item: any) => (
-                                <tr key={`${item.type}-${item._id}`} className="hover:bg-slate-50/80 transition">
-                                  <td className="py-3.5 px-4">
-                                    <span className="font-mono font-bold text-forest-950 block">{item.id}</span>
-                                    <span className="text-[10.5px] text-slate-400">
-                                      {new Date(item.date).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' })}
-                                    </span>
-                                  </td>
-                                  <td className="py-3.5 px-4">
-                                    {item.type === 'ONLINE' ? (
-                                      <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-md text-[10.5px] font-bold bg-blue-50 text-blue-800 border border-blue-200">
-                                        <Globe className="w-3 h-3" />
-                                        <span>ONLINE</span>
-                                      </span>
-                                    ) : (
-                                      <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-md text-[10.5px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
-                                        <Store className="w-3 h-3" />
-                                        <span>OFFLINE</span>
-                                      </span>
-                                    )}
-                                  </td>
-                                  <td className="py-3.5 px-4 font-semibold text-slate-800">
-                                    {item.customer}
-                                    <span className="block text-[10px] text-slate-400 font-sans">{item.subtitle}</span>
-                                  </td>
-                                  <td className="py-3.5 px-4 font-mono font-semibold text-slate-700">
-                                    {item.paymentMethod}
-                                  </td>
-                                  <td className="py-3.5 px-4">
-                                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${item.paymentStatus === 'PAID'
-                                      ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                                      : item.paymentStatus === 'PARTIAL'
-                                        ? 'bg-amber-50 text-amber-800 border-amber-200'
-                                        : item.paymentStatus === 'REFUNDED'
-                                          ? 'bg-purple-50 text-purple-800 border-purple-200'
-                                          : 'bg-rose-50 text-rose-800 border-rose-200'
-                                      }`}>
-                                      {item.paymentStatus}
-                                    </span>
-                                  </td>
-                                  <td className="py-3.5 px-4 text-right font-mono font-bold text-sm text-forest-950">
-                                    ₹{item.amount}
-                                  </td>
-                                  <td className="py-3.5 px-4 text-right font-mono font-bold text-xs">
-                                    {item.due > 0 ? (
-                                      <span className="text-rose-700">₹{item.due}</span>
-                                    ) : (
-                                      <span className="text-slate-400">₹0</span>
-                                    )}
-                                  </td>
-                                </tr>
-                              ))
-                            )}
-                          </tbody>
-                        </table>
+                      <div className="mt-3">
+                        <span className="text-2xl sm:text-3xl font-black text-slate-900 font-mono">
+                          {formatCurrency(overviewData?.summary?.manufacturingSummary?.netManufacturingExpense)}
+                        </span>
+                        <p className="text-[11px] text-slate-500 font-semibold mt-1">
+                          Net sourcing for {overviewData?.summary?.manufacturingSummary?.totalBatches || 0} production batches
+                        </p>
                       </div>
-
-                      {filteredConsolidated.length > 0 && (
-                        <AdminPagination
-                          currentPage={consolidatedPage}
-                          totalItems={filteredConsolidated.length}
-                          pageSize={consolidatedPageSize}
-                          onPageChange={setConsolidatedPage}
-                          onPageSizeChange={setConsolidatedPageSize}
-                          itemLabel="transactions"
-                        />
-                      )}
                     </div>
+
+                    {/* Card 3: Total Operating Overhead */}
+                    <div className="p-5 bg-white rounded-3xl border border-slate-200/90 shadow-xs relative overflow-hidden">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider font-mono">
+                          Operating Overhead
+                        </span>
+                        <span className="p-2 bg-rose-50 text-rose-700 rounded-xl">
+                          <Receipt className="w-4 h-4" />
+                        </span>
+                      </div>
+                      <div className="mt-3">
+                        <span className="text-2xl sm:text-3xl font-black text-slate-900 font-mono">
+                          {formatCurrency(overviewData?.summary?.operatingSummary?.totalOperatingExpense)}
+                        </span>
+                        <p className="text-[11px] text-slate-500 font-semibold mt-1">
+                          Rent, power bills, salaries & tea/pantry
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Card 4: Net Business Profit */}
+                    <div className={`p-5 rounded-3xl border shadow-xs relative overflow-hidden ${(overviewData?.summary?.netProfit || 0) >= 0
+                      ? 'bg-gradient-to-br from-[#07190F] to-forest-900 text-white border-forest-800'
+                      : 'bg-rose-900 text-white border-rose-800'
+                      }`}>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-bold text-gold-300 uppercase tracking-wider font-mono">
+                          Net Business Profit
+                        </span>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-black uppercase bg-gold-400 text-forest-950">
+                          {overviewData?.summary?.netProfitMargin || 0}% Margin
+                        </span>
+                      </div>
+                      <div className="mt-3">
+                        <span className="text-2xl sm:text-3xl font-black text-gold-400 font-mono">
+                          {formatCurrency(overviewData?.summary?.netProfit)}
+                        </span>
+                        <p className="text-[11px] text-slate-200 font-medium mt-1">
+                          Inflow minus manufacturing & overhead
+                        </p>
+                      </div>
+                    </div>
+
                   </div>
-                )}
 
-                {/* ==========================================
-                SUB-TAB 2: ONLINE SELLING (WEBSITE ORDERS)
-                ========================================== */}
-                {sellingSubTab === 'online' && (
-                  <div className="space-y-6">
-                    {/* Selling Scorecard */}
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                      <div className="p-4 bg-white rounded-2xl border border-slate-200/90 shadow-2xs">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono block">
-                          Total Orders Placed
-                        </span>
-                        <span className="text-xl sm:text-2xl font-black text-forest-950 font-mono mt-1 block">
-                          {salesData?.online?.metrics?.totalOrdersCount ?? salesData?.metrics?.totalOrdersCount ?? 0}
-                        </span>
-                        <span className="text-[10px] text-slate-500">Gross: {formatCurrency(salesData?.online?.metrics?.grossSales ?? salesData?.metrics?.grossSales)}</span>
-                      </div>
+                  {/* Outstanding Receivables vs Payables */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
-                      <div className="p-4 bg-white rounded-2xl border border-slate-200/90 shadow-2xs">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono block">
-                          Realized Earning (Paid)
-                        </span>
-                        <span className="text-xl sm:text-2xl font-black text-emerald-700 font-mono mt-1 block">
-                          {formatCurrency(salesData?.online?.metrics?.realizedEarning ?? salesData?.metrics?.realizedEarning)}
-                        </span>
-                        <span className="text-[10px] text-emerald-600 font-semibold">Online & Delivered COD</span>
-                      </div>
-
-                      <div className="p-4 bg-white rounded-2xl border border-slate-200/90 shadow-2xs">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono block">
-                          Pending Due (In Transit)
+                    {/* Pending Due: Customer COD in-transit */}
+                    <div className="p-5 bg-white rounded-3xl border border-slate-200/90 shadow-xs flex items-center justify-between">
+                      <div>
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 font-mono block">
+                          Outstanding Receivables (Pending COD)
                         </span>
                         <span className="text-xl sm:text-2xl font-black text-amber-700 font-mono mt-1 block">
-                          {formatCurrency(salesData?.online?.metrics?.pendingDue ?? salesData?.metrics?.pendingDue)}
+                          {formatCurrency(overviewData?.summary?.pendingReceivables)}
                         </span>
-                        <span className="text-[10px] text-amber-600 font-semibold">Awaiting Courier COD Cash</span>
+                        <span className="text-[11px] text-slate-500">
+                          Awaiting courier delivery & cash collection from buyers
+                        </span>
                       </div>
+                      <div className="p-3 bg-amber-50 rounded-2xl border border-amber-200/60">
+                        <Clock className="w-6 h-6 text-amber-600" />
+                      </div>
+                    </div>
 
-                      <div className="p-4 bg-white rounded-2xl border border-slate-200/90 shadow-2xs">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono block">
-                          Refunded & Cancelled
+                    {/* Outstanding Payables: Due to Suppliers */}
+                    <div className="p-5 bg-white rounded-3xl border border-slate-200/90 shadow-xs flex items-center justify-between">
+                      <div>
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 font-mono block">
+                          Outstanding Payables (Due to Suppliers)
                         </span>
                         <span className="text-xl sm:text-2xl font-black text-rose-700 font-mono mt-1 block">
-                          {formatCurrency(
-                            salesData?.online?.metrics?.cancelledAndRefundedValue !== undefined
-                              ? salesData?.online?.metrics?.cancelledAndRefundedValue
-                              : ((Number(salesData?.online?.metrics?.returnedValue ?? salesData?.metrics?.returnedValue) || 0) + (Number(salesData?.online?.metrics?.cancelledValue) || 0))
+                          {formatCurrency(overviewData?.summary?.outstandingPayables)}
+                        </span>
+                        <span className="text-[11px] text-slate-500">
+                          Balance payment due for raw materials & product batches
+                        </span>
+                      </div>
+                      <div className="p-3 bg-rose-50 rounded-2xl border border-rose-200/60">
+                        <AlertCircle className="w-6 h-6 text-rose-600" />
+                      </div>
+                    </div>
+
+                  </div>
+
+                  {/* Consolidated P&L Breakdown Table */}
+                  <div className="bg-white p-6 rounded-3xl border border-slate-200/90 shadow-xs space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h3 className="font-serif text-lg font-bold text-forest-950">
+                        Consolidated Profit & Loss Statement
+                      </h3>
+                      <span className="text-xs text-slate-400 font-mono">
+                        {getPeriodLabel()}
+                      </span>
+                    </div>
+
+                    <div className="border border-slate-200 rounded-2xl overflow-hidden divide-y divide-slate-100 text-xs font-medium">
+                      <div className="p-3.5 bg-slate-50 font-bold flex justify-between text-slate-600 uppercase tracking-wider text-[11px]">
+                        <span>Ledger Component</span>
+                        <span>Amount (₹)</span>
+                      </div>
+
+                      {/* 1. Gross Sales Revenue (Combined Online + Offline) */}
+                      <div className="p-3.5 flex justify-between items-center hover:bg-slate-50/60 transition">
+                        <div className="flex items-center space-x-2">
+                          <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                          <span className="font-semibold text-slate-800">1. Gross Order Revenue (Customer Sales)</span>
+                        </div>
+                        <span className="font-bold font-mono text-emerald-700">
+                          +{formatCurrency(
+                            overviewData?.summary?.sellingSummary?.combinedGrossSales ??
+                            ((overviewData?.summary?.sellingSummary?.grossSalesValue || 0) + (overviewData?.summary?.sellingSummary?.offlineGrossValue || 0))
                           )}
                         </span>
-                        <div className="flex items-center gap-1.5 mt-1 text-[10px] flex-wrap">
-                          <span className="text-rose-600 font-semibold">
-                            {salesData?.online?.metrics?.cancelledAndRefundedCount ?? ((Number(salesData?.online?.metrics?.refundedCount) || 0) + (Number(salesData?.online?.metrics?.cancelledCount) || 0))} Total
+                      </div>
+
+                      {/* Online Realized Cash */}
+                      <div className="p-3.5 pl-7 flex justify-between items-center text-slate-500 text-[11px] bg-slate-50/30">
+                        <div className="flex items-center space-x-2">
+                          <span>• Online Prepaid & Delivered COD Cash Collected</span>
+                          {(overviewData?.summary?.sellingSummary?.totalOrdersCount || 0) > 0 && (
+                            <span className="px-1.5 py-0.5 bg-blue-50 text-blue-700 font-mono text-[9px] font-bold rounded">
+                              {overviewData?.summary?.sellingSummary?.totalOrdersCount} Orders
+                            </span>
+                          )}
+                        </div>
+                        <span className="font-mono font-bold text-emerald-600">
+                          {formatCurrency(overviewData?.summary?.sellingSummary?.realizedRevenue)}
+                        </span>
+                      </div>
+
+                      {/* Offline Retail Store Counter Sales Cash */}
+                      <div className="p-3.5 pl-7 flex justify-between items-center text-slate-500 text-[11px] bg-slate-50/30">
+                        <div className="flex items-center space-x-2">
+                          <span>• Offline Retail Store Counter Cash Collected</span>
+                          {(overviewData?.summary?.sellingSummary?.offlineSalesCount || 0) > 0 && (
+                            <span className="px-1.5 py-0.5 bg-emerald-100 text-emerald-800 font-mono text-[9px] font-bold rounded">
+                              {overviewData?.summary?.sellingSummary?.offlineSalesCount} Bills
+                            </span>
+                          )}
+                        </div>
+                        <span className="font-mono font-bold text-emerald-600">
+                          {formatCurrency(overviewData?.summary?.sellingSummary?.offlineRealizedRevenue)}
+                        </span>
+                      </div>
+
+                      {/* Offline Direct Counter Outstanding Due - if any */}
+                      {(overviewData?.summary?.sellingSummary?.offlinePendingDue || 0) > 0 && (
+                        <div className="p-3.5 pl-7 flex justify-between items-center text-slate-500 text-[11px] bg-slate-50/30">
+                          <span>• Offline Store Pending Receivables (Customer Credit)</span>
+                          <span className="font-mono font-bold text-amber-700">
+                            {formatCurrency(overviewData?.summary?.sellingSummary?.offlinePendingDue)}
                           </span>
-                          <span className="text-slate-300">•</span>
-                          <span className="text-slate-500">
-                            Can: {salesData?.online?.metrics?.cancelledCount ?? 0}
+                        </div>
+                      )}
+
+                      {/* Refunded */}
+                      <div className="p-3.5 pl-7 flex justify-between items-center text-slate-500 text-[11px] bg-slate-50/30">
+                        <span>• Cancelled & Returned Orders Value</span>
+                        <span className="font-mono text-rose-600">
+                          -{formatCurrency(overviewData?.summary?.sellingSummary?.totalRefundedValue)}
+                        </span>
+                      </div>
+
+                      {/* 2. Manufacturing & Sourcing Costs (COGS) */}
+                      <div className="p-3.5 flex justify-between items-center hover:bg-slate-50/60 transition">
+                        <div className="flex items-center space-x-2">
+                          <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                          <span className="font-semibold text-slate-800">2. Cost of Goods Sold (Product Manufacturing & Procurement)</span>
+                        </div>
+                        <span className="font-bold font-mono text-rose-700">
+                          -{formatCurrency(overviewData?.summary?.manufacturingSummary?.netManufacturingExpense)}
+                        </span>
+                      </div>
+
+                      {/* Supplier returns */}
+                      <div className="p-3.5 pl-7 flex justify-between items-center text-slate-500 text-[11px] bg-slate-50/30">
+                        <span>• Supplier Returns & Defect Refunds Credited Back</span>
+                        <span className="font-mono text-emerald-600">
+                          +{formatCurrency(overviewData?.summary?.manufacturingSummary?.totalSupplierReturnsRefunded)}
+                        </span>
+                      </div>
+
+                      {/* Gross Profit */}
+                      <div className="p-3.5 flex justify-between items-center bg-slate-100/80 font-bold text-slate-900">
+                        <span>Gross Profit (Sales Inflow - Sourcing COGS)</span>
+                        <span className="font-mono font-black text-forest-950">
+                          {formatCurrency(overviewData?.summary?.grossProfit)}
+                        </span>
+                      </div>
+
+                      {/* 3. Operating Overhead Expenses */}
+                      <div className="p-3.5 flex justify-between items-center hover:bg-slate-50/60 transition">
+                        <div className="flex items-center space-x-2">
+                          <span className="w-2 h-2 rounded-full bg-rose-500"></span>
+                          <span className="font-semibold text-slate-800">3. Shop & Fulfillment Operational Overhead (Rent, Light, Salary, Tea)</span>
+                        </div>
+                        <span className="font-bold font-mono text-rose-700">
+                          -{formatCurrency(overviewData?.summary?.operatingSummary?.totalOperatingExpense)}
+                        </span>
+                      </div>
+
+                      {/* Net Profit Final */}
+                      <div className="p-4 flex justify-between items-center bg-forest-900 text-white font-bold text-sm">
+                        <div className="flex items-center space-x-2">
+                          <span className="font-serif text-base text-gold-400 font-black">NET BUSINESS PROFIT / LOSS</span>
+                          <span className="text-[10px] bg-gold-400 text-forest-950 px-2 py-0.5 rounded font-mono uppercase font-black">
+                            {overviewData?.summary?.netProfitMargin || 0}% MARGIN
                           </span>
-                          <span className="text-slate-300">•</span>
-                          <span className="text-slate-500">
-                            Ref: {salesData?.online?.metrics?.refundedCount ?? (salesData?.online?.metrics?.returnedCount ?? 0)}
+                        </div>
+                        <span className="font-serif text-lg text-gold-400 font-mono font-black">
+                          {formatCurrency(overviewData?.summary?.netProfit)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )
+            }
+
+            {/* ====================================================================
+          TAB 2: SELLING & REVENUE (3 SUB-TABS: OVERALL, ONLINE, OFFLINE)
+          ==================================================================== */}
+            {
+              activeTab === 'sales' && (
+                <div className="space-y-6">
+                  {/* 3 Sub-tabs Navigation Bar */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-2.5 rounded-2xl border border-slate-200/90 shadow-2xs">
+                    <div className="flex items-center space-x-1.5 overflow-x-auto pb-1 sm:pb-0">
+                      <button
+                        onClick={() => setSellingSubTab('overall')}
+                        className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer whitespace-nowrap ${sellingSubTab === 'overall'
+                          ? 'bg-forest-900 text-gold-400 shadow-sm'
+                          : 'text-slate-600 hover:text-forest-950 hover:bg-slate-100'
+                          }`}
+                      >
+                        <Layers className="w-4 h-4" />
+                        <span>1. Overall Consolidated</span>
+                      </button>
+
+                      <button
+                        onClick={() => setSellingSubTab('online')}
+                        className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer whitespace-nowrap ${sellingSubTab === 'online'
+                          ? 'bg-forest-900 text-gold-400 shadow-sm'
+                          : 'text-slate-600 hover:text-forest-950 hover:bg-slate-100'
+                          }`}
+                      >
+                        <Globe className="w-4 h-4" />
+                        <span>2. Online Selling</span>
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-mono font-bold ${sellingSubTab === 'online' ? 'bg-gold-400 text-forest-950' : 'bg-slate-200 text-slate-700'
+                          }`}>
+                          {salesData?.online?.orders?.length || salesData?.orders?.length || 0}
+                        </span>
+                      </button>
+
+                      <button
+                        onClick={() => setSellingSubTab('offline')}
+                        className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer whitespace-nowrap ${sellingSubTab === 'offline'
+                          ? 'bg-forest-900 text-gold-400 shadow-sm'
+                          : 'text-slate-600 hover:text-forest-950 hover:bg-slate-100'
+                          }`}
+                      >
+                        <Store className="w-4 h-4" />
+                        <span>3. Offline Selling</span>
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-mono font-bold ${sellingSubTab === 'offline' ? 'bg-gold-400 text-forest-950' : 'bg-slate-200 text-slate-700'
+                          }`}>
+                          {salesData?.offline?.sales?.length || salesData?.offlineSales?.length || 0}
+                        </span>
+                      </button>
+                    </div>
+
+                    {sellingSubTab === 'offline' && (
+                      <button
+                        onClick={() => setIsAddOfflineModalOpen(true)}
+                        className="inline-flex items-center justify-center space-x-1.5 px-4 py-2 bg-forest-900 hover:bg-forest-950 text-gold-400 font-bold text-xs rounded-xl transition shadow-xs cursor-pointer shrink-0"
+                      >
+                        <Plus className="w-4 h-4" />
+                        <span>Record Offline Sale</span>
+                      </button>
+                    )}
+                  </div>
+
+                  {/* ==========================================
+                SUB-TAB 1: OVERALL CONSOLIDATED
+                ========================================== */}
+                  {sellingSubTab === 'overall' && (
+                    <div className="space-y-6">
+                      {/* Consolidated Scorecards */}
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                        <div className="p-4 bg-white rounded-2xl border border-slate-200/90 shadow-2xs">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono block">
+                            Total Combined Gross Sales
+                          </span>
+                          <span className="text-xl sm:text-2xl font-black text-forest-950 font-mono mt-1 block">
+                            {formatCurrency(salesData?.overall?.combinedGross ?? salesData?.metrics?.grossSales)}
+                          </span>
+                          <span className="text-[10px] text-slate-500 font-medium">Online Web + Offline Retail</span>
+                        </div>
+
+                        <div className="p-4 bg-white rounded-2xl border border-slate-200/90 shadow-2xs">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono block">
+                            Realized Cashflow (Paid)
+                          </span>
+                          <span className="text-xl sm:text-2xl font-black text-emerald-700 font-mono mt-1 block">
+                            {formatCurrency(salesData?.overall?.combinedRealized ?? salesData?.metrics?.realizedEarning)}
+                          </span>
+                          <span className="text-[10px] text-emerald-600 font-semibold">In Hand & Bank Inflow</span>
+                        </div>
+
+                        <div className="p-4 bg-white rounded-2xl border border-slate-200/90 shadow-2xs">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono block">
+                            Total Pending Receivables
+                          </span>
+                          <span className="text-xl sm:text-2xl font-black text-amber-700 font-mono mt-1 block">
+                            {formatCurrency(salesData?.overall?.combinedPendingDue ?? salesData?.metrics?.pendingDue)}
+                          </span>
+                          <span className="text-[10px] text-amber-600 font-semibold">COD In-Transit + Offline Credit</span>
+                        </div>
+
+                        <div className="p-4 bg-white rounded-2xl border border-slate-200/90 shadow-2xs">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono block">
+                            Total Transactions
+                          </span>
+                          <span className="text-xl sm:text-2xl font-black text-forest-950 font-mono mt-1 block">
+                            {salesData?.overall?.totalTransactions || 0}
+                          </span>
+                          <span className="text-[10px] text-slate-500 font-medium">
+                            {salesData?.overall?.onlineOrdersCount || 0} Online + {salesData?.overall?.offlineSalesCount || 0} Offline
                           </span>
                         </div>
                       </div>
-                    </div>
 
-                    {/* Action Bar */}
-                    <div className="flex items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-slate-200/90 shadow-2xs">
-                      <div className="relative w-full sm:w-96">
-                        <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                        <input
-                          type="text"
-                          placeholder="Search orders in online sales ledger..."
-                          value={salesSearch}
-                          onChange={(e) => setSalesSearch(e.target.value)}
-                          className="w-full pl-9 pr-3 py-2 bg-[#FAF8F5] border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-forest-900"
-                        />
+                      {/* Channel Comparison Cards (Online vs Offline) */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* Online Channel Card */}
+                        <div className="p-5 bg-white rounded-3xl border border-slate-200/90 shadow-xs space-y-4">
+                          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                            <div className="flex items-center space-x-2.5">
+                              <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center font-bold">
+                                <Globe className="w-5 h-5" />
+                              </div>
+                              <div>
+                                <h4 className="font-serif font-bold text-forest-950 text-sm">Online E-Commerce Channel</h4>
+                                <p className="text-[11px] text-slate-400">Direct Store Orders & Courier Logistics</p>
+                              </div>
+                            </div>
+                            <span className="px-2.5 py-1 bg-blue-50 text-blue-800 border border-blue-200 text-xs font-black font-mono rounded-lg">
+                              {salesData?.overall?.onlineSharePercent ?? 0}%
+                            </span>
+                          </div>
+
+                          <div className="grid grid-cols-3 gap-2 text-center pt-1">
+                            <div className="p-2.5 bg-[#FAF8F5] rounded-xl border border-slate-100">
+                              <span className="text-[10px] text-slate-400 uppercase font-mono block font-bold">Gross Sales</span>
+                              <span className="font-mono font-black text-sm text-forest-950 block mt-0.5">
+                                ₹{salesData?.overall?.onlineGross || 0}
+                              </span>
+                            </div>
+                            <div className="p-2.5 bg-emerald-50/60 rounded-xl border border-emerald-100">
+                              <span className="text-[10px] text-emerald-600 uppercase font-mono block font-bold">Realized Cash</span>
+                              <span className="font-mono font-black text-sm text-emerald-800 block mt-0.5">
+                                ₹{salesData?.overall?.onlineRealized || 0}
+                              </span>
+                            </div>
+                            <div className="p-2.5 bg-amber-50/60 rounded-xl border border-amber-100">
+                              <span className="text-[10px] text-amber-600 uppercase font-mono block font-bold">Pending COD</span>
+                              <span className="font-mono font-black text-sm text-amber-800 block mt-0.5">
+                                ₹{salesData?.overall?.onlinePendingDue || 0}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center justify-between text-xs text-slate-500 pt-1">
+                            <span>Orders Placed: <strong className="text-forest-950 font-mono">{salesData?.overall?.onlineOrdersCount || 0}</strong></span>
+                            <button
+                              onClick={() => setSellingSubTab('online')}
+                              className="text-forest-900 font-bold hover:underline flex items-center space-x-1 cursor-pointer"
+                            >
+                              <span>View Online Orders</span>
+                              <ChevronRight className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Offline Channel Card */}
+                        <div className="p-5 bg-white rounded-3xl border border-slate-200/90 shadow-xs space-y-4">
+                          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                            <div className="flex items-center space-x-2.5">
+                              <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold">
+                                <Store className="w-5 h-5" />
+                              </div>
+                              <div>
+                                <h4 className="font-serif font-bold text-forest-950 text-sm">Offline Local Retail & Direct</h4>
+                                <p className="text-[11px] text-slate-400">Local Area, Counter Sales & Retailers</p>
+                              </div>
+                            </div>
+                            <span className="px-2.5 py-1 bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-black font-mono rounded-lg">
+                              {salesData?.overall?.offlineSharePercent ?? 0}%
+                            </span>
+                          </div>
+
+                          <div className="grid grid-cols-3 gap-2 text-center pt-1">
+                            <div className="p-2.5 bg-[#FAF8F5] rounded-xl border border-slate-100">
+                              <span className="text-[10px] text-slate-400 uppercase font-mono block font-bold">Gross Sales</span>
+                              <span className="font-mono font-black text-sm text-forest-950 block mt-0.5">
+                                ₹{salesData?.overall?.offlineGross || 0}
+                              </span>
+                            </div>
+                            <div className="p-2.5 bg-emerald-50/60 rounded-xl border border-emerald-100">
+                              <span className="text-[10px] text-emerald-600 uppercase font-mono block font-bold">Cash/UPI Paid</span>
+                              <span className="font-mono font-black text-sm text-emerald-800 block mt-0.5">
+                                ₹{salesData?.overall?.offlineRealized || 0}
+                              </span>
+                            </div>
+                            <div className="p-2.5 bg-rose-50/60 rounded-xl border border-rose-100">
+                              <span className="text-[10px] text-rose-600 uppercase font-mono block font-bold">Pending / Due</span>
+                              <span className="font-mono font-black text-sm text-rose-800 block mt-0.5">
+                                ₹{salesData?.overall?.offlineDue || 0}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center justify-between text-xs text-slate-500 pt-1">
+                            <span>Offline Bills: <strong className="text-forest-950 font-mono">{salesData?.overall?.offlineSalesCount || 0}</strong></span>
+                            <button
+                              onClick={() => setSellingSubTab('offline')}
+                              className="text-forest-900 font-bold hover:underline flex items-center space-x-1 cursor-pointer"
+                            >
+                              <span>View Offline Sales</span>
+                              <ChevronRight className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
                       </div>
-                    </div>
 
-                    {/* Customer Orders Sales Ledger Table */}
-                    <div className="bg-white rounded-3xl border border-slate-200/90 shadow-xs overflow-hidden">
-                      <div className="p-4 border-b border-slate-100 flex items-center justify-between">
-                        <h3 className="font-serif text-sm font-bold text-forest-950 flex items-center space-x-1.5">
-                          <ShoppingBag className="w-4 h-4 text-forest-800" />
-                          <span>Online Sales Ledger ({salesData?.online?.orders?.length || salesData?.orders?.length || 0} Orders)</span>
-                        </h3>
-                        <span className="text-xs text-slate-400 font-mono">{getPeriodLabel()}</span>
-                      </div>
+                      {/* Consolidated Activity Stream / Combined Ledger Table */}
+                      <div className="bg-white rounded-3xl border border-slate-200/90 shadow-xs overflow-hidden">
+                        <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                          <div>
+                            <h3 className="font-serif text-sm font-bold text-forest-950 flex items-center space-x-1.5">
+                              <Layers className="w-4 h-4 text-forest-800" />
+                              <span>Combined Sales Ledger ({consolidatedLedger.length} Total Records)</span>
+                            </h3>
+                            <p className="text-[11px] text-slate-400">Consolidated chronological timeline of Online and Offline sales</p>
+                          </div>
+                          <div className="relative w-full sm:w-72">
+                            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                            <input
+                              type="text"
+                              placeholder="Search combined transactions..."
+                              value={salesSearch}
+                              onChange={(e) => setSalesSearch(e.target.value)}
+                              className="w-full pl-8 pr-3 py-1.5 bg-[#FAF8F5] border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-forest-900"
+                            />
+                          </div>
+                        </div>
 
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-left text-xs">
-                          <thead className="bg-[#FAF8F5] text-slate-500 font-bold uppercase tracking-wider text-[10px] border-b border-slate-200">
-                            <tr>
-                              <th className="py-3 px-4">Order ID & Date</th>
-                              <th className="py-3 px-4">Customer Details</th>
-                              <th className="py-3 px-4">Payment Method</th>
-                              <th className="py-3 px-4">Payment Status</th>
-                              <th className="py-3 px-4">Order Status</th>
-                              <th className="py-3 px-4 text-right">Order Amount</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-100 font-medium">
-                            {filteredOnlineOrders.length === 0 ? (
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-left text-xs">
+                            <thead className="bg-[#FAF8F5] text-slate-500 font-bold uppercase tracking-wider text-[10px] border-b border-slate-200">
                               <tr>
-                                <td colSpan={6} className="py-10 text-center text-slate-400 italic">
-                                  No customer orders placed during {getPeriodLabel().toLowerCase()}.
-                                </td>
+                                <th className="py-3 px-4">Transaction ID & Date</th>
+                                <th className="py-3 px-4">Channel</th>
+                                <th className="py-3 px-4">Customer & Location</th>
+                                <th className="py-3 px-4">Payment Method</th>
+                                <th className="py-3 px-4">Payment Status</th>
+                                <th className="py-3 px-4 text-right">Amount</th>
+                                <th className="py-3 px-4 text-right">Due / Outstanding</th>
                               </tr>
-                            ) : (
-                              paginatedOnlineOrders.map((order: any) => (
-                                <tr key={order._id} className="hover:bg-slate-50/80 transition">
-                                  <td className="py-3.5 px-4">
-                                    <span className="font-mono font-bold text-forest-950 block">{order.orderId}</span>
-                                    <span className="text-[10.5px] text-slate-400">
-                                      {new Date(order.createdAt).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' })}
-                                    </span>
-                                  </td>
-                                  <td className="py-3.5 px-4 font-semibold text-slate-800">
-                                    {order.customerDetails?.fullName}
-                                    <span className="block text-[10px] text-slate-400 font-mono">+91 {order.customerDetails?.phone}</span>
-                                  </td>
-                                  <td className="py-3.5 px-4 font-mono font-semibold text-slate-700">
-                                    {order.paymentInfo?.method}
-                                  </td>
-                                  <td className="py-3.5 px-4">
-                                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${order.paymentInfo?.status === 'PAID'
-                                      ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                                      : order.paymentInfo?.status === 'REFUNDED'
-                                        ? 'bg-purple-50 text-purple-800 border-purple-200'
-                                        : 'bg-amber-50 text-amber-800 border-amber-200'
-                                      }`}>
-                                      {order.paymentInfo?.status}
-                                    </span>
-                                  </td>
-                                  <td className="py-3.5 px-4 font-semibold">
-                                    <span className={`px-2 py-0.5 rounded-md text-[10.5px] ${order.orderStatus === 'DELIVERED'
-                                      ? 'bg-emerald-100 text-emerald-900'
-                                      : order.orderStatus === 'CANCELLED'
-                                        ? 'bg-rose-100 text-rose-900'
-                                        : order.orderStatus === 'RETURNED'
-                                          ? 'bg-orange-100 text-orange-900'
-                                          : 'bg-slate-100 text-slate-800'
-                                      }`}>
-                                      {order.orderStatus}
-                                    </span>
-                                  </td>
-                                  <td className="py-3.5 px-4 text-right font-mono font-bold text-sm text-forest-950">
-                                    ₹{order.pricing?.totalAmount || 0}
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 font-medium">
+                              {filteredConsolidated.length === 0 ? (
+                                <tr>
+                                  <td colSpan={7} className="py-10 text-center text-slate-400 italic">
+                                    No sales transactions recorded during {getPeriodLabel().toLowerCase()}.
                                   </td>
                                 </tr>
-                              ))
-                            )}
-                          </tbody>
-                        </table>
+                              ) : (
+                                paginatedConsolidated.map((item: any) => (
+                                  <tr key={`${item.type}-${item._id}`} className="hover:bg-slate-50/80 transition">
+                                    <td className="py-3.5 px-4">
+                                      <span className="font-mono font-bold text-forest-950 block">{item.id}</span>
+                                      <span className="text-[10.5px] text-slate-400">
+                                        {new Date(item.date).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                      </span>
+                                    </td>
+                                    <td className="py-3.5 px-4">
+                                      {item.type === 'ONLINE' ? (
+                                        <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-md text-[10.5px] font-bold bg-blue-50 text-blue-800 border border-blue-200">
+                                          <Globe className="w-3 h-3" />
+                                          <span>ONLINE</span>
+                                        </span>
+                                      ) : (
+                                        <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-md text-[10.5px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                                          <Store className="w-3 h-3" />
+                                          <span>OFFLINE</span>
+                                        </span>
+                                      )}
+                                    </td>
+                                    <td className="py-3.5 px-4 font-semibold text-slate-800">
+                                      {item.customer}
+                                      <span className="block text-[10px] text-slate-400 font-sans">{item.subtitle}</span>
+                                    </td>
+                                    <td className="py-3.5 px-4 font-mono font-semibold text-slate-700">
+                                      {item.paymentMethod}
+                                    </td>
+                                    <td className="py-3.5 px-4">
+                                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${item.paymentStatus === 'PAID'
+                                        ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                                        : item.paymentStatus === 'PARTIAL'
+                                          ? 'bg-amber-50 text-amber-800 border-amber-200'
+                                          : item.paymentStatus === 'REFUNDED'
+                                            ? 'bg-purple-50 text-purple-800 border-purple-200'
+                                            : 'bg-rose-50 text-rose-800 border-rose-200'
+                                        }`}>
+                                        {item.paymentStatus}
+                                      </span>
+                                    </td>
+                                    <td className="py-3.5 px-4 text-right font-mono font-bold text-sm text-forest-950">
+                                      ₹{item.amount}
+                                    </td>
+                                    <td className="py-3.5 px-4 text-right font-mono font-bold text-xs">
+                                      {item.due > 0 ? (
+                                        <span className="text-rose-700">₹{item.due}</span>
+                                      ) : (
+                                        <span className="text-slate-400">₹0</span>
+                                      )}
+                                    </td>
+                                  </tr>
+                                ))
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+
+                        {filteredConsolidated.length > 0 && (
+                          <AdminPagination
+                            currentPage={consolidatedPage}
+                            totalItems={filteredConsolidated.length}
+                            pageSize={consolidatedPageSize}
+                            onPageChange={setConsolidatedPage}
+                            onPageSizeChange={setConsolidatedPageSize}
+                            itemLabel="transactions"
+                          />
+                        )}
                       </div>
-
-                      {filteredOnlineOrders.length > 0 && (
-                        <AdminPagination
-                          currentPage={onlineSalesPage}
-                          totalItems={filteredOnlineOrders.length}
-                          pageSize={onlineSalesPageSize}
-                          onPageChange={setOnlineSalesPage}
-                          onPageSizeChange={setOnlineSalesPageSize}
-                          itemLabel="online orders"
-                        />
-                      )}
                     </div>
-                  </div>
-                )}
+                  )}
 
-                {/* ==========================================
-                SUB-TAB 3: OFFLINE SELLING (LOCAL RETAIL)
+                  {/* ==========================================
+                SUB-TAB 2: ONLINE SELLING (WEBSITE ORDERS)
                 ========================================== */}
-                {sellingSubTab === 'offline' && (
-                  <div className="space-y-6">
-                    {/* Offline Scorecard */}
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                      <div className="p-4 bg-white rounded-2xl border border-slate-200/90 shadow-2xs">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono block">
-                          Total Offline Gross Sales
-                        </span>
-                        <span className="text-xl sm:text-2xl font-black text-forest-950 font-mono mt-1 block">
-                          {formatCurrency(salesData?.offline?.metrics?.grossSales || 0)}
-                        </span>
-                        <span className="text-[10px] text-slate-500 font-medium">Local Area Retail Counter</span>
+                  {sellingSubTab === 'online' && (
+                    <div className="space-y-6">
+                      {/* Selling Scorecard */}
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                        <div className="p-4 bg-white rounded-2xl border border-slate-200/90 shadow-2xs">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono block">
+                            Total Orders Placed
+                          </span>
+                          <span className="text-xl sm:text-2xl font-black text-forest-950 font-mono mt-1 block">
+                            {salesData?.online?.metrics?.totalOrdersCount ?? salesData?.metrics?.totalOrdersCount ?? 0}
+                          </span>
+                          <span className="text-[10px] text-slate-500">Gross: {formatCurrency(salesData?.online?.metrics?.grossSales ?? salesData?.metrics?.grossSales)}</span>
+                        </div>
+
+                        <div className="p-4 bg-white rounded-2xl border border-slate-200/90 shadow-2xs">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono block">
+                            Realized Earning (Paid)
+                          </span>
+                          <span className="text-xl sm:text-2xl font-black text-emerald-700 font-mono mt-1 block">
+                            {formatCurrency(salesData?.online?.metrics?.realizedEarning ?? salesData?.metrics?.realizedEarning)}
+                          </span>
+                          <span className="text-[10px] text-emerald-600 font-semibold">Online & Delivered COD</span>
+                        </div>
+
+                        <div className="p-4 bg-white rounded-2xl border border-slate-200/90 shadow-2xs">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono block">
+                            Pending Due (In Transit)
+                          </span>
+                          <span className="text-xl sm:text-2xl font-black text-amber-700 font-mono mt-1 block">
+                            {formatCurrency(salesData?.online?.metrics?.pendingDue ?? salesData?.metrics?.pendingDue)}
+                          </span>
+                          <span className="text-[10px] text-amber-600 font-semibold">Awaiting Courier COD Cash</span>
+                        </div>
+
+                        <div className="p-4 bg-white rounded-2xl border border-slate-200/90 shadow-2xs">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono block">
+                            Refunded & Cancelled
+                          </span>
+                          <span className="text-xl sm:text-2xl font-black text-rose-700 font-mono mt-1 block">
+                            {formatCurrency(
+                              salesData?.online?.metrics?.cancelledAndRefundedValue !== undefined
+                                ? salesData?.online?.metrics?.cancelledAndRefundedValue
+                                : ((Number(salesData?.online?.metrics?.returnedValue ?? salesData?.metrics?.returnedValue) || 0) + (Number(salesData?.online?.metrics?.cancelledValue) || 0))
+                            )}
+                          </span>
+                          <div className="flex items-center gap-1.5 mt-1 text-[10px] flex-wrap">
+                            <span className="text-rose-600 font-semibold">
+                              {salesData?.online?.metrics?.cancelledAndRefundedCount ?? ((Number(salesData?.online?.metrics?.refundedCount) || 0) + (Number(salesData?.online?.metrics?.cancelledCount) || 0))} Total
+                            </span>
+                            <span className="text-slate-300">•</span>
+                            <span className="text-slate-500">
+                              Can: {salesData?.online?.metrics?.cancelledCount ?? 0}
+                            </span>
+                            <span className="text-slate-300">•</span>
+                            <span className="text-slate-500">
+                              Ref: {salesData?.online?.metrics?.refundedCount ?? (salesData?.online?.metrics?.returnedCount ?? 0)}
+                            </span>
+                          </div>
+                        </div>
                       </div>
 
-                      <div className="p-4 bg-white rounded-2xl border border-slate-200/90 shadow-2xs">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono block">
-                          Realized Inflow (Collected)
-                        </span>
-                        <span className="text-xl sm:text-2xl font-black text-emerald-700 font-mono mt-1 block">
-                          {formatCurrency(salesData?.offline?.metrics?.realizedEarning || 0)}
-                        </span>
-                        <span className="text-[10px] text-emerald-600 font-semibold">
-                          Cash: ₹{salesData?.offline?.metrics?.cashCollected || 0} • UPI: ₹{salesData?.offline?.metrics?.upiCollected || 0}
-                        </span>
-                      </div>
-
-                      <div className="p-4 bg-white rounded-2xl border border-slate-200/90 shadow-2xs">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono block">
-                          Pending(Due)
-                        </span>
-                        <span className="text-xl sm:text-2xl font-black text-rose-700 font-mono mt-1 block">
-                          {formatCurrency(salesData?.offline?.metrics?.pendingDue || 0)}
-                        </span>
-                        <span className="text-[10px] text-rose-600 font-semibold">Pending Local Customer Credit</span>
-                      </div>
-
-                      <div className="p-4 bg-white rounded-2xl border border-slate-200/90 shadow-2xs">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono block">
-                          Total Offline Bills
-                        </span>
-                        <span className="text-xl sm:text-2xl font-black text-forest-950 font-mono mt-1 block">
-                          {salesData?.offline?.metrics?.totalSalesCount || 0}
-                        </span>
-                        <span className="text-[10px] text-slate-500 font-medium">Customer & Retail Invoices</span>
-                      </div>
-                    </div>
-
-                    {/* Filter and Action Bar */}
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-slate-200/90 shadow-2xs">
-                      <div className="flex flex-col sm:flex-row sm:items-center gap-3 w-full sm:w-auto">
-                        <div className="relative w-full sm:w-80">
+                      {/* Action Bar */}
+                      <div className="flex items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-slate-200/90 shadow-2xs">
+                        <div className="relative w-full sm:w-96">
                           <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                           <input
                             type="text"
-                            placeholder="Search by Bill ID, Customer, Phone, Area..."
-                            value={offlineSearch}
-                            onChange={(e) => setOfflineSearch(e.target.value)}
+                            placeholder="Search orders in online sales ledger..."
+                            value={salesSearch}
+                            onChange={(e) => setSalesSearch(e.target.value)}
                             className="w-full pl-9 pr-3 py-2 bg-[#FAF8F5] border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-forest-900"
                           />
                         </div>
+                      </div>
 
-                        <div className="w-full sm:w-auto">
-                          <AdminSelect
-                            value={offlineStatusFilter}
-                            onChange={setOfflineStatusFilter}
-                            options={OFFLINE_STATUS_FILTER_OPTIONS}
-                            icon={Filter}
-                            size="sm"
-                            className="w-full sm:w-56"
-                          />
+                      {/* Customer Orders Sales Ledger Table */}
+                      <div className="bg-white rounded-3xl border border-slate-200/90 shadow-xs overflow-hidden">
+                        <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+                          <h3 className="font-serif text-sm font-bold text-forest-950 flex items-center space-x-1.5">
+                            <ShoppingBag className="w-4 h-4 text-forest-800" />
+                            <span>Online Sales Ledger ({salesData?.online?.orders?.length || salesData?.orders?.length || 0} Orders)</span>
+                          </h3>
+                          <span className="text-xs text-slate-400 font-mono">{getPeriodLabel()}</span>
                         </div>
+
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-left text-xs">
+                            <thead className="bg-[#FAF8F5] text-slate-500 font-bold uppercase tracking-wider text-[10px] border-b border-slate-200">
+                              <tr>
+                                <th className="py-3 px-4">Order ID & Date</th>
+                                <th className="py-3 px-4">Customer Details</th>
+                                <th className="py-3 px-4">Payment Method</th>
+                                <th className="py-3 px-4">Payment Status</th>
+                                <th className="py-3 px-4">Order Status</th>
+                                <th className="py-3 px-4 text-right">Order Amount</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 font-medium">
+                              {filteredOnlineOrders.length === 0 ? (
+                                <tr>
+                                  <td colSpan={6} className="py-10 text-center text-slate-400 italic">
+                                    No customer orders placed during {getPeriodLabel().toLowerCase()}.
+                                  </td>
+                                </tr>
+                              ) : (
+                                paginatedOnlineOrders.map((order: any) => (
+                                  <tr key={order._id} className="hover:bg-slate-50/80 transition">
+                                    <td className="py-3.5 px-4">
+                                      <span className="font-mono font-bold text-forest-950 block">{order.orderId}</span>
+                                      <span className="text-[10.5px] text-slate-400">
+                                        {new Date(order.createdAt).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                      </span>
+                                    </td>
+                                    <td className="py-3.5 px-4 font-semibold text-slate-800">
+                                      {order.customerDetails?.fullName}
+                                      <span className="block text-[10px] text-slate-400 font-mono">+91 {order.customerDetails?.phone}</span>
+                                    </td>
+                                    <td className="py-3.5 px-4 font-mono font-semibold text-slate-700">
+                                      {order.paymentInfo?.method}
+                                    </td>
+                                    <td className="py-3.5 px-4">
+                                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${order.paymentInfo?.status === 'PAID'
+                                        ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                                        : order.paymentInfo?.status === 'REFUNDED'
+                                          ? 'bg-purple-50 text-purple-800 border-purple-200'
+                                          : 'bg-amber-50 text-amber-800 border-amber-200'
+                                        }`}>
+                                        {order.paymentInfo?.status}
+                                      </span>
+                                    </td>
+                                    <td className="py-3.5 px-4 font-semibold">
+                                      <span className={`px-2 py-0.5 rounded-md text-[10.5px] ${order.orderStatus === 'DELIVERED'
+                                        ? 'bg-emerald-100 text-emerald-900'
+                                        : order.orderStatus === 'CANCELLED'
+                                          ? 'bg-rose-100 text-rose-900'
+                                          : order.orderStatus === 'RETURNED'
+                                            ? 'bg-orange-100 text-orange-900'
+                                            : 'bg-slate-100 text-slate-800'
+                                        }`}>
+                                        {order.orderStatus}
+                                      </span>
+                                    </td>
+                                    <td className="py-3.5 px-4 text-right font-mono font-bold text-sm text-forest-950">
+                                      ₹{order.pricing?.totalAmount || 0}
+                                    </td>
+                                  </tr>
+                                ))
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+
+                        {filteredOnlineOrders.length > 0 && (
+                          <AdminPagination
+                            currentPage={onlineSalesPage}
+                            totalItems={filteredOnlineOrders.length}
+                            pageSize={onlineSalesPageSize}
+                            onPageChange={setOnlineSalesPage}
+                            onPageSizeChange={setOnlineSalesPageSize}
+                            itemLabel="online orders"
+                          />
+                        )}
                       </div>
                     </div>
+                  )}
 
-                    {/* Offline Sales Ledger Table */}
-                    <div className="bg-white rounded-3xl border border-slate-200/90 shadow-xs overflow-hidden">
-                      <div className="p-4 border-b border-slate-100 flex items-center justify-between">
-                        <h3 className="font-serif text-sm font-bold text-forest-950 flex items-center space-x-1.5">
-                          <Store className="w-4 h-4 text-emerald-700" />
-                          <span>Offline Sales & Retail Ledger ({filteredOfflineSales.length} Invoices)</span>
-                        </h3>
-                        <span className="text-xs text-slate-400 font-mono">{getPeriodLabel()}</span>
+                  {/* ==========================================
+                SUB-TAB 3: OFFLINE SELLING (LOCAL RETAIL)
+                ========================================== */}
+                  {sellingSubTab === 'offline' && (
+                    <div className="space-y-6">
+                      {/* Offline Scorecard */}
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                        <div className="p-4 bg-white rounded-2xl border border-slate-200/90 shadow-2xs">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono block">
+                            Total Offline Gross Sales
+                          </span>
+                          <span className="text-xl sm:text-2xl font-black text-forest-950 font-mono mt-1 block">
+                            {formatCurrency(salesData?.offline?.metrics?.grossSales || 0)}
+                          </span>
+                          <span className="text-[10px] text-slate-500 font-medium">Local Area Retail Counter</span>
+                        </div>
+
+                        <div className="p-4 bg-white rounded-2xl border border-slate-200/90 shadow-2xs">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono block">
+                            Realized Inflow (Collected)
+                          </span>
+                          <span className="text-xl sm:text-2xl font-black text-emerald-700 font-mono mt-1 block">
+                            {formatCurrency(salesData?.offline?.metrics?.realizedEarning || 0)}
+                          </span>
+                          <span className="text-[10px] text-emerald-600 font-semibold">
+                            Cash: ₹{salesData?.offline?.metrics?.cashCollected || 0} • UPI: ₹{salesData?.offline?.metrics?.upiCollected || 0}
+                          </span>
+                        </div>
+
+                        <div className="p-4 bg-white rounded-2xl border border-slate-200/90 shadow-2xs">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono block">
+                            Pending(Due)
+                          </span>
+                          <span className="text-xl sm:text-2xl font-black text-rose-700 font-mono mt-1 block">
+                            {formatCurrency(salesData?.offline?.metrics?.pendingDue || 0)}
+                          </span>
+                          <span className="text-[10px] text-rose-600 font-semibold">Pending Local Customer Credit</span>
+                        </div>
+
+                        <div className="p-4 bg-white rounded-2xl border border-slate-200/90 shadow-2xs">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono block">
+                            Total Offline Bills
+                          </span>
+                          <span className="text-xl sm:text-2xl font-black text-forest-950 font-mono mt-1 block">
+                            {salesData?.offline?.metrics?.totalSalesCount || 0}
+                          </span>
+                          <span className="text-[10px] text-slate-500 font-medium">Customer & Retail Invoices</span>
+                        </div>
                       </div>
 
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-left text-xs">
-                          <thead className="bg-[#FAF8F5] text-slate-500 font-bold uppercase tracking-wider text-[10px] border-b border-slate-200">
-                            <tr>
-                              <th className="py-3 px-4">Sale ID & Date</th>
-                              <th className="py-3 px-4">Customer / Retailer</th>
-                              <th className="py-3 px-4">Items Sold</th>
-                              <th className="py-3 px-4">Payment Mode</th>
-                              <th className="py-3 px-4">Payment Status</th>
-                              <th className="py-3 px-4 text-right">Total Amount</th>
-                              <th className="py-3 px-4 text-right">Paid</th>
-                              <th className="py-3 px-4 text-right">Pending / Due</th>
-                              <th className="py-3 px-4 text-right">Actions</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-100 font-medium">
-                            {filteredOfflineSales.length === 0 ? (
+                      {/* Filter and Action Bar */}
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-slate-200/90 shadow-2xs">
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-3 w-full sm:w-auto">
+                          <div className="relative w-full sm:w-80">
+                            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                            <input
+                              type="text"
+                              placeholder="Search by Bill ID, Customer, Phone, Area..."
+                              value={offlineSearch}
+                              onChange={(e) => setOfflineSearch(e.target.value)}
+                              className="w-full pl-9 pr-3 py-2 bg-[#FAF8F5] border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-forest-900"
+                            />
+                          </div>
+
+                          <div className="w-full sm:w-auto">
+                            <AdminSelect
+                              value={offlineStatusFilter}
+                              onChange={setOfflineStatusFilter}
+                              options={OFFLINE_STATUS_FILTER_OPTIONS}
+                              icon={Filter}
+                              size="sm"
+                              className="w-full sm:w-56"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Offline Sales Ledger Table */}
+                      <div className="bg-white rounded-3xl border border-slate-200/90 shadow-xs overflow-hidden">
+                        <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+                          <h3 className="font-serif text-sm font-bold text-forest-950 flex items-center space-x-1.5">
+                            <Store className="w-4 h-4 text-emerald-700" />
+                            <span>Offline Sales & Retail Ledger ({filteredOfflineSales.length} Invoices)</span>
+                          </h3>
+                          <span className="text-xs text-slate-400 font-mono">{getPeriodLabel()}</span>
+                        </div>
+
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-left text-xs">
+                            <thead className="bg-[#FAF8F5] text-slate-500 font-bold uppercase tracking-wider text-[10px] border-b border-slate-200">
                               <tr>
-                                <td colSpan={9} className="py-10 text-center text-slate-400 italic">
-                                  No offline sales recorded matching your criteria.
-                                </td>
+                                <th className="py-3 px-4">Sale ID & Date</th>
+                                <th className="py-3 px-4">Customer / Retailer</th>
+                                <th className="py-3 px-4">Items Sold</th>
+                                <th className="py-3 px-4">Payment Mode</th>
+                                <th className="py-3 px-4">Payment Status</th>
+                                <th className="py-3 px-4 text-right">Total Amount</th>
+                                <th className="py-3 px-4 text-right">Paid</th>
+                                <th className="py-3 px-4 text-right">Pending / Due</th>
+                                <th className="py-3 px-4 text-right">Actions</th>
                               </tr>
-                            ) : (
-                              paginatedOfflineSales.map((sale: any) => (
-                                <tr key={sale._id} className="hover:bg-slate-50/80 transition">
-                                  <td className="py-3.5 px-4">
-                                    <span className="font-mono font-bold text-forest-950 block">{sale.saleId}</span>
-                                    {sale.billNumber && (
-                                      <span className="text-[10px] text-slate-500 font-mono block">Bill: #{sale.billNumber}</span>
-                                    )}
-                                    <span className="text-[10.5px] text-slate-400 font-sans">
-                                      {new Date(sale.saleDate).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' })}
-                                    </span>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 font-medium">
+                              {filteredOfflineSales.length === 0 ? (
+                                <tr>
+                                  <td colSpan={9} className="py-10 text-center text-slate-400 italic">
+                                    No offline sales recorded matching your criteria.
                                   </td>
-                                  <td className="py-3.5 px-4 font-semibold text-slate-800">
-                                    {sale.customerName}
-                                    {sale.customerPhone && (
-                                      <span className="block text-[10px] text-slate-400 font-mono">+91 {sale.customerPhone}</span>
-                                    )}
-                                    {sale.locationArea && (
-                                      <span className="inline-flex items-center space-x-1 text-[10px] text-forest-800 bg-forest-50 px-1.5 py-0.5 rounded mt-0.5 font-sans font-medium">
-                                        <MapPin className="w-2.5 h-2.5 text-forest-700" />
-                                        <span>{sale.locationArea}</span>
+                                </tr>
+                              ) : (
+                                paginatedOfflineSales.map((sale: any) => (
+                                  <tr key={sale._id} className="hover:bg-slate-50/80 transition">
+                                    <td className="py-3.5 px-4">
+                                      <span className="font-mono font-bold text-forest-950 block">{sale.saleId}</span>
+                                      {sale.billNumber && (
+                                        <span className="text-[10px] text-slate-500 font-mono block">Bill: #{sale.billNumber}</span>
+                                      )}
+                                      <span className="text-[10.5px] text-slate-400 font-sans">
+                                        {new Date(sale.saleDate).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' })}
                                       </span>
-                                    )}
-                                  </td>
-                                  <td className="py-3.5 px-4">
-                                    {sale.items?.map((it: any, idx: number) => (
-                                      <div key={idx} className="text-slate-700">
-                                        <span className="font-bold">{it.name}</span>
-                                        <span className="text-slate-500 font-mono text-[10.5px] ml-1">× {it.quantity} (@ ₹{it.unitPrice})</span>
-                                      </div>
-                                    ))}
-                                  </td>
-                                  <td className="py-3.5 px-4 font-mono font-semibold text-slate-700">
-                                    {sale.paymentMode === 'CREDIT_UDHAAR' ? 'STORE CREDIT' : sale.paymentMode}
-                                  </td>
-                                  <td className="py-3.5 px-4">
-                                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${sale.paymentStatus === 'PAID'
-                                      ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                                      : sale.paymentStatus === 'PARTIAL'
-                                        ? 'bg-amber-50 text-amber-800 border-amber-200'
-                                        : 'bg-rose-50 text-rose-800 border-rose-200'
-                                      }`}>
-                                      {sale.paymentStatus === 'PENDING' ? 'PENDING' : sale.paymentStatus}
+                                    </td>
+                                    <td className="py-3.5 px-4 font-semibold text-slate-800">
+                                      {sale.customerName}
+                                      {sale.customerPhone && (
+                                        <span className="block text-[10px] text-slate-400 font-mono">+91 {sale.customerPhone}</span>
+                                      )}
+                                      {sale.locationArea && (
+                                        <span className="inline-flex items-center space-x-1 text-[10px] text-forest-800 bg-forest-50 px-1.5 py-0.5 rounded mt-0.5 font-sans font-medium">
+                                          <MapPin className="w-2.5 h-2.5 text-forest-700" />
+                                          <span>{sale.locationArea}</span>
+                                        </span>
+                                      )}
+                                    </td>
+                                    <td className="py-3.5 px-4">
+                                      {sale.items?.map((it: any, idx: number) => (
+                                        <div key={idx} className="text-slate-700">
+                                          <span className="font-bold">{it.name}</span>
+                                          <span className="text-slate-500 font-mono text-[10.5px] ml-1">× {it.quantity} (@ ₹{it.unitPrice})</span>
+                                        </div>
+                                      ))}
+                                    </td>
+                                    <td className="py-3.5 px-4 font-mono font-semibold text-slate-700">
+                                      {sale.paymentMode === 'CREDIT_UDHAAR' ? 'STORE CREDIT' : sale.paymentMode}
+                                    </td>
+                                    <td className="py-3.5 px-4">
+                                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${sale.paymentStatus === 'PAID'
+                                        ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                                        : sale.paymentStatus === 'PARTIAL'
+                                          ? 'bg-amber-50 text-amber-800 border-amber-200'
+                                          : 'bg-rose-50 text-rose-800 border-rose-200'
+                                        }`}>
+                                        {sale.paymentStatus === 'PENDING' ? 'PENDING' : sale.paymentStatus}
+                                      </span>
+                                    </td>
+                                    <td className="py-3.5 px-4 text-right font-mono font-bold text-sm text-forest-950">
+                                      ₹{sale.totalAmount || 0}
+                                    </td>
+                                    <td className="py-3.5 px-4 text-right font-mono font-bold text-xs text-emerald-700">
+                                      ₹{sale.amountPaid || 0}
+                                    </td>
+                                    <td className="py-3.5 px-4 text-right font-mono font-bold text-xs">
+                                      {sale.amountDue > 0 ? (
+                                        <span className="text-rose-700 font-black">₹{sale.amountDue}</span>
+                                      ) : (
+                                        <span className="text-slate-400">₹0</span>
+                                      )}
+                                    </td>
+                                    <td className="py-3.5 px-4 text-right space-x-1 whitespace-nowrap">
+                                      <button
+                                        onClick={() => setSelectedOfflineSaleForView(sale)}
+                                        className="p-1.5 text-slate-400 hover:text-forest-950 hover:bg-slate-100 rounded-lg transition cursor-pointer"
+                                        title="View Invoice & Audit Change History"
+                                      >
+                                        <Eye className="w-3.5 h-3.5" />
+                                      </button>
+                                      <button
+                                        onClick={() => handleOpenEditOfflineSale(sale)}
+                                        className="p-1.5 text-slate-400 hover:text-forest-950 hover:bg-slate-100 rounded-lg transition cursor-pointer"
+                                        title="Edit Sale Details & Record Changes"
+                                      >
+                                        <Edit2 className="w-3.5 h-3.5" />
+                                      </button>
+                                      {sale.amountDue > 0 && (
+                                        <button
+                                          onClick={() => handleOpenOfflinePayment(sale)}
+                                          className="px-2 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold rounded-lg text-[10.5px] transition cursor-pointer"
+                                          title="Settle pending balance or record payment"
+                                        >
+                                          Collect
+                                        </button>
+                                      )}
+                                      <button
+                                        onClick={() => handleDeleteOfflineSale(sale._id, sale.saleId)}
+                                        className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer"
+                                        title="Delete record and restore inventory"
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                      </button>
+                                    </td>
+                                  </tr>
+                                ))
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+
+                        {filteredOfflineSales.length > 0 && (
+                          <AdminPagination
+                            currentPage={offlineSalesPage}
+                            totalItems={filteredOfflineSales.length}
+                            pageSize={offlineSalesPageSize}
+                            onPageChange={setOfflineSalesPage}
+                            onPageSizeChange={setOfflineSalesPageSize}
+                            itemLabel="offline bills"
+                          />
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )
+            }
+
+            {/* ====================================================================
+          TAB 3: PRODUCT MANUFACTURING & SOURCING
+          ==================================================================== */}
+            {
+              activeTab === 'manufacturing' && (
+                <div className="space-y-6">
+                  {/* Manufacturing Metrics */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                    <div className="p-4 bg-white rounded-2xl border border-slate-200/90 shadow-2xs">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono block">
+                        Total Sourcing Cost
+                      </span>
+                      <span className="text-xl sm:text-2xl font-black text-slate-900 font-mono mt-1 block">
+                        {formatCurrency(mfgData?.metrics?.totalCost)}
+                      </span>
+                      <span className="text-[10px] text-slate-500">{mfgData?.metrics?.totalBatches || 0} production batches</span>
+                    </div>
+
+                    <div className="p-4 bg-white rounded-2xl border border-slate-200/90 shadow-2xs">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono block">
+                        Total Paid to Vendors
+                      </span>
+                      <span className="text-xl sm:text-2xl font-black text-emerald-700 font-mono mt-1 block">
+                        {formatCurrency(mfgData?.metrics?.totalPaid)}
+                      </span>
+                      <span className="text-[10px] text-emerald-600 font-semibold">Cleared via bank & UPI</span>
+                    </div>
+
+                    <div className="p-4 bg-white rounded-2xl border border-slate-200/90 shadow-2xs">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono block">
+                        Pending Due to Vendors
+                      </span>
+                      <span className="text-xl sm:text-2xl font-black text-rose-700 font-mono mt-1 block">
+                        {formatCurrency(mfgData?.metrics?.totalDue)}
+                      </span>
+                      <span className="text-[10px] text-rose-600 font-semibold">Outstanding Accounts Payable</span>
+                    </div>
+
+                    <div className="p-4 bg-white rounded-2xl border border-slate-200/90 shadow-2xs">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono block">
+                        Supplier Returns & Refunds
+                      </span>
+                      <span className="text-xl sm:text-2xl font-black text-purple-700 font-mono mt-1 block">
+                        {formatCurrency(mfgData?.metrics?.totalRefunded)}
+                      </span>
+                      <span className="text-[10px] text-purple-600 font-semibold">Refunded for defective/returned batches</span>
+                    </div>
+                  </div>
+
+                  {/* Action Bar */}
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-slate-200/90 shadow-2xs">
+                    <div className="relative w-full sm:w-80">
+                      <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="text"
+                        placeholder="Search vendor, batch number, product..."
+                        value={mfgSearch}
+                        onChange={(e) => setMfgSearch(e.target.value)}
+                        className="w-full pl-9 pr-3 py-2 bg-[#FAF8F5] border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-forest-900"
+                      />
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        const nextNum = (mfgData?.entries?.length || 0) + 1;
+                        const autoBatch = `BATCH-${String(nextNum).padStart(2, '0')}`;
+                        setNewMfg({
+                          productName: '',
+                          batchNumber: autoBatch,
+                          vendorName: '',
+                          vendorContact: '',
+                          quantity: 100,
+                          unitCost: 100,
+                          totalCost: 10000,
+                          amountPaid: 0,
+                          paymentMode: 'BANK_TRANSFER',
+                          invoiceNumber: '',
+                          expenseDate: new Date().toISOString().split('T')[0],
+                          notes: ''
+                        });
+                        setIsAddMfgModalOpen(true);
+                      }}
+                      className="w-full sm:w-auto inline-flex items-center justify-center space-x-1.5 px-4 py-2 rounded-xl bg-forest-900 hover:bg-forest-950 text-gold-400 font-bold text-xs transition cursor-pointer"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span>Record Manufacturing Procurement Batch</span>
+                    </button>
+                  </div>
+
+                  {/* Manufacturing Ledger Table */}
+                  <div className="bg-white rounded-3xl border border-slate-200/90 shadow-xs overflow-hidden">
+                    <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+                      <h3 className="font-serif text-sm font-bold text-forest-950 flex items-center space-x-1.5">
+                        <Factory className="w-4 h-4 text-forest-800" />
+                        <span>Manufacturing Procurement Batches ({mfgData?.entries?.length || 0})</span>
+                      </h3>
+                      <span className="text-xs text-slate-400 font-mono">{getPeriodLabel()}</span>
+                    </div>
+
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs">
+                        <thead className="bg-[#FAF8F5] text-slate-500 font-bold uppercase tracking-wider text-[10px] border-b border-slate-200">
+                          <tr>
+                            <th className="py-3 px-4">Batch & Date</th>
+                            <th className="py-3 px-4">Product & Quantity</th>
+                            <th className="py-3 px-4">Vendor / Manufacturer</th>
+                            <th className="py-3 px-4">Cost (Unit & Total)</th>
+                            <th className="py-3 px-4">Paid & Due</th>
+                            <th className="py-3 px-4">Status & Returns</th>
+                            <th className="py-3 px-4 text-right">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 font-medium">
+                          {filteredMfgEntries.length === 0 ? (
+                            <tr>
+                              <td colSpan={7} className="py-10 text-center text-slate-400 italic">
+                                No manufacturing procurement batches recorded for this period.
+                              </td>
+                            </tr>
+                          ) : (
+                            paginatedMfgEntries.map((entry: any) => (
+                              <tr key={entry._id} className="hover:bg-slate-50/80 transition">
+                                <td className="py-3.5 px-4">
+                                  <span className="font-mono font-bold text-forest-950 block">{entry.batchNumber}</span>
+                                  <span className="text-[10px] text-slate-400">
+                                    {new Date(entry.expenseDate).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                  </span>
+                                  {entry.invoiceNumber && (
+                                    <span className="text-[10px] text-slate-500 block font-mono">Inv: {entry.invoiceNumber}</span>
+                                  )}
+                                </td>
+                                <td className="py-3.5 px-4 font-semibold text-slate-900">
+                                  {entry.productName}
+                                  <span className="block text-[11px] text-forest-900 font-bold">
+                                    {entry.quantity} units manufactured
+                                  </span>
+                                </td>
+                                <td className="py-3.5 px-4 font-medium text-slate-700">
+                                  {entry.vendorName}
+                                  {entry.vendorContact && (
+                                    <span className="block text-[10.5px] text-slate-400 font-mono">{entry.vendorContact}</span>
+                                  )}
+                                </td>
+                                <td className="py-3.5 px-4 font-mono">
+                                  <span className="font-bold text-slate-900 block">₹{entry.totalCost}</span>
+                                  <span className="text-[10.5px] text-slate-400">@ ₹{entry.unitCost}/unit</span>
+                                </td>
+                                <td className="py-3.5 px-4 font-mono text-[11.5px]">
+                                  <span className="text-emerald-700 font-bold block">Paid: ₹{entry.amountPaid}</span>
+                                  <span className={`font-bold block ${entry.amountDue > 0 ? 'text-rose-700' : 'text-slate-400'}`}>
+                                    Due: ₹{entry.amountDue}
+                                  </span>
+                                </td>
+                                <td className="py-3.5 px-4">
+                                  <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${entry.paymentStatus === 'PAID'
+                                    ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                                    : entry.paymentStatus === 'PARTIAL'
+                                      ? 'bg-amber-50 text-amber-800 border-amber-300'
+                                      : 'bg-rose-50 text-rose-800 border-rose-300'
+                                    }`}>
+                                    {entry.paymentStatus}
+                                  </span>
+
+                                  {entry.totalRefundedFromReturns > 0 && (
+                                    <span className="block text-[10px] text-purple-700 font-bold mt-1">
+                                      ↺ ₹{entry.totalRefundedFromReturns} Refunded
                                     </span>
-                                  </td>
-                                  <td className="py-3.5 px-4 text-right font-mono font-bold text-sm text-forest-950">
-                                    ₹{sale.totalAmount || 0}
-                                  </td>
-                                  <td className="py-3.5 px-4 text-right font-mono font-bold text-xs text-emerald-700">
-                                    ₹{sale.amountPaid || 0}
-                                  </td>
-                                  <td className="py-3.5 px-4 text-right font-mono font-bold text-xs">
-                                    {sale.amountDue > 0 ? (
-                                      <span className="text-rose-700 font-black">₹{sale.amountDue}</span>
-                                    ) : (
-                                      <span className="text-slate-400">₹0</span>
-                                    )}
-                                  </td>
-                                  <td className="py-3.5 px-4 text-right space-x-1 whitespace-nowrap">
+                                  )}
+                                </td>
+                                <td className="py-3.5 px-4 text-right">
+                                  <div className="flex items-center justify-end space-x-1">
                                     <button
-                                      onClick={() => setSelectedOfflineSaleForView(sale)}
+                                      onClick={() => setSelectedMfgForView(entry)}
                                       className="p-1.5 text-slate-400 hover:text-forest-950 hover:bg-slate-100 rounded-lg transition cursor-pointer"
-                                      title="View Invoice & Audit Change History"
+                                      title="View Batch Details & Modification History"
                                     >
                                       <Eye className="w-3.5 h-3.5" />
                                     </button>
+
                                     <button
-                                      onClick={() => handleOpenEditOfflineSale(sale)}
+                                      onClick={() => handleOpenEditMfg(entry)}
                                       className="p-1.5 text-slate-400 hover:text-forest-950 hover:bg-slate-100 rounded-lg transition cursor-pointer"
-                                      title="Edit Sale Details & Record Changes"
+                                      title="Edit Procurement Batch Details"
                                     >
                                       <Edit2 className="w-3.5 h-3.5" />
                                     </button>
-                                    {sale.amountDue > 0 && (
+
+                                    {entry.amountDue > 0 && (
                                       <button
-                                        onClick={() => handleOpenOfflinePayment(sale)}
-                                        className="px-2 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold rounded-lg text-[10.5px] transition cursor-pointer"
-                                        title="Settle pending balance or record payment"
+                                        onClick={() => {
+                                          setSelectedMfgForPayment(entry);
+                                          setPaymentAmount(entry.amountDue);
+                                          setIsRecordPaymentModalOpen(true);
+                                        }}
+                                        className="px-2 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold rounded-lg text-[10.5px] transition"
+                                        title="Pay supplier balance"
                                       >
-                                        Collect
+                                        Pay Due
                                       </button>
                                     )}
+
                                     <button
-                                      onClick={() => handleDeleteOfflineSale(sale._id, sale.saleId)}
-                                      className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer"
-                                      title="Delete record and restore inventory"
+                                      onClick={() => {
+                                        setSelectedMfgForReturn(entry);
+                                        setReturnQty(1);
+                                        setRefundAmount(entry.unitCost);
+                                        setReturnReason('');
+                                        setIsRecordReturnModalOpen(true);
+                                      }}
+                                      className="px-2 py-1 bg-purple-50 hover:bg-purple-100 text-purple-800 font-bold rounded-lg text-[10.5px] transition"
+                                      title="Record defective/unsold return to supplier"
+                                    >
+                                      Return Batch
+                                    </button>
+
+                                    <button
+                                      onClick={() => handleDeleteMfg(entry._id, entry.batchNumber)}
+                                      className="p-1 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition cursor-pointer"
+                                      title="Delete batch entry"
                                     >
                                       <Trash2 className="w-3.5 h-3.5" />
                                     </button>
-                                  </td>
-                                </tr>
-                              ))
-                            )}
-                          </tbody>
-                        </table>
-                      </div>
+                                  </div>
+                                </td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
 
-                      {filteredOfflineSales.length > 0 && (
-                        <AdminPagination
-                          currentPage={offlineSalesPage}
-                          totalItems={filteredOfflineSales.length}
-                          pageSize={offlineSalesPageSize}
-                          onPageChange={setOfflineSalesPage}
-                          onPageSizeChange={setOfflineSalesPageSize}
-                          itemLabel="offline bills"
-                        />
-                      )}
+                    {filteredMfgEntries.length > 0 && (
+                      <AdminPagination
+                        currentPage={mfgPage}
+                        totalItems={filteredMfgEntries.length}
+                        pageSize={mfgPageSize}
+                        onPageChange={setMfgPage}
+                        onPageSizeChange={setMfgPageSize}
+                        itemLabel="batches"
+                      />
+                    )}
+                  </div>
+                </div>
+              )
+            }
+
+            {/* ====================================================================
+          TAB 4: SHOP & OVERHEAD OPERATIONAL EXPENSES
+          ==================================================================== */}
+            {
+              activeTab === 'operating' && (
+                <div className="space-y-6">
+                  {/* Operating Metrics */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                    <div className="p-4 bg-white rounded-2xl border border-slate-200/90 shadow-2xs">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono block">
+                        Total Operating Expenses
+                      </span>
+                      <span className="text-xl sm:text-2xl font-black text-slate-900 font-mono mt-1 block">
+                        {formatCurrency(operatingData?.metrics?.totalOperatingExpense)}
+                      </span>
+                      <span className="text-[10px] text-slate-500">{operatingData?.metrics?.totalEntries || 0} logged vouchers</span>
+                    </div>
+
+                    <div className="p-4 bg-white rounded-2xl border border-slate-200/90 shadow-2xs">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono block">
+                        Rent & Facilities
+                      </span>
+                      <span className="text-xl sm:text-2xl font-black text-forest-950 font-mono mt-1 block">
+                        {formatCurrency(operatingData?.metrics?.categoryBreakdown?.RENT)}
+                      </span>
+                      <span className="text-[10px] text-slate-500">Warehouse & fulfillment space</span>
+                    </div>
+
+                    <div className="p-4 bg-white rounded-2xl border border-slate-200/90 shadow-2xs">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono block">
+                        Electricity & Utilities
+                      </span>
+                      <span className="text-xl sm:text-2xl font-black text-amber-700 font-mono mt-1 block">
+                        {formatCurrency(operatingData?.metrics?.categoryBreakdown?.ELECTRICITY_BILL)}
+                      </span>
+                      <span className="text-[10px] text-slate-500">Light bills & power backup</span>
+                    </div>
+
+                    <div className="p-4 bg-white rounded-2xl border border-slate-200/90 shadow-2xs">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono block">
+                        Pantry & Refreshments
+                      </span>
+                      <span className="text-xl sm:text-2xl font-black text-slate-800 font-mono mt-1 block">
+                        {formatCurrency(operatingData?.metrics?.categoryBreakdown?.FOOD_REFRESHMENTS)}
+                      </span>
+                      <span className="text-[10px] text-slate-500">Staff tea, breakfast & snacks</span>
                     </div>
                   </div>
-                )}
-              </div>
-            )
-          }
 
-          {/* ====================================================================
-          TAB 3: PRODUCT MANUFACTURING & SOURCING
-          ==================================================================== */}
-          {
-            activeTab === 'manufacturing' && (
-              <div className="space-y-6">
-                {/* Manufacturing Metrics */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                  <div className="p-4 bg-white rounded-2xl border border-slate-200/90 shadow-2xs">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono block">
-                      Total Sourcing Cost
-                    </span>
-                    <span className="text-xl sm:text-2xl font-black text-slate-900 font-mono mt-1 block">
-                      {formatCurrency(mfgData?.metrics?.totalCost)}
-                    </span>
-                    <span className="text-[10px] text-slate-500">{mfgData?.metrics?.totalBatches || 0} production batches</span>
+                  {/* Action & Filter Bar */}
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-slate-200/90 shadow-2xs">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-2 w-full sm:w-auto">
+                      <span className="text-slate-500 font-bold text-xs shrink-0">Filter Category:</span>
+                      <AdminSelect
+                        value={operatingCategoryFilter}
+                        onChange={setOperatingCategoryFilter}
+                        options={OPERATING_CATEGORY_FILTER_OPTIONS}
+                        icon={Filter}
+                        size="sm"
+                        searchable={true}
+                        className="w-full sm:w-64"
+                      />
+                    </div>
+
+                    <button
+                      onClick={() => setIsAddOperatingModalOpen(true)}
+                      className="w-full sm:w-auto inline-flex items-center justify-center space-x-1.5 px-4 py-2 rounded-xl bg-forest-900 hover:bg-forest-950 text-gold-400 font-bold text-xs transition cursor-pointer"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span>Record Expense (Rent, Bill, Tea/Snacks)</span>
+                    </button>
                   </div>
 
-                  <div className="p-4 bg-white rounded-2xl border border-slate-200/90 shadow-2xs">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono block">
-                      Total Paid to Vendors
-                    </span>
-                    <span className="text-xl sm:text-2xl font-black text-emerald-700 font-mono mt-1 block">
-                      {formatCurrency(mfgData?.metrics?.totalPaid)}
-                    </span>
-                    <span className="text-[10px] text-emerald-600 font-semibold">Cleared via bank & UPI</span>
-                  </div>
+                  {/* Operating Expenses Table */}
+                  <div className="bg-white rounded-3xl border border-slate-200/90 shadow-xs overflow-hidden">
+                    <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+                      <h3 className="font-serif text-sm font-bold text-forest-950 flex items-center space-x-1.5">
+                        <Receipt className="w-4 h-4 text-forest-800" />
+                        <span>Operating Expense Ledger ({operatingData?.entries?.length || 0})</span>
+                      </h3>
+                      <span className="text-xs text-slate-400 font-mono">{getPeriodLabel()}</span>
+                    </div>
 
-                  <div className="p-4 bg-white rounded-2xl border border-slate-200/90 shadow-2xs">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono block">
-                      Pending Due to Vendors
-                    </span>
-                    <span className="text-xl sm:text-2xl font-black text-rose-700 font-mono mt-1 block">
-                      {formatCurrency(mfgData?.metrics?.totalDue)}
-                    </span>
-                    <span className="text-[10px] text-rose-600 font-semibold">Outstanding Accounts Payable</span>
-                  </div>
-
-                  <div className="p-4 bg-white rounded-2xl border border-slate-200/90 shadow-2xs">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono block">
-                      Supplier Returns & Refunds
-                    </span>
-                    <span className="text-xl sm:text-2xl font-black text-purple-700 font-mono mt-1 block">
-                      {formatCurrency(mfgData?.metrics?.totalRefunded)}
-                    </span>
-                    <span className="text-[10px] text-purple-600 font-semibold">Refunded for defective/returned batches</span>
-                  </div>
-                </div>
-
-                {/* Action Bar */}
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-slate-200/90 shadow-2xs">
-                  <div className="relative w-full sm:w-80">
-                    <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                    <input
-                      type="text"
-                      placeholder="Search vendor, batch number, product..."
-                      value={mfgSearch}
-                      onChange={(e) => setMfgSearch(e.target.value)}
-                      className="w-full pl-9 pr-3 py-2 bg-[#FAF8F5] border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-forest-900"
-                    />
-                  </div>
-
-                  <button
-                    onClick={() => {
-                      const nextNum = (mfgData?.entries?.length || 0) + 1;
-                      const autoBatch = `BATCH-${String(nextNum).padStart(2, '0')}`;
-                      setNewMfg({
-                        productName: '',
-                        batchNumber: autoBatch,
-                        vendorName: '',
-                        vendorContact: '',
-                        quantity: 100,
-                        unitCost: 100,
-                        totalCost: 10000,
-                        amountPaid: 0,
-                        paymentMode: 'BANK_TRANSFER',
-                        invoiceNumber: '',
-                        expenseDate: new Date().toISOString().split('T')[0],
-                        notes: ''
-                      });
-                      setIsAddMfgModalOpen(true);
-                    }}
-                    className="w-full sm:w-auto inline-flex items-center justify-center space-x-1.5 px-4 py-2 rounded-xl bg-forest-900 hover:bg-forest-950 text-gold-400 font-bold text-xs transition cursor-pointer"
-                  >
-                    <Plus className="w-4 h-4" />
-                    <span>Record Manufacturing Procurement Batch</span>
-                  </button>
-                </div>
-
-                {/* Manufacturing Ledger Table */}
-                <div className="bg-white rounded-3xl border border-slate-200/90 shadow-xs overflow-hidden">
-                  <div className="p-4 border-b border-slate-100 flex items-center justify-between">
-                    <h3 className="font-serif text-sm font-bold text-forest-950 flex items-center space-x-1.5">
-                      <Factory className="w-4 h-4 text-forest-800" />
-                      <span>Manufacturing Procurement Batches ({mfgData?.entries?.length || 0})</span>
-                    </h3>
-                    <span className="text-xs text-slate-400 font-mono">{getPeriodLabel()}</span>
-                  </div>
-
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-xs">
-                      <thead className="bg-[#FAF8F5] text-slate-500 font-bold uppercase tracking-wider text-[10px] border-b border-slate-200">
-                        <tr>
-                          <th className="py-3 px-4">Batch & Date</th>
-                          <th className="py-3 px-4">Product & Quantity</th>
-                          <th className="py-3 px-4">Vendor / Manufacturer</th>
-                          <th className="py-3 px-4">Cost (Unit & Total)</th>
-                          <th className="py-3 px-4">Paid & Due</th>
-                          <th className="py-3 px-4">Status & Returns</th>
-                          <th className="py-3 px-4 text-right">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100 font-medium">
-                        {filteredMfgEntries.length === 0 ? (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs">
+                        <thead className="bg-[#FAF8F5] text-slate-500 font-bold uppercase tracking-wider text-[10px] border-b border-slate-200">
                           <tr>
-                            <td colSpan={7} className="py-10 text-center text-slate-400 italic">
-                              No manufacturing procurement batches recorded for this period.
-                            </td>
+                            <th className="py-3 px-4">Date & Category</th>
+                            <th className="py-3 px-4">Expense Title & Description</th>
+                            <th className="py-3 px-4">Paid To</th>
+                            <th className="py-3 px-4">Payment Mode</th>
+                            <th className="py-3 px-4 text-right">Amount (₹)</th>
+                            <th className="py-3 px-4 text-right">Action</th>
                           </tr>
-                        ) : (
-                          paginatedMfgEntries.map((entry: any) => (
-                            <tr key={entry._id} className="hover:bg-slate-50/80 transition">
-                              <td className="py-3.5 px-4">
-                                <span className="font-mono font-bold text-forest-950 block">{entry.batchNumber}</span>
-                                <span className="text-[10px] text-slate-400">
-                                  {new Date(entry.expenseDate).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' })}
-                                </span>
-                                {entry.invoiceNumber && (
-                                  <span className="text-[10px] text-slate-500 block font-mono">Inv: {entry.invoiceNumber}</span>
-                                )}
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 font-medium">
+                          {filteredOperatingEntries.length === 0 ? (
+                            <tr>
+                              <td colSpan={6} className="py-10 text-center text-slate-400 italic">
+                                No operating overhead expenses logged for this period.
                               </td>
-                              <td className="py-3.5 px-4 font-semibold text-slate-900">
-                                {entry.productName}
-                                <span className="block text-[11px] text-forest-900 font-bold">
-                                  {entry.quantity} units manufactured
-                                </span>
-                              </td>
-                              <td className="py-3.5 px-4 font-medium text-slate-700">
-                                {entry.vendorName}
-                                {entry.vendorContact && (
-                                  <span className="block text-[10.5px] text-slate-400 font-mono">{entry.vendorContact}</span>
-                                )}
-                              </td>
-                              <td className="py-3.5 px-4 font-mono">
-                                <span className="font-bold text-slate-900 block">₹{entry.totalCost}</span>
-                                <span className="text-[10.5px] text-slate-400">@ ₹{entry.unitCost}/unit</span>
-                              </td>
-                              <td className="py-3.5 px-4 font-mono text-[11.5px]">
-                                <span className="text-emerald-700 font-bold block">Paid: ₹{entry.amountPaid}</span>
-                                <span className={`font-bold block ${entry.amountDue > 0 ? 'text-rose-700' : 'text-slate-400'}`}>
-                                  Due: ₹{entry.amountDue}
-                                </span>
-                              </td>
-                              <td className="py-3.5 px-4">
-                                <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${entry.paymentStatus === 'PAID'
-                                  ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
-                                  : entry.paymentStatus === 'PARTIAL'
-                                    ? 'bg-amber-50 text-amber-800 border-amber-300'
-                                    : 'bg-rose-50 text-rose-800 border-rose-300'
-                                  }`}>
-                                  {entry.paymentStatus}
-                                </span>
-
-                                {entry.totalRefundedFromReturns > 0 && (
-                                  <span className="block text-[10px] text-purple-700 font-bold mt-1">
-                                    ↺ ₹{entry.totalRefundedFromReturns} Refunded
+                            </tr>
+                          ) : (
+                            paginatedOperatingEntries.map((entry: any) => (
+                              <tr key={entry._id} className="hover:bg-slate-50/80 transition">
+                                <td className="py-3.5 px-4">
+                                  <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-700 block w-max">
+                                    {entry.category}
                                   </span>
-                                )}
-                              </td>
-                              <td className="py-3.5 px-4 text-right">
-                                <div className="flex items-center justify-end space-x-1">
+                                  <span className="text-[10px] text-slate-400 mt-1 block">
+                                    {new Date(entry.expenseDate).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                  </span>
+                                </td>
+                                <td className="py-3.5 px-4">
+                                  <span className="font-bold text-slate-900 block">{entry.title}</span>
+                                  {entry.notes && (
+                                    <span className="text-[10.5px] text-slate-400">{entry.notes}</span>
+                                  )}
+                                </td>
+                                <td className="py-3.5 px-4 font-semibold text-slate-700">
+                                  {entry.paidTo || 'N/A'}
+                                  {entry.billNumber && (
+                                    <span className="block text-[10px] text-slate-400 font-mono">Bill #{entry.billNumber}</span>
+                                  )}
+                                </td>
+                                <td className="py-3.5 px-4 font-mono font-semibold text-slate-600">
+                                  {entry.paymentMode}
+                                </td>
+                                <td className="py-3.5 px-4 text-right font-mono font-bold text-sm text-forest-950">
+                                  ₹{entry.amount}
+                                </td>
+                                <td className="py-3.5 px-4 text-right space-x-1 whitespace-nowrap">
                                   <button
-                                    onClick={() => setSelectedMfgForView(entry)}
+                                    onClick={() => setSelectedOperatingForView(entry)}
                                     className="p-1.5 text-slate-400 hover:text-forest-950 hover:bg-slate-100 rounded-lg transition cursor-pointer"
-                                    title="View Batch Details & Modification History"
+                                    title="View Voucher Details & Modification History"
                                   >
                                     <Eye className="w-3.5 h-3.5" />
                                   </button>
-
                                   <button
-                                    onClick={() => handleOpenEditMfg(entry)}
+                                    onClick={() => handleOpenEditOperating(entry)}
                                     className="p-1.5 text-slate-400 hover:text-forest-950 hover:bg-slate-100 rounded-lg transition cursor-pointer"
-                                    title="Edit Procurement Batch Details"
+                                    title="Edit Expense Voucher"
                                   >
                                     <Edit2 className="w-3.5 h-3.5" />
                                   </button>
-
-                                  {entry.amountDue > 0 && (
-                                    <button
-                                      onClick={() => {
-                                        setSelectedMfgForPayment(entry);
-                                        setPaymentAmount(entry.amountDue);
-                                        setIsRecordPaymentModalOpen(true);
-                                      }}
-                                      className="px-2 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold rounded-lg text-[10.5px] transition"
-                                      title="Pay supplier balance"
-                                    >
-                                      Pay Due
-                                    </button>
-                                  )}
-
                                   <button
-                                    onClick={() => {
-                                      setSelectedMfgForReturn(entry);
-                                      setReturnQty(1);
-                                      setRefundAmount(entry.unitCost);
-                                      setReturnReason('');
-                                      setIsRecordReturnModalOpen(true);
-                                    }}
-                                    className="px-2 py-1 bg-purple-50 hover:bg-purple-100 text-purple-800 font-bold rounded-lg text-[10.5px] transition"
-                                    title="Record defective/unsold return to supplier"
-                                  >
-                                    Return Batch
-                                  </button>
-
-                                  <button
-                                    onClick={() => handleDeleteMfg(entry._id, entry.batchNumber)}
-                                    className="p-1 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition cursor-pointer"
-                                    title="Delete batch entry"
+                                    onClick={() => handleDeleteOperating(entry._id, entry.title)}
+                                    className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition cursor-pointer"
+                                    title="Delete expense entry"
                                   >
                                     <Trash2 className="w-3.5 h-3.5" />
                                   </button>
-                                </div>
-                              </td>
-                            </tr>
-                          ))
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
+                                </td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
 
-                  {filteredMfgEntries.length > 0 && (
-                    <AdminPagination
-                      currentPage={mfgPage}
-                      totalItems={filteredMfgEntries.length}
-                      pageSize={mfgPageSize}
-                      onPageChange={setMfgPage}
-                      onPageSizeChange={setMfgPageSize}
-                      itemLabel="batches"
-                    />
-                  )}
-                </div>
-              </div>
-            )
-          }
-
-          {/* ====================================================================
-          TAB 4: SHOP & OVERHEAD OPERATIONAL EXPENSES
-          ==================================================================== */}
-          {
-            activeTab === 'operating' && (
-              <div className="space-y-6">
-                {/* Operating Metrics */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                  <div className="p-4 bg-white rounded-2xl border border-slate-200/90 shadow-2xs">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono block">
-                      Total Operating Expenses
-                    </span>
-                    <span className="text-xl sm:text-2xl font-black text-slate-900 font-mono mt-1 block">
-                      {formatCurrency(operatingData?.metrics?.totalOperatingExpense)}
-                    </span>
-                    <span className="text-[10px] text-slate-500">{operatingData?.metrics?.totalEntries || 0} logged vouchers</span>
-                  </div>
-
-                  <div className="p-4 bg-white rounded-2xl border border-slate-200/90 shadow-2xs">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono block">
-                      Rent & Facilities
-                    </span>
-                    <span className="text-xl sm:text-2xl font-black text-forest-950 font-mono mt-1 block">
-                      {formatCurrency(operatingData?.metrics?.categoryBreakdown?.RENT)}
-                    </span>
-                    <span className="text-[10px] text-slate-500">Warehouse & fulfillment space</span>
-                  </div>
-
-                  <div className="p-4 bg-white rounded-2xl border border-slate-200/90 shadow-2xs">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono block">
-                      Electricity & Utilities
-                    </span>
-                    <span className="text-xl sm:text-2xl font-black text-amber-700 font-mono mt-1 block">
-                      {formatCurrency(operatingData?.metrics?.categoryBreakdown?.ELECTRICITY_BILL)}
-                    </span>
-                    <span className="text-[10px] text-slate-500">Light bills & power backup</span>
-                  </div>
-
-                  <div className="p-4 bg-white rounded-2xl border border-slate-200/90 shadow-2xs">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono block">
-                      Pantry & Refreshments
-                    </span>
-                    <span className="text-xl sm:text-2xl font-black text-slate-800 font-mono mt-1 block">
-                      {formatCurrency(operatingData?.metrics?.categoryBreakdown?.FOOD_REFRESHMENTS)}
-                    </span>
-                    <span className="text-[10px] text-slate-500">Staff tea, breakfast & snacks</span>
+                    {filteredOperatingEntries.length > 0 && (
+                      <AdminPagination
+                        currentPage={operatingPage}
+                        totalItems={filteredOperatingEntries.length}
+                        pageSize={operatingPageSize}
+                        onPageChange={setOperatingPage}
+                        onPageSizeChange={setOperatingPageSize}
+                        itemLabel="expenses"
+                      />
+                    )}
                   </div>
                 </div>
+              )
+            }
 
-                {/* Action & Filter Bar */}
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-slate-200/90 shadow-2xs">
-                  <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-2 w-full sm:w-auto">
-                    <span className="text-slate-500 font-bold text-xs shrink-0">Filter Category:</span>
-                    <AdminSelect
-                      value={operatingCategoryFilter}
-                      onChange={setOperatingCategoryFilter}
-                      options={OPERATING_CATEGORY_FILTER_OPTIONS}
-                      icon={Filter}
-                      size="sm"
-                      searchable={true}
-                      className="w-full sm:w-64"
-                    />
-                  </div>
-
-                  <button
-                    onClick={() => setIsAddOperatingModalOpen(true)}
-                    className="w-full sm:w-auto inline-flex items-center justify-center space-x-1.5 px-4 py-2 rounded-xl bg-forest-900 hover:bg-forest-950 text-gold-400 font-bold text-xs transition cursor-pointer"
-                  >
-                    <Plus className="w-4 h-4" />
-                    <span>Record Expense (Rent, Bill, Tea/Snacks)</span>
-                  </button>
-                </div>
-
-                {/* Operating Expenses Table */}
-                <div className="bg-white rounded-3xl border border-slate-200/90 shadow-xs overflow-hidden">
-                  <div className="p-4 border-b border-slate-100 flex items-center justify-between">
-                    <h3 className="font-serif text-sm font-bold text-forest-950 flex items-center space-x-1.5">
-                      <Receipt className="w-4 h-4 text-forest-800" />
-                      <span>Operating Expense Ledger ({operatingData?.entries?.length || 0})</span>
-                    </h3>
-                    <span className="text-xs text-slate-400 font-mono">{getPeriodLabel()}</span>
-                  </div>
-
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-xs">
-                      <thead className="bg-[#FAF8F5] text-slate-500 font-bold uppercase tracking-wider text-[10px] border-b border-slate-200">
-                        <tr>
-                          <th className="py-3 px-4">Date & Category</th>
-                          <th className="py-3 px-4">Expense Title & Description</th>
-                          <th className="py-3 px-4">Paid To</th>
-                          <th className="py-3 px-4">Payment Mode</th>
-                          <th className="py-3 px-4 text-right">Amount (₹)</th>
-                          <th className="py-3 px-4 text-right">Action</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100 font-medium">
-                        {filteredOperatingEntries.length === 0 ? (
-                          <tr>
-                            <td colSpan={6} className="py-10 text-center text-slate-400 italic">
-                              No operating overhead expenses logged for this period.
-                            </td>
-                          </tr>
-                        ) : (
-                          paginatedOperatingEntries.map((entry: any) => (
-                            <tr key={entry._id} className="hover:bg-slate-50/80 transition">
-                              <td className="py-3.5 px-4">
-                                <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-700 block w-max">
-                                  {entry.category}
-                                </span>
-                                <span className="text-[10px] text-slate-400 mt-1 block">
-                                  {new Date(entry.expenseDate).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' })}
-                                </span>
-                              </td>
-                              <td className="py-3.5 px-4">
-                                <span className="font-bold text-slate-900 block">{entry.title}</span>
-                                {entry.notes && (
-                                  <span className="text-[10.5px] text-slate-400">{entry.notes}</span>
-                                )}
-                              </td>
-                              <td className="py-3.5 px-4 font-semibold text-slate-700">
-                                {entry.paidTo || 'N/A'}
-                                {entry.billNumber && (
-                                  <span className="block text-[10px] text-slate-400 font-mono">Bill #{entry.billNumber}</span>
-                                )}
-                              </td>
-                              <td className="py-3.5 px-4 font-mono font-semibold text-slate-600">
-                                {entry.paymentMode}
-                              </td>
-                              <td className="py-3.5 px-4 text-right font-mono font-bold text-sm text-forest-950">
-                                ₹{entry.amount}
-                              </td>
-                              <td className="py-3.5 px-4 text-right space-x-1 whitespace-nowrap">
-                                <button
-                                  onClick={() => setSelectedOperatingForView(entry)}
-                                  className="p-1.5 text-slate-400 hover:text-forest-950 hover:bg-slate-100 rounded-lg transition cursor-pointer"
-                                  title="View Voucher Details & Modification History"
-                                >
-                                  <Eye className="w-3.5 h-3.5" />
-                                </button>
-                                <button
-                                  onClick={() => handleOpenEditOperating(entry)}
-                                  className="p-1.5 text-slate-400 hover:text-forest-950 hover:bg-slate-100 rounded-lg transition cursor-pointer"
-                                  title="Edit Expense Voucher"
-                                >
-                                  <Edit2 className="w-3.5 h-3.5" />
-                                </button>
-                                <button
-                                  onClick={() => handleDeleteOperating(entry._id, entry.title)}
-                                  className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition cursor-pointer"
-                                  title="Delete expense entry"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
-                              </td>
-                            </tr>
-                          ))
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  {filteredOperatingEntries.length > 0 && (
-                    <AdminPagination
-                      currentPage={operatingPage}
-                      totalItems={filteredOperatingEntries.length}
-                      pageSize={operatingPageSize}
-                      onPageChange={setOperatingPage}
-                      onPageSizeChange={setOperatingPageSize}
-                      itemLabel="expenses"
-                    />
-                  )}
-                </div>
-              </div>
-            )
-          }
-
-          {/* ====================================================================
+            {/* ====================================================================
           TAB 5: AUDIT & DELETION LOGS
           Comprehensive audit trail of records deleted across all 4 finance tabs
           ==================================================================== */}
-          {
-            activeTab === 'audit_logs' && (
-              <div className="space-y-6 animate-fadeIn">
-                {/* Summary Metric Ribbon */}
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                  <div className="p-4 bg-white rounded-2xl border border-slate-200/90 shadow-2xs">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono">
-                        Total Purged Records
+            {
+              activeTab === 'audit_logs' && (
+                <div className="space-y-6 animate-fadeIn">
+                  {/* Summary Metric Ribbon */}
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="p-4 bg-white rounded-2xl border border-slate-200/90 shadow-2xs">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono">
+                          Total Purged Records
+                        </span>
+                        <Archive className="w-4 h-4 text-slate-400" />
+                      </div>
+                      <span className="text-xl sm:text-2xl font-black text-forest-950 font-mono mt-1 block">
+                        {auditData?.metrics?.totalDeletions ?? 0}
                       </span>
-                      <Archive className="w-4 h-4 text-slate-400" />
+                      <span className="text-[10px] text-slate-500">Across all finance modules</span>
                     </div>
-                    <span className="text-xl sm:text-2xl font-black text-forest-950 font-mono mt-1 block">
-                      {auditData?.metrics?.totalDeletions ?? 0}
-                    </span>
-                    <span className="text-[10px] text-slate-500">Across all finance modules</span>
+
+                    <div className="p-4 bg-white rounded-2xl border border-slate-200/90 shadow-2xs">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono">
+                          Deleted Offline Sales
+                        </span>
+                        <Store className="w-4 h-4 text-emerald-600" />
+                      </div>
+                      <span className="text-xl sm:text-2xl font-black text-emerald-700 font-mono mt-1 block">
+                        {auditData?.metrics?.offlineSalesDeleted ?? 0}
+                      </span>
+                      <span className="text-[10px] text-slate-500 font-mono">
+                        Local retail & counter sales purged
+                      </span>
+                    </div>
+
+                    <div className="p-4 bg-white rounded-2xl border border-slate-200/90 shadow-2xs">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono">
+                          Deleted Sourcing & Overhead
+                        </span>
+                        <Factory className="w-4 h-4 text-purple-600" />
+                      </div>
+                      <span className="text-xl sm:text-2xl font-black text-purple-700 font-mono mt-1 block">
+                        {(auditData?.metrics?.mfgBatchesDeleted ?? 0) + (auditData?.metrics?.operatingExpensesDeleted ?? 0)}
+                      </span>
+                      <span className="text-[10px] text-slate-500 font-mono">
+                        Mfg: {auditData?.metrics?.mfgBatchesDeleted ?? 0} • Overhead: {auditData?.metrics?.operatingExpensesDeleted ?? 0}
+                      </span>
+                    </div>
+
+                    <div className="p-4 bg-white rounded-2xl border border-rose-200 shadow-2xs bg-rose-50/20">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold text-rose-500 uppercase tracking-wider font-mono">
+                          Purged Financial Value
+                        </span>
+                        <ShieldAlert className="w-4 h-4 text-rose-600" />
+                      </div>
+                      <span className="text-xl sm:text-2xl font-black text-rose-600 font-mono mt-1 block">
+                        ₹{Number(auditData?.metrics?.totalDeletedValue || 0).toLocaleString('en-IN')}
+                      </span>
+                      <span className="text-[10px] text-rose-500">Cumulative value of deleted entries</span>
+                    </div>
                   </div>
 
-                  <div className="p-4 bg-white rounded-2xl border border-slate-200/90 shadow-2xs">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono">
-                        Deleted Offline Sales
-                      </span>
-                      <Store className="w-4 h-4 text-emerald-600" />
-                    </div>
-                    <span className="text-xl sm:text-2xl font-black text-emerald-700 font-mono mt-1 block">
-                      {auditData?.metrics?.offlineSalesDeleted ?? 0}
-                    </span>
-                    <span className="text-[10px] text-slate-500 font-mono">
-                      Local retail & counter sales purged
-                    </span>
-                  </div>
-
-                  <div className="p-4 bg-white rounded-2xl border border-slate-200/90 shadow-2xs">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono">
-                        Deleted Sourcing & Overhead
-                      </span>
-                      <Factory className="w-4 h-4 text-purple-600" />
-                    </div>
-                    <span className="text-xl sm:text-2xl font-black text-purple-700 font-mono mt-1 block">
-                      {(auditData?.metrics?.mfgBatchesDeleted ?? 0) + (auditData?.metrics?.operatingExpensesDeleted ?? 0)}
-                    </span>
-                    <span className="text-[10px] text-slate-500 font-mono">
-                      Mfg: {auditData?.metrics?.mfgBatchesDeleted ?? 0} • Overhead: {auditData?.metrics?.operatingExpensesDeleted ?? 0}
-                    </span>
-                  </div>
-
-                  <div className="p-4 bg-white rounded-2xl border border-rose-200 shadow-2xs bg-rose-50/20">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-bold text-rose-500 uppercase tracking-wider font-mono">
-                        Purged Financial Value
-                      </span>
-                      <ShieldAlert className="w-4 h-4 text-rose-600" />
-                    </div>
-                    <span className="text-xl sm:text-2xl font-black text-rose-600 font-mono mt-1 block">
-                      ₹{Number(auditData?.metrics?.totalDeletedValue || 0).toLocaleString('en-IN')}
-                    </span>
-                    <span className="text-[10px] text-rose-500">Cumulative value of deleted entries</span>
-                  </div>
-                </div>
-
-                {/* Controls: Filter by Module, Search & Refresh */}
-                <div className="bg-white p-4 sm:p-5 rounded-3xl border border-slate-200/90 shadow-xs space-y-3">
-                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-                    <div className="flex items-center space-x-1.5 overflow-x-auto pb-1 md:pb-0 scrollbar-none">
-                      {[
-                        { key: 'ALL', label: 'All Deleted Records' },
-                        { key: 'OFFLINE_SALE', label: 'Offline Sales' },
-                        { key: 'MANUFACTURING', label: 'Manufacturing Batches' },
-                        { key: 'OPERATING', label: 'Shop & Overhead' }
-                      ].map(tab => (
-                        <button
-                          key={tab.key}
-                          onClick={() => {
-                            setAuditFilter(tab.key as any);
-                            setAuditPage(1);
-                          }}
-                          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer ${auditFilter === tab.key
-                            ? 'bg-forest-900 text-gold-400 shadow-xs'
-                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                            }`}
-                        >
-                          {tab.label}
-                        </button>
-                      ))}
-                    </div>
-
-                    <div className="flex items-center space-x-2">
-                      <div className="relative min-w-[220px]">
-                        <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                        <input
-                          type="text"
-                          placeholder="Search deleted records by ID, title, admin..."
-                          value={auditSearch}
-                          onChange={(e) => {
-                            setAuditSearch(e.target.value);
-                            setAuditPage(1);
-                          }}
-                          className="w-full pl-9 pr-3 py-1.5 bg-[#FAF8F5] border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-forest-900"
-                        />
-                        {auditSearch && (
+                  {/* Controls: Filter by Module, Search & Refresh */}
+                  <div className="bg-white p-4 sm:p-5 rounded-3xl border border-slate-200/90 shadow-xs space-y-3">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                      <div className="flex items-center space-x-1.5 overflow-x-auto pb-1 md:pb-0 scrollbar-none">
+                        {[
+                          { key: 'ALL', label: 'All Deleted Records' },
+                          { key: 'OFFLINE_SALE', label: 'Offline Sales' },
+                          { key: 'MANUFACTURING', label: 'Manufacturing Batches' },
+                          { key: 'OPERATING', label: 'Shop & Overhead' }
+                        ].map(tab => (
                           <button
-                            onClick={() => setAuditSearch('')}
-                            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                            key={tab.key}
+                            onClick={() => {
+                              setAuditFilter(tab.key as any);
+                              setAuditPage(1);
+                            }}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer ${auditFilter === tab.key
+                              ? 'bg-forest-900 text-gold-400 shadow-xs'
+                              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                              }`}
                           >
-                            <X className="w-3.5 h-3.5" />
+                            {tab.label}
                           </button>
-                        )}
+                        ))}
                       </div>
 
-                      <button
-                        onClick={fetchAuditLogs}
-                        disabled={isLoadingAudit}
-                        className="p-2 rounded-xl border border-slate-200 hover:bg-slate-100 text-slate-600 transition cursor-pointer"
-                        title="Refresh Audit Logs"
-                      >
-                        <RefreshCw className={`w-3.5 h-3.5 ${isLoadingAudit ? 'animate-spin text-forest-900' : ''}`} />
-                      </button>
+                      <div className="flex items-center space-x-2">
+                        <div className="relative min-w-[220px]">
+                          <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                          <input
+                            type="text"
+                            placeholder="Search deleted records by ID, title, admin..."
+                            value={auditSearch}
+                            onChange={(e) => {
+                              setAuditSearch(e.target.value);
+                              setAuditPage(1);
+                            }}
+                            className="w-full pl-9 pr-3 py-1.5 bg-[#FAF8F5] border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-forest-900"
+                          />
+                          {auditSearch && (
+                            <button
+                              onClick={() => setAuditSearch('')}
+                              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+
+                        <button
+                          onClick={fetchAuditLogs}
+                          disabled={isLoadingAudit}
+                          className="p-2 rounded-xl border border-slate-200 hover:bg-slate-100 text-slate-600 transition cursor-pointer"
+                          title="Refresh Audit Logs"
+                        >
+                          <RefreshCw className={`w-3.5 h-3.5 ${isLoadingAudit ? 'animate-spin text-forest-900' : ''}`} />
+                        </button>
+                      </div>
                     </div>
-                  </div>
 
-                  {/* Audit Logs Table */}
-                  <div className="overflow-x-auto rounded-2xl border border-slate-200/80">
-                    <table className="w-full text-left text-xs text-slate-700">
-                      <thead className="bg-[#FAF8F5] border-b border-slate-200/90 text-slate-500 font-bold uppercase tracking-wider text-[10px]">
-                        <tr>
-                          <th className="py-3 px-4">Deletion Date & Time</th>
-                          <th className="py-3 px-4">Source Category</th>
-                          <th className="py-3 px-4">Deleted Record Title / ID</th>
-                          <th className="py-3 px-4 text-right">Financial Value</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {isLoadingAudit ? (
+                    {/* Audit Logs Table */}
+                    <div className="overflow-x-auto rounded-2xl border border-slate-200/80">
+                      <table className="w-full text-left text-xs text-slate-700">
+                        <thead className="bg-[#FAF8F5] border-b border-slate-200/90 text-slate-500 font-bold uppercase tracking-wider text-[10px]">
                           <tr>
-                            <td colSpan={4} className="py-12 text-center text-slate-400">
-                              <div className="inline-flex items-center space-x-2">
-                                <RefreshCw className="w-4 h-4 animate-spin text-forest-900" />
-                                <span>Loading audit records...</span>
-                              </div>
-                            </td>
+                            <th className="py-3 px-4">Deletion Date & Time</th>
+                            <th className="py-3 px-4">Source Category</th>
+                            <th className="py-3 px-4">Deleted Record Title / ID</th>
+                            <th className="py-3 px-4 text-right">Financial Value</th>
                           </tr>
-                        ) : !auditData?.logs || auditData.logs.length === 0 ? (
-                          <tr>
-                            <td colSpan={4} className="py-12 text-center text-slate-400">
-                              <Archive className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-                              <p className="font-medium text-slate-600">No deleted entries found in this view</p>
-                              <p className="text-[11px] text-slate-400 mt-0.5">Whenever an entry is deleted from Offline Selling, Manufacturing, or Shop & Overhead, its full snapshot is preserved here.</p>
-                            </td>
-                          </tr>
-                        ) : (
-                          auditData.logs.map((log: any) => {
-                            const getCategoryBadge = (type: string) => {
-                              switch (type) {
-                                case 'OFFLINE_SALE':
-                                  return <span className="px-2 py-0.5 bg-amber-100 text-amber-800 rounded-md font-bold text-[10px]">Offline Sale</span>;
-                                case 'ONLINE_ORDER':
-                                case 'ORDER':
-                                  return <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-md font-bold text-[10px]">Online Order</span>;
-                                case 'MANUFACTURING':
-                                  return <span className="px-2 py-0.5 bg-purple-100 text-purple-800 rounded-md font-bold text-[10px]">Mfg Sourcing</span>;
-                                case 'OPERATING':
-                                  return <span className="px-2 py-0.5 bg-rose-100 text-rose-800 rounded-md font-bold text-[10px]">Shop Overhead</span>;
-                                default:
-                                  return <span className="px-2 py-0.5 bg-slate-100 text-slate-800 rounded-md font-bold text-[10px]">{type}</span>;
-                              }
-                            };
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {isLoadingAudit ? (
+                            <tr>
+                              <td colSpan={4} className="py-12 text-center text-slate-400">
+                                <div className="inline-flex items-center space-x-2">
+                                  <RefreshCw className="w-4 h-4 animate-spin text-forest-900" />
+                                  <span>Loading audit records...</span>
+                                </div>
+                              </td>
+                            </tr>
+                          ) : !auditData?.logs || auditData.logs.length === 0 ? (
+                            <tr>
+                              <td colSpan={4} className="py-12 text-center text-slate-400">
+                                <Archive className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                                <p className="font-medium text-slate-600">No deleted entries found in this view</p>
+                                <p className="text-[11px] text-slate-400 mt-0.5">Whenever an entry is deleted from Offline Selling, Manufacturing, or Shop & Overhead, its full snapshot is preserved here.</p>
+                              </td>
+                            </tr>
+                          ) : (
+                            auditData.logs.map((log: any) => {
+                              const getCategoryBadge = (type: string) => {
+                                switch (type) {
+                                  case 'OFFLINE_SALE':
+                                    return <span className="px-2 py-0.5 bg-amber-100 text-amber-800 rounded-md font-bold text-[10px]">Offline Sale</span>;
+                                  case 'ONLINE_ORDER':
+                                  case 'ORDER':
+                                    return <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-md font-bold text-[10px]">Online Order</span>;
+                                  case 'MANUFACTURING':
+                                    return <span className="px-2 py-0.5 bg-purple-100 text-purple-800 rounded-md font-bold text-[10px]">Mfg Sourcing</span>;
+                                  case 'OPERATING':
+                                    return <span className="px-2 py-0.5 bg-rose-100 text-rose-800 rounded-md font-bold text-[10px]">Shop Overhead</span>;
+                                  default:
+                                    return <span className="px-2 py-0.5 bg-slate-100 text-slate-800 rounded-md font-bold text-[10px]">{type}</span>;
+                                }
+                              };
 
-                            const getCleanTitle = () => {
-                              let title = log.entityTitle || 'Untitled Record';
-                              title = title.replace(/\s*\((?:Bill\s*#?|OFF-)[^)]+\)/gi, '');
-                              title = title.replace(/\s*-\s*Batch\s+[^\s(]+/gi, '');
-                              title = title.replace(/#OFF-[0-9-]+/gi, '');
-                              return title.trim() || log.entityTitle || 'Untitled Record';
-                            };
+                              const getCleanTitle = () => {
+                                let title = log.entityTitle || 'Untitled Record';
+                                title = title.replace(/\s*\((?:Bill\s*#?|OFF-)[^)]+\)/gi, '');
+                                title = title.replace(/\s*-\s*Batch\s+[^\s(]+/gi, '');
+                                title = title.replace(/#OFF-[0-9-]+/gi, '');
+                                return title.trim() || log.entityTitle || 'Untitled Record';
+                              };
 
-                            const getFormattedId = () => {
-                              let id = log.entityId;
-                              if (!id) return 'N/A';
-                              if (log.entityType === 'OPERATING' && /^[0-9a-fA-F]{24}$/.test(id)) {
-                                const year = new Date(log.createdAt || Date.now()).getFullYear();
-                                return `OVH-${year}-${id.slice(-4).toUpperCase()}`;
-                              }
-                              return id;
-                            };
+                              const getFormattedId = () => {
+                                let id = log.entityId;
+                                if (!id) return 'N/A';
+                                if (log.entityType === 'OPERATING' && /^[0-9a-fA-F]{24}$/.test(id)) {
+                                  const year = new Date(log.createdAt || Date.now()).getFullYear();
+                                  return `OVH-${year}-${id.slice(-4).toUpperCase()}`;
+                                }
+                                return id;
+                              };
 
-                            return (
-                              <tr key={log._id} className="hover:bg-slate-50/80 transition">
-                                <td className="py-3 px-4 font-mono text-[11px] text-slate-600 whitespace-nowrap">
-                                  <div>{new Date(log.createdAt).toLocaleDateString('en-IN')}</div>
-                                  <div className="text-[10px] text-slate-400">{new Date(log.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}</div>
-                                </td>
-                                <td className="py-3 px-4 whitespace-nowrap">
-                                  {getCategoryBadge(log.entityType)}
-                                </td>
-                                <td className="py-3 px-4 font-medium text-slate-800">
-                                  <span className="block font-bold text-forest-950">{getCleanTitle()}</span>
-                                  <span className="block text-[10px] text-slate-400 font-mono">ID: {getFormattedId()}</span>
-                                </td>
-                                <td className="py-3 px-4 text-right font-mono font-bold text-xs text-rose-600 whitespace-nowrap">
-                                  ₹{Number(log.amount || 0).toLocaleString('en-IN')}
-                                </td>
+                              return (
+                                <tr key={log._id} className="hover:bg-slate-50/80 transition">
+                                  <td className="py-3 px-4 font-mono text-[11px] text-slate-600 whitespace-nowrap">
+                                    <div>{new Date(log.createdAt).toLocaleDateString('en-IN')}</div>
+                                    <div className="text-[10px] text-slate-400">{new Date(log.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}</div>
+                                  </td>
+                                  <td className="py-3 px-4 whitespace-nowrap">
+                                    {getCategoryBadge(log.entityType)}
+                                  </td>
+                                  <td className="py-3 px-4 font-medium text-slate-800">
+                                    <span className="block font-bold text-forest-950">{getCleanTitle()}</span>
+                                    <span className="block text-[10px] text-slate-400 font-mono">ID: {getFormattedId()}</span>
+                                  </td>
+                                  <td className="py-3 px-4 text-right font-mono font-bold text-xs text-rose-600 whitespace-nowrap">
+                                    ₹{Number(log.amount || 0).toLocaleString('en-IN')}
+                                  </td>
 
-                              </tr>
-                            );
-                          })
-                        )}
-                      </tbody>
-                    </table>
+                                </tr>
+                              );
+                            })
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {auditData?.pagination && auditData.pagination.totalItems > 0 && (
+                      <AdminPagination
+                        currentPage={auditPage}
+                        totalItems={auditData.pagination.totalItems}
+                        pageSize={auditPageSize}
+                        onPageChange={setAuditPage}
+                        onPageSizeChange={setAuditPageSize}
+                        itemLabel="logs"
+                      />
+                    )}
                   </div>
-
-                  {auditData?.pagination && auditData.pagination.totalItems > 0 && (
-                    <AdminPagination
-                      currentPage={auditPage}
-                      totalItems={auditData.pagination.totalItems}
-                      pageSize={auditPageSize}
-                      onPageChange={setAuditPage}
-                      onPageSizeChange={setAuditPageSize}
-                      itemLabel="logs"
-                    />
-                  )}
                 </div>
-              </div>
-            )
-          }
-        </div>
-      )}
+              )
+            }
+          </div>
+        )}
 
-      {/* ====================================================================
+        {/* ====================================================================
           MODAL 1: ADD MANUFACTURING PROCUREMENT BATCH
           ==================================================================== */}
-      {
-        isAddMfgModalOpen && (
-          <div className="space-y-6 w-full animate-fadeIn pb-12">
-            {/* Top Action Nav Bar with Back Button */}
-            <div className="bg-white p-3.5 sm:p-5 rounded-2xl sm:rounded-3xl border border-slate-200/90 shadow-xs">
-              <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-4 w-full">
-                <button
-                  type="button"
-                  onClick={() => setIsAddMfgModalOpen(false)}
-                  className="inline-flex items-center space-x-1.5 sm:space-x-2 px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl bg-slate-100 hover:bg-forest-900 hover:text-gold-400 text-slate-700 font-bold text-xs sm:text-sm transition cursor-pointer shadow-xs group shrink-0 self-start sm:self-auto"
-                >
-                  <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-                  <span>Back<span className="hidden sm:inline"> to Manufacturing</span></span>
-                </button>
-                <div className="h-6 w-px bg-slate-200 hidden sm:block" />
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center space-x-2">
-                    <span className="p-1 sm:p-1.5 bg-forest-900/10 text-forest-900 rounded-lg shrink-0">
-                      <Factory className="w-4 sm:w-5 h-4 sm:h-5 text-forest-900" />
-                    </span>
-                    <h2 className="font-serif text-base sm:text-xl font-bold text-forest-950">
-                      Record Manufacturing Procurement
-                    </h2>
-                  </div>
-                  <p className="text-[11px] sm:text-xs text-slate-500 mt-0.5">
-                    Log vendor sourcing batches, production quantities, unit pricing, and supplier settlements.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Main Full-Page Content Card */}
-            <div className="bg-white rounded-3xl w-full p-4 sm:p-7 shadow-xs border border-slate-200/90 space-y-4">
-              <form onSubmit={handleCreateMfg} className="space-y-4 text-xs">
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Product Name *</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Novise Ayurvedic Hair Growth Oil (200ml)"
-                    value={newMfg.productName}
-                    onChange={(e) => setNewMfg({ ...newMfg, productName: e.target.value })}
-                    className="w-full px-3 py-2 bg-[#FAF8F5] border border-slate-300 rounded-xl focus:outline-none focus:ring-1 focus:ring-forest-900"
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block font-bold text-slate-700 mb-1">Manufacturer / Vendor *</label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="e.g. Aayush Herbals Ltd."
-                      value={newMfg.vendorName}
-                      onChange={(e) => setNewMfg({ ...newMfg, vendorName: e.target.value })}
-                      className="w-full px-3 py-2 bg-[#FAF8F5] border border-slate-300 rounded-xl focus:outline-none focus:ring-1 focus:ring-forest-900"
-                    />
-                  </div>
-                  <div>
-                    <label className="block font-bold text-slate-700 mb-1">Batch Number</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. BATCH-01"
-                      value={newMfg.batchNumber}
-                      onChange={(e) => setNewMfg({ ...newMfg, batchNumber: e.target.value })}
-                      className="w-full px-3 py-2 bg-[#FAF8F5] border border-slate-300 rounded-xl font-mono focus:outline-none focus:ring-1 focus:ring-forest-900"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block font-bold text-slate-700 mb-1">Quantity (Units) *</label>
-                    <input
-                      type="number"
-                      min="1"
-                      required
-                      placeholder="e.g. 500"
-                      value={newMfg.quantity || ''}
-                      onChange={(e) => {
-                        const val = e.target.value === '' ? '' : Number(e.target.value);
-                        const qty = Number(val) || 0;
-                        const unit = Number(newMfg.unitCost) || 0;
-                        const newTotal = (qty > 0 && unit >= 0) ? Math.round(qty * unit * 100) / 100 : '';
-                        setNewMfg({ ...newMfg, quantity: val as any, totalCost: newTotal as any });
-                      }}
-                      className="w-full px-3 py-2 bg-[#FAF8F5] border border-slate-300 rounded-xl font-mono focus:outline-none focus:ring-1 focus:ring-forest-900"
-                    />
-                  </div>
-                  <div>
-                    <label className="block font-bold text-slate-700 mb-1">Unit Cost (₹) *</label>
-                    <input
-                      type="number"
-                      step="any"
-                      min="0"
-                      required
-                      placeholder="e.g. 180"
-                      value={newMfg.unitCost || ''}
-                      onChange={(e) => {
-                        const val = e.target.value === '' ? '' : Number(e.target.value);
-                        const unit = Number(val) || 0;
-                        const qty = Number(newMfg.quantity) || 0;
-                        const newTotal = (qty > 0 && unit >= 0) ? Math.round(qty * unit * 100) / 100 : '';
-                        setNewMfg({ ...newMfg, unitCost: val as any, totalCost: newTotal as any });
-                      }}
-                      className="w-full px-3 py-2 bg-[#FAF8F5] border border-slate-300 rounded-xl font-mono focus:outline-none focus:ring-1 focus:ring-forest-900"
-                    />
-                  </div>
-                </div>
-
-                {/* Calculated Total Sourcing Cost (Interactive Input Field) */}
-                <div>
-                  <div className="flex justify-between items-center mb-1">
-                    <label className="block font-bold text-slate-700">Calculated Total Sourcing Cost (₹) *</label>
-                    <span className="text-[10px] text-slate-400">Auto-calculates Unit Cost when edited</span>
-                  </div>
-                  <div className="relative">
-                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 font-bold font-mono text-xs">₹</span>
-                    <input
-                      type="number"
-                      step="any"
-                      min="0"
-                      required
-                      placeholder="0"
-                      value={newMfg.totalCost !== undefined ? newMfg.totalCost : ((Number(newMfg.quantity) || 0) * (Number(newMfg.unitCost) || 0) || '')}
-                      onChange={(e) => {
-                        const val = e.target.value === '' ? '' : Number(e.target.value);
-                        const total = Number(val) || 0;
-                        const qty = Number(newMfg.quantity) || 0;
-                        let newUnitCost = newMfg.unitCost;
-                        if (qty > 0 && total >= 0) {
-                          newUnitCost = Number((total / qty).toFixed(2));
-                        }
-                        setNewMfg({ ...newMfg, totalCost: val as any, unitCost: newUnitCost });
-                      }}
-                      className="w-full pl-8 pr-3 py-2 bg-[#FAF8F5] border border-slate-300 rounded-xl font-mono font-bold text-forest-950 focus:outline-none focus:ring-1 focus:ring-forest-900"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <div className="flex justify-between items-center mb-1">
-                      <label className="block font-bold text-slate-700">Amount Paid to Supplier (₹)</label>
-                      <span className="text-[10px] text-slate-400">Optional</span>
-                    </div>
-                    <div className="relative">
-                      <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-emerald-600 font-bold text-xs">₹</span>
-                      <input
-                        type="number"
-                        step="any"
-                        min="0"
-                        placeholder="0"
-                        value={newMfg.amountPaid || ''}
-                        onChange={(e) => setNewMfg({ ...newMfg, amountPaid: e.target.value === '' ? ('' as any) : Number(e.target.value) })}
-                        className="w-full pl-8 pr-3 py-2 bg-[#FAF8F5] border border-slate-300 rounded-xl font-mono text-emerald-700 font-bold focus:outline-none focus:ring-1 focus:ring-forest-900"
-                      />
-                    </div>
-                    <div className="mt-1 flex items-center justify-between text-[11px] font-mono">
-                      <span className="text-slate-500">
-                        Due: ₹{Math.max(0, (Number(newMfg.totalCost !== undefined && newMfg.totalCost !== '' ? newMfg.totalCost : (Number(newMfg.quantity || 0) * Number(newMfg.unitCost || 0))) - (Number(newMfg.amountPaid) || 0))).toLocaleString('en-IN')}
-                      </span>
-                      {Number(newMfg.amountPaid) > 0 && Number(newMfg.amountPaid) >= Number(newMfg.totalCost !== undefined && newMfg.totalCost !== '' ? newMfg.totalCost : (Number(newMfg.quantity) * Number(newMfg.unitCost))) ? (
-                        <span className="text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.5 rounded">Fully Paid</span>
-                      ) : Number(newMfg.amountPaid) > 0 ? (
-                        <span className="text-amber-700 font-bold bg-amber-50 px-1.5 py-0.5 rounded">Partial</span>
-                      ) : (
-                        <span className="text-slate-500 font-medium bg-slate-100 px-1.5 py-0.5 rounded">Unpaid</span>
-                      )}
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block font-bold text-slate-700 mb-1">Payment Mode</label>
-                    <AdminSelect
-                      value={newMfg.paymentMode}
-                      onChange={(val) => setNewMfg({ ...newMfg, paymentMode: val })}
-                      options={PAYMENT_MODE_OPTIONS}
-                      size="md"
-                      className="w-full"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <div className="flex justify-between items-center mb-1">
-                      <label className="block font-bold text-slate-700">Vendor Contact Phone</label>
-                      <span className="text-[10px] text-slate-400 font-mono">
-                        {newMfg.vendorContact ? `${newMfg.vendorContact.length}/10 digits` : '10 digits'}
-                      </span>
-                    </div>
-                    <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs">+91</span>
-                      <input
-                        type="tel"
-                        inputMode="numeric"
-                        pattern="[6-9][0-9]{9}"
-                        maxLength={10}
-                        placeholder="9876543210"
-                        value={newMfg.vendorContact}
-                        onChange={(e) => setNewMfg({ ...newMfg, vendorContact: sanitizePhoneNumber(e.target.value) })}
-                        onKeyDown={handlePhoneKeyDown}
-                        className="w-full pl-11 pr-3 py-2 bg-[#FAF8F5] border border-slate-300 rounded-xl font-mono focus:outline-none focus:ring-1 focus:ring-forest-900"
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block font-bold text-slate-700 mb-1">Invoice / Bill Number</label>
-                    <input
-                      type="text"
-                      placeholder="INV-2026-90"
-                      value={newMfg.invoiceNumber}
-                      onChange={(e) => setNewMfg({ ...newMfg, invoiceNumber: e.target.value })}
-                      className="w-full px-3 py-2 bg-[#FAF8F5] border border-slate-300 rounded-xl font-mono focus:outline-none focus:ring-1 focus:ring-forest-900"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Notes / Quality Remarks</label>
-                  <textarea
-                    rows={2}
-                    placeholder="e.g. QC passed, bottle caps verified, batch expiry 2028."
-                    value={newMfg.notes}
-                    onChange={(e) => setNewMfg({ ...newMfg, notes: e.target.value })}
-                    className="w-full px-3 py-2 bg-[#FAF8F5] border border-slate-300 rounded-xl focus:outline-none focus:ring-1 focus:ring-forest-900"
-                  />
-                </div>
-
-                <div className="flex justify-end space-x-2 pt-2 border-t border-slate-100">
+        {
+          isAddMfgModalOpen && (
+            <div className="space-y-6 w-full animate-fadeIn pb-12">
+              {/* Top Action Nav Bar with Back Button */}
+              <div className="bg-white p-3.5 sm:p-5 rounded-2xl sm:rounded-3xl border border-slate-200/90 shadow-xs">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-4 w-full">
                   <button
                     type="button"
                     onClick={() => setIsAddMfgModalOpen(false)}
-                    className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl cursor-pointer"
+                    className="inline-flex items-center space-x-1.5 sm:space-x-2 px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl bg-slate-100 hover:bg-forest-900 hover:text-gold-400 text-slate-700 font-bold text-xs sm:text-sm transition cursor-pointer shadow-xs group shrink-0 self-start sm:self-auto"
                   >
-                    Cancel
+                    <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+                    <span>Back<span className="hidden sm:inline"> to Manufacturing</span></span>
                   </button>
-                  <button
-                    type="submit"
-                    className="px-5 py-2 bg-forest-900 hover:bg-forest-950 text-gold-400 font-bold rounded-xl cursor-pointer"
-                  >
-                    Save Batch
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )
-      }
-
-      {/* ====================================================================
-          MODAL 2: RECORD SUPPLIER PAYMENT
-          ==================================================================== */}
-      {
-        isRecordPaymentModalOpen && selectedMfgForPayment && (
-          <div className="space-y-6 w-full animate-fadeIn pb-12">
-            {/* Top Action Nav Bar with Back Button */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-4 sm:p-6 rounded-3xl border border-slate-200/90 shadow-xs">
-              <div className="flex items-center space-x-3 sm:space-x-4">
-                <button
-                  type="button"
-                  onClick={() => { setIsRecordPaymentModalOpen(false); setSelectedMfgForPayment(null); }}
-                  className="inline-flex items-center space-x-2 px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-xl bg-slate-100 hover:bg-forest-900 hover:text-gold-400 text-slate-700 font-bold text-xs sm:text-sm transition cursor-pointer shadow-xs group"
-                >
-                  <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-                  <span>Back<span className="hidden sm:inline"> to Manufacturing</span></span>
-                </button>
-                <div className="h-6 w-px bg-slate-200 hidden sm:block" />
-                <div>
-                  <div className="flex items-center space-x-2">
-                    <span className="p-1.5 bg-forest-900/10 text-forest-900 rounded-lg">
-                      <CreditCard className="w-5 h-5 text-forest-900" />
-                    </span>
-                    <h2 className="font-serif text-lg sm:text-2xl font-black text-forest-950">
-                      {'Record Supplier Payment'}
-                    </h2>
+                  <div className="h-6 w-px bg-slate-200 hidden sm:block" />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center space-x-2">
+                      <span className="p-1 sm:p-1.5 bg-forest-900/10 text-forest-900 rounded-lg shrink-0">
+                        <Factory className="w-4 sm:w-5 h-4 sm:h-5 text-forest-900" />
+                      </span>
+                      <h2 className="font-serif text-base sm:text-xl font-bold text-forest-950">
+                        Record Manufacturing Procurement
+                      </h2>
+                    </div>
+                    <p className="text-[11px] sm:text-xs text-slate-500 mt-0.5">
+                      Log vendor sourcing batches, production quantities, unit pricing, and supplier settlements.
+                    </p>
                   </div>
-                  <p className="text-xs text-slate-500 mt-0.5">{selectedMfgForPayment ? `Vendor: ${selectedMfgForPayment.vendorName} • Batch: #${selectedMfgForPayment.batchNumber}` : ''}</p>
                 </div>
               </div>
-            </div>
 
-            {/* Main Full-Page Content Card */}
-            <div className="bg-white rounded-3xl w-full p-6 sm:p-8 shadow-xs border border-slate-200/90 space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                <h3 className="font-serif text-base font-bold text-forest-950">Record Supplier Payment</h3>
-                <button onClick={() => setIsRecordPaymentModalOpen(false)} className="p-1 text-slate-400 hover:text-slate-700">
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-
-              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1">
-                <p className="font-bold text-slate-800">{selectedMfgForPayment.productName}</p>
-                <p className="text-[11px] text-slate-500 font-mono">{selectedMfgForPayment.batchNumber} • Vendor: {selectedMfgForPayment.vendorName}</p>
-                <p className="text-xs font-bold text-rose-700 font-mono">Current Outstanding Due: ₹{selectedMfgForPayment.amountDue}</p>
-              </div>
-
-              <form onSubmit={handleRecordPayment} className="space-y-3">
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Payment Amount (₹) *</label>
-                  <input
-                    type="number"
-                    min="1"
-                    max={selectedMfgForPayment.amountDue}
-                    required
-                    value={paymentAmount}
-                    onChange={(e) => setPaymentAmount(Number(e.target.value))}
-                    className="w-full px-3 py-2 bg-[#FAF8F5] border border-slate-300 rounded-xl font-mono text-sm font-bold text-forest-950 focus:outline-none focus:ring-1 focus:ring-forest-900"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Payment Mode</label>
-                  <AdminSelect
-                    value={paymentMode}
-                    onChange={setPaymentMode}
-                    options={PAYMENT_MODE_OPTIONS}
-                    size="md"
-                    className="w-full"
-                  />
-                </div>
-
-                <div className="flex justify-end space-x-2 pt-2 border-t border-slate-100">
-                  <button
-                    type="button"
-                    onClick={() => setIsRecordPaymentModalOpen(false)}
-                    className="px-4 py-2 bg-slate-100 text-slate-700 font-bold rounded-xl"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded-xl"
-                  >
-                    Confirm Payment
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )
-      }
-
-      {/* ====================================================================
-          MODAL 3: RECORD SUPPLIER RETURN & REFUND
-          ==================================================================== */}
-      {
-        isRecordReturnModalOpen && selectedMfgForReturn && (
-          <div className="space-y-6 w-full animate-fadeIn pb-12">
-            {/* Top Action Nav Bar with Back Button */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-4 sm:p-6 rounded-3xl border border-slate-200/90 shadow-xs">
-              <div className="flex items-center space-x-3 sm:space-x-4">
-                <button
-                  type="button"
-                  onClick={() => { setIsRecordReturnModalOpen(false); setSelectedMfgForReturn(null); }}
-                  className="inline-flex items-center space-x-2 px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-xl bg-slate-100 hover:bg-forest-900 hover:text-gold-400 text-slate-700 font-bold text-xs sm:text-sm transition cursor-pointer shadow-xs group"
-                >
-                  <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-                  <span>Back<span className="hidden sm:inline"> to Manufacturing</span></span>
-                </button>
-                <div className="h-6 w-px bg-slate-200 hidden sm:block" />
-                <div>
-                  <div className="flex items-center space-x-2">
-                    <span className="p-1.5 bg-forest-900/10 text-forest-900 rounded-lg">
-                      <RotateCcw className="w-5 h-5 text-forest-900" />
-                    </span>
-                    <h2 className="font-serif text-lg sm:text-2xl font-black text-forest-950">
-                      {'Return Batch to Supplier'}
-                    </h2>
-                  </div>
-                  <p className="text-xs text-slate-500 mt-0.5">{selectedMfgForReturn ? `Vendor: ${selectedMfgForReturn.vendorName} • Batch: #${selectedMfgForReturn.batchNumber}` : ''}</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Main Full-Page Content Card */}
-            <div className="bg-white rounded-3xl w-full p-6 sm:p-8 shadow-xs border border-slate-200/90 space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                <h3 className="font-serif text-base font-bold text-forest-950">Return Batch to Supplier</h3>
-                <button onClick={() => setIsRecordReturnModalOpen(false)} className="p-1 text-slate-400 hover:text-slate-700">
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-
-              <div className="p-3 bg-purple-50 border border-purple-200 rounded-xl space-y-1">
-                <p className="font-bold text-purple-950">{selectedMfgForReturn.productName}</p>
-                <p className="text-[11px] text-purple-700">Unit Cost: ₹{selectedMfgForReturn.unitCost} • Vendor: {selectedMfgForReturn.vendorName}</p>
-              </div>
-
-              <form onSubmit={handleRecordReturn} className="space-y-3">
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Return Quantity (Units) *</label>
-                  <input
-                    type="number"
-                    min="1"
-                    max={selectedMfgForReturn.quantity}
-                    required
-                    value={returnQty}
-                    onChange={(e) => {
-                      const q = Number(e.target.value);
-                      setReturnQty(q);
-                      setRefundAmount(q * selectedMfgForReturn.unitCost);
-                    }}
-                    className="w-full px-3 py-2 bg-[#FAF8F5] border border-slate-300 rounded-xl font-mono text-sm font-bold text-slate-900 focus:outline-none focus:ring-1 focus:ring-forest-900"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Refund Amount Credited (₹) *</label>
-                  <input
-                    type="number"
-                    min="0"
-                    required
-                    value={refundAmount}
-                    onChange={(e) => setRefundAmount(Number(e.target.value))}
-                    className="w-full px-3 py-2 bg-[#FAF8F5] border border-slate-300 rounded-xl font-mono text-sm font-bold text-purple-900 focus:outline-none focus:ring-1 focus:ring-forest-900"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Reason for Return *</label>
-                  <textarea
-                    rows={2}
-                    required
-                    placeholder="e.g. Cap leakage detected, bottle label defect, batch QC rejection"
-                    value={returnReason}
-                    onChange={(e) => setReturnReason(e.target.value)}
-                    className="w-full px-3 py-2 bg-[#FAF8F5] border border-slate-300 rounded-xl focus:outline-none focus:ring-1 focus:ring-forest-900"
-                  />
-                </div>
-
-                <div className="flex justify-end space-x-2 pt-2 border-t border-slate-100">
-                  <button
-                    type="button"
-                    onClick={() => setIsRecordReturnModalOpen(false)}
-                    className="px-4 py-2 bg-slate-100 text-slate-700 font-bold rounded-xl"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-4 py-2 bg-purple-700 hover:bg-purple-800 text-white font-bold rounded-xl"
-                  >
-                    Process Return & Credit
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )
-      }
-
-      {/* ====================================================================
-          MODAL 4: RECORD OPERATING OVERHEAD EXPENSE
-          ==================================================================== */}
-      {
-        isAddOperatingModalOpen && (
-          <div className="space-y-6 w-full animate-fadeIn pb-12">
-            {/* Top Action Nav Bar with Back Button */}
-            <div className="bg-white p-3.5 sm:p-5 rounded-2xl sm:rounded-3xl border border-slate-200/90 shadow-xs">
-              <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-4 w-full">
-                <button
-                  type="button"
-                  onClick={() => setIsAddOperatingModalOpen(false)}
-                  className="inline-flex items-center space-x-1.5 sm:space-x-2 px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl bg-slate-100 hover:bg-forest-900 hover:text-gold-400 text-slate-700 font-bold text-xs sm:text-sm transition cursor-pointer shadow-xs group shrink-0 self-start sm:self-auto"
-                >
-                  <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-                  <span>Back<span className="hidden sm:inline"> to Shop & Overhead</span></span>
-                </button>
-                <div className="h-6 w-px bg-slate-200 hidden sm:block" />
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center space-x-2">
-                    <span className="p-1.5 bg-forest-900/10 text-forest-900 rounded-lg shrink-0">
-                      <Store className="w-5 h-5 text-forest-900" />
-                    </span>
-                    <h2 className="font-serif text-base sm:text-xl font-bold text-forest-950">
-                      {'Record Shop & Overhead Expense'}
-                    </h2>
-                  </div>
-                  <p className="text-[11px] sm:text-xs text-slate-500 mt-0.5">{'Log shop and warehouse operational expenses, utilities, payroll, packaging, or petty cash.'}</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Main Full-Page Content Card */}
-            <div className="bg-white rounded-3xl w-full p-6 sm:p-8 shadow-xs border border-slate-200/90 space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                <div className="flex items-center space-x-2">
-                  <Receipt className="w-5 h-5 text-forest-900" />
-                  <h3 className="font-serif text-lg font-bold text-forest-950">
-                    Record Shop & Overhead Expense
-                  </h3>
-                </div>
-                <button
-                  onClick={() => setIsAddOperatingModalOpen(false)}
-                  className="p-1.5 text-slate-400 hover:text-slate-800 rounded-lg hover:bg-slate-100"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-
-              <form onSubmit={handleCreateOperating} className="space-y-3.5">
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Expense Category *</label>
-                  <AdminSelect
-                    value={newOperating.category}
-                    onChange={(val) => setNewOperating({ ...newOperating, category: val })}
-                    options={OPERATING_CATEGORY_OPTIONS}
-                    size="md"
-                    searchable={true}
-                    className="w-full"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Expense Title / Description (Optional)</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Torrent Power October Bill, Staff Morning Tea"
-                    value={newOperating.title}
-                    onChange={(e) => setNewOperating({ ...newOperating, title: e.target.value })}
-                    className="w-full px-3 py-2 bg-[#FAF8F5] border border-slate-300 rounded-xl focus:outline-none focus:ring-1 focus:ring-forest-900"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
+              {/* Main Full-Page Content Card */}
+              <div className="bg-white rounded-3xl w-full p-4 sm:p-7 shadow-xs border border-slate-200/90 space-y-4">
+                <form onSubmit={handleCreateMfg} className="space-y-4 text-xs">
                   <div>
-                    <label className="block font-bold text-slate-700 mb-1">Amount (₹) *</label>
-                    <input
-                      type="number"
-                      min="1"
-                      required
-                      placeholder="2500"
-                      value={newOperating.amount}
-                      onChange={(e) => setNewOperating({ ...newOperating, amount: e.target.value })}
-                      className="w-full px-3 py-2 bg-[#FAF8F5] border border-slate-300 rounded-xl font-mono text-sm font-bold text-forest-950 focus:outline-none focus:ring-1 focus:ring-forest-900"
-                    />
-                  </div>
-                  <div>
-                    <label className="block font-bold text-slate-700 mb-1">Payment Mode</label>
-                    <AdminSelect
-                      value={newOperating.paymentMode}
-                      onChange={(val) => setNewOperating({ ...newOperating, paymentMode: val })}
-                      options={PAYMENT_MODE_OPTIONS}
-                      size="md"
-                      className="w-full"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block font-bold text-slate-700 mb-1">Paid To (Vendor/Person)</label>
+                    <label className="block font-bold text-slate-700 mb-1">Product Name *</label>
                     <input
                       type="text"
-                      placeholder="e.g. Torrent Power Ltd., Local Canteen"
-                      value={newOperating.paidTo}
-                      onChange={(e) => setNewOperating({ ...newOperating, paidTo: e.target.value })}
+                      required
+                      placeholder="e.g. Novise Ayurvedic Hair Growth Oil (200ml)"
+                      value={newMfg.productName}
+                      onChange={(e) => setNewMfg({ ...newMfg, productName: e.target.value })}
                       className="w-full px-3 py-2 bg-[#FAF8F5] border border-slate-300 rounded-xl focus:outline-none focus:ring-1 focus:ring-forest-900"
                     />
                   </div>
-                  <div>
-                    <label className="block font-bold text-slate-700 mb-1">Bill / Voucher Number</label>
-                    <input
-                      type="text"
-                      placeholder="ELE-90218"
-                      value={newOperating.billNumber}
-                      onChange={(e) => setNewOperating({ ...newOperating, billNumber: e.target.value })}
-                      className="w-full px-3 py-2 bg-[#FAF8F5] border border-slate-300 rounded-xl font-mono focus:outline-none focus:ring-1 focus:ring-forest-900"
-                    />
-                  </div>
-                </div>
 
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Notes / Remarks</label>
-                  <textarea
-                    rows={2}
-                    placeholder="Optional billing details or ledger notes"
-                    value={newOperating.notes}
-                    onChange={(e) => setNewOperating({ ...newOperating, notes: e.target.value })}
-                    className="w-full px-3 py-2 bg-[#FAF8F5] border border-slate-300 rounded-xl focus:outline-none focus:ring-1 focus:ring-forest-900"
-                  />
-                </div>
-
-                <div className="flex justify-end space-x-2 pt-2 border-t border-slate-100">
-                  <button
-                    type="button"
-                    onClick={() => setIsAddOperatingModalOpen(false)}
-                    className="px-4 py-2 bg-slate-100 text-slate-700 font-bold rounded-xl"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-5 py-2 bg-forest-900 hover:bg-forest-950 text-gold-400 font-bold rounded-xl"
-                  >
-                    Record Expense
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )
-      }
-
-      {/* ====================================================================
-          MODAL 5: RECORD OFFLINE SALE (LOCAL RETAIL / DIRECT SALE)
-          ==================================================================== */}
-      {
-        isAddOfflineModalOpen && (
-          <div className="space-y-6 w-full animate-fadeIn pb-12">
-            {/* Top Action Nav Bar with Back Button */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-4 sm:p-6 rounded-3xl border border-slate-200/90 shadow-xs">
-              <div className="flex items-center space-x-3 sm:space-x-4">
-                <button
-                  type="button"
-                  onClick={() => setIsAddOfflineModalOpen(false)}
-                  className="inline-flex items-center space-x-2 px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-xl bg-slate-100 hover:bg-forest-900 hover:text-gold-400 text-slate-700 font-bold text-xs sm:text-sm transition cursor-pointer shadow-xs group"
-                >
-                  <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-                  <span>Back<span className="hidden sm:inline"> to Offline Sales</span></span>
-                </button>
-                <div className="h-6 w-px bg-slate-200 hidden sm:block" />
-                <div>
-                  <div className="flex items-center space-x-2">
-                    <span className="p-1.5 bg-forest-900/10 text-forest-900 rounded-lg">
-                      <Store className="w-5 h-5 text-forest-900" />
-                    </span>
-                    <h2 className="font-serif text-lg sm:text-2xl font-black text-forest-950">
-                      {'Record Offline Retail Sale'}
-                    </h2>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Main Full-Page Content Card */}
-            <div className="bg-white rounded-3xl w-full p-6 sm:p-8 shadow-xs border border-slate-200/90 space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                <div className="flex items-center space-x-2">
-                  <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-800 flex items-center justify-center font-bold">
-                    <Store className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <h3 className="font-serif text-sm font-bold text-forest-950">Record Offline Sale</h3>
-                    <p className="text-[11px] text-slate-400">Log local counter order, retail bill or credit sale</p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => setIsAddOfflineModalOpen(false)}
-                  className="p-1.5 text-slate-400 hover:text-slate-800 rounded-lg hover:bg-slate-100 transition cursor-pointer"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-
-              <form onSubmit={handleCreateOfflineSale} className="space-y-4">
-                {/* Customer Details */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                      Customer / Shop Name <span className="text-rose-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="e.g. Ramesh Bhai Patel / Shreenath Store"
-                      value={newOfflineSale.customerName}
-                      onChange={(e) => setNewOfflineSale(prev => ({ ...prev, customerName: e.target.value }))}
-                      className="w-full px-3 py-2 bg-[#FAF8F5] border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-forest-900"
-                    />
-                  </div>
-
-                  <div>
-                    <div className="flex justify-between items-center mb-1">
-                      <label className="block text-[11px] font-bold text-slate-600">
-                        Phone Number
-                      </label>
-                      <span className="text-[10px] text-slate-400 font-mono">
-                        {newOfflineSale.customerPhone ? `${newOfflineSale.customerPhone.length}/10 digits` : '10 digits'}
-                      </span>
-                    </div>
-                    <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs">+91</span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block font-bold text-slate-700 mb-1">Manufacturer / Vendor *</label>
                       <input
-                        type="tel"
-                        inputMode="numeric"
-                        pattern="[6-9][0-9]{9}"
-                        maxLength={10}
-                        placeholder="9876543210"
-                        value={newOfflineSale.customerPhone}
-                        onChange={(e) => setNewOfflineSale(prev => ({
-                          ...prev,
-                          customerPhone: sanitizePhoneNumber(e.target.value)
-                        }))}
-                        onKeyDown={handlePhoneKeyDown}
-                        className="w-full pl-11 pr-3 py-2 bg-[#FAF8F5] border border-slate-200 rounded-xl text-xs text-slate-800 font-mono focus:outline-none focus:ring-1 focus:ring-forest-900"
+                        type="text"
+                        required
+                        placeholder="e.g. Aayush Herbals Ltd."
+                        value={newMfg.vendorName}
+                        onChange={(e) => setNewMfg({ ...newMfg, vendorName: e.target.value })}
+                        className="w-full px-3 py-2 bg-[#FAF8F5] border border-slate-300 rounded-xl focus:outline-none focus:ring-1 focus:ring-forest-900"
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-bold text-slate-700 mb-1">Batch Number</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. BATCH-01"
+                        value={newMfg.batchNumber}
+                        onChange={(e) => setNewMfg({ ...newMfg, batchNumber: e.target.value })}
+                        className="w-full px-3 py-2 bg-[#FAF8F5] border border-slate-300 rounded-xl font-mono focus:outline-none focus:ring-1 focus:ring-forest-900"
                       />
                     </div>
                   </div>
-                </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                      Area / Location
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="e.g. Sidhpur Station Road, Ahmedabad"
-                      value={newOfflineSale.locationArea}
-                      onChange={(e) => setNewOfflineSale(prev => ({ ...prev, locationArea: e.target.value }))}
-                      className="w-full px-3 py-2 bg-[#FAF8F5] border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-forest-900"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                      Physical Bill / Invoice # (Optional)
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="e.g. BILL-102"
-                      value={newOfflineSale.billNumber}
-                      onChange={(e) => setNewOfflineSale(prev => ({ ...prev, billNumber: e.target.value }))}
-                      className="w-full px-3 py-2 bg-[#FAF8F5] border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-forest-900"
-                    />
-                  </div>
-                </div>
-
-                {/* Product Selection */}
-                <div className="p-3 bg-[#FAF8F5] rounded-2xl border border-slate-200/80 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-forest-950 text-xs flex items-center space-x-1">
-                      <Package className="w-3.5 h-3.5 text-forest-700" />
-                      <span>Product Sold</span>
-                    </span>
-                    <span className="text-[10.5px] text-slate-400">Select catalog item or enter name</span>
-                  </div>
-
-                  {availableProducts.length > 0 && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                      <AdminSelect
-                        value={newOfflineSale.productId}
-                        onChange={handleSelectOfflineProduct}
-                        placeholder="-- Choose from Botanical Catalog --"
-                        options={[
-                          { value: '', label: '-- Choose from Botanical Catalog --' },
-                          ...availableProducts.map(p => ({
-                            value: p._id,
-                            label: `${p.name} (₹${p.sellingPrice ?? p.price ?? 0})`,
-                            badge: `Stock: ${p.stock ?? p.stockQuantity ?? 0}`
-                          }))
-                        ]}
-                        size="md"
-                        searchable={true}
-                        className="w-full"
-                      />
-                    </div>
-                  )}
-
-                  <div>
-                    <label className="block text-[10.5px] font-bold text-slate-600 mb-1">Product Name</label>
-                    <input
-                      type="text"
-                      value={newOfflineSale.productName}
-                      onChange={(e) => setNewOfflineSale(prev => ({ ...prev, productName: e.target.value }))}
-                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-forest-900"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-2">
-                    <div>
-                      <label className="block text-[10.5px] font-bold text-slate-600 mb-1">Quantity</label>
+                      <label className="block font-bold text-slate-700 mb-1">Quantity (Units) *</label>
                       <input
                         type="number"
                         min="1"
                         required
-                        value={newOfflineSale.quantity}
-                        onFocus={(e) => e.target.select()}
-                        onChange={(e) => handleOfflineQuantityChange(e.target.value)}
-                        onBlur={() => {
-                          if (!newOfflineSale.quantity || Number(newOfflineSale.quantity) < 1) {
-                            handleOfflineQuantityChange(1);
-                          }
+                        placeholder="e.g. 500"
+                        value={newMfg.quantity || ''}
+                        onChange={(e) => {
+                          const val = e.target.value === '' ? '' : Number(e.target.value);
+                          const qty = Number(val) || 0;
+                          const unit = Number(newMfg.unitCost) || 0;
+                          const newTotal = (qty > 0 && unit >= 0) ? Math.round(qty * unit * 100) / 100 : '';
+                          setNewMfg({ ...newMfg, quantity: val as any, totalCost: newTotal as any });
                         }}
-                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-mono font-bold text-slate-800 focus:outline-none focus:ring-1 focus:ring-forest-900"
+                        className="w-full px-3 py-2 bg-[#FAF8F5] border border-slate-300 rounded-xl font-mono focus:outline-none focus:ring-1 focus:ring-forest-900"
                       />
                     </div>
                     <div>
-                      <label className="block text-[10.5px] font-bold text-slate-600 mb-1">Unit Price (₹)</label>
+                      <label className="block font-bold text-slate-700 mb-1">Unit Cost (₹) *</label>
                       <input
                         type="number"
+                        step="any"
                         min="0"
                         required
-                        value={newOfflineSale.unitPrice}
-                        onFocus={(e) => e.target.select()}
-                        onChange={(e) => handleOfflineUnitPriceChange(e.target.value)}
-                        onBlur={() => {
-                          if (newOfflineSale.unitPrice === '' || Number(newOfflineSale.unitPrice) < 0) {
-                            handleOfflineUnitPriceChange(0);
-                          }
+                        placeholder="e.g. 180"
+                        value={newMfg.unitCost || ''}
+                        onChange={(e) => {
+                          const val = e.target.value === '' ? '' : Number(e.target.value);
+                          const unit = Number(val) || 0;
+                          const qty = Number(newMfg.quantity) || 0;
+                          const newTotal = (qty > 0 && unit >= 0) ? Math.round(qty * unit * 100) / 100 : '';
+                          setNewMfg({ ...newMfg, unitCost: val as any, totalCost: newTotal as any });
                         }}
-                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-mono font-bold text-slate-800 focus:outline-none focus:ring-1 focus:ring-forest-900"
+                        className="w-full px-3 py-2 bg-[#FAF8F5] border border-slate-300 rounded-xl font-mono focus:outline-none focus:ring-1 focus:ring-forest-900"
                       />
                     </div>
-                    <div>
-                      <label className="block text-[10.5px] font-bold text-slate-600 mb-1">Total Bill (₹)</label>
+                  </div>
+
+                  {/* Calculated Total Sourcing Cost (Interactive Input Field) */}
+                  <div>
+                    <div className="flex justify-between items-center mb-1">
+                      <label className="block font-bold text-slate-700">Calculated Total Sourcing Cost (₹) *</label>
+                      <span className="text-[10px] text-slate-400">Auto-calculates Unit Cost when edited</span>
+                    </div>
+                    <div className="relative">
+                      <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 font-bold font-mono text-xs">₹</span>
                       <input
                         type="number"
-                        readOnly
-                        value={newOfflineSale.totalAmount}
-                        className="w-full px-3 py-2 bg-slate-100 border border-slate-200 rounded-xl text-xs font-mono font-black text-forest-950 focus:outline-none cursor-not-allowed"
+                        step="any"
+                        min="0"
+                        required
+                        placeholder="0"
+                        value={newMfg.totalCost !== undefined ? newMfg.totalCost : ((Number(newMfg.quantity) || 0) * (Number(newMfg.unitCost) || 0) || '')}
+                        onChange={(e) => {
+                          const val = e.target.value === '' ? '' : Number(e.target.value);
+                          const total = Number(val) || 0;
+                          const qty = Number(newMfg.quantity) || 0;
+                          let newUnitCost = newMfg.unitCost;
+                          if (qty > 0 && total >= 0) {
+                            newUnitCost = Number((total / qty).toFixed(2));
+                          }
+                          setNewMfg({ ...newMfg, totalCost: val as any, unitCost: newUnitCost });
+                        }}
+                        className="w-full pl-8 pr-3 py-2 bg-[#FAF8F5] border border-slate-300 rounded-xl font-mono font-bold text-forest-950 focus:outline-none focus:ring-1 focus:ring-forest-900"
                       />
                     </div>
                   </div>
 
-                  <div className="flex items-center space-x-2 pt-1">
-                    <input
-                      type="checkbox"
-                      id="deductStockCheckbox"
-                      checked={newOfflineSale.deductStock}
-                      onChange={(e) => setNewOfflineSale(prev => ({ ...prev, deductStock: e.target.checked }))}
-                      className="rounded text-forest-900 focus:ring-forest-900 cursor-pointer"
-                    />
-                    <label htmlFor="deductStockCheckbox" className="text-[11px] text-slate-600 font-medium cursor-pointer">
-                      Auto-deduct items from warehouse inventory stock
-                    </label>
-                  </div>
-                </div>
-
-                {/* Payment Mode & Amount Paid */}
-                <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-3">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                        Payment Mode
-                      </label>
+                      <div className="flex justify-between items-center mb-1">
+                        <label className="block font-bold text-slate-700">Amount Paid to Supplier (₹)</label>
+                        <span className="text-[10px] text-slate-400">Optional</span>
+                      </div>
+                      <div className="relative">
+                        <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-emerald-600 font-bold text-xs">₹</span>
+                        <input
+                          type="number"
+                          step="any"
+                          min="0"
+                          placeholder="0"
+                          value={newMfg.amountPaid || ''}
+                          onChange={(e) => setNewMfg({ ...newMfg, amountPaid: e.target.value === '' ? ('' as any) : Number(e.target.value) })}
+                          className="w-full pl-8 pr-3 py-2 bg-[#FAF8F5] border border-slate-300 rounded-xl font-mono text-emerald-700 font-bold focus:outline-none focus:ring-1 focus:ring-forest-900"
+                        />
+                      </div>
+                      <div className="mt-1 flex items-center justify-between text-[11px] font-mono">
+                        <span className="text-slate-500">
+                          Due: ₹{Math.max(0, (Number(newMfg.totalCost !== undefined && newMfg.totalCost !== '' ? newMfg.totalCost : (Number(newMfg.quantity || 0) * Number(newMfg.unitCost || 0))) - (Number(newMfg.amountPaid) || 0))).toLocaleString('en-IN')}
+                        </span>
+                        {Number(newMfg.amountPaid) > 0 && Number(newMfg.amountPaid) >= Number(newMfg.totalCost !== undefined && newMfg.totalCost !== '' ? newMfg.totalCost : (Number(newMfg.quantity) * Number(newMfg.unitCost))) ? (
+                          <span className="text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.5 rounded">Fully Paid</span>
+                        ) : Number(newMfg.amountPaid) > 0 ? (
+                          <span className="text-amber-700 font-bold bg-amber-50 px-1.5 py-0.5 rounded">Partial</span>
+                        ) : (
+                          <span className="text-slate-500 font-medium bg-slate-100 px-1.5 py-0.5 rounded">Unpaid</span>
+                        )}
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block font-bold text-slate-700 mb-1">Payment Mode</label>
                       <AdminSelect
-                        value={newOfflineSale.paymentMode}
-                        onChange={handleOfflinePaymentModeChange}
-                        options={OFFLINE_PAYMENT_MODE_OPTIONS}
+                        value={newMfg.paymentMode}
+                        onChange={(val) => setNewMfg({ ...newMfg, paymentMode: val })}
+                        options={PAYMENT_MODE_OPTIONS}
                         size="md"
                         className="w-full"
                       />
                     </div>
-
-                    <div>
-                      <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                        Amount Received Now (₹)
-                      </label>
-                      <input
-                        type="number"
-                        min="0"
-                        max={newOfflineSale.totalAmount}
-                        value={newOfflineSale.amountPaid}
-                        onChange={(e) => setNewOfflineSale(prev => ({ ...prev, amountPaid: Number(e.target.value) }))}
-                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-mono font-bold text-emerald-800 focus:outline-none"
-                      />
-                    </div>
                   </div>
 
-                  <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-200/60">
-                    <span className="text-slate-500 font-medium">Remaining Pending / Due:</span>
-                    <span className={`font-mono font-bold ${(newOfflineSale.totalAmount - newOfflineSale.amountPaid) > 0 ? 'text-rose-700' : 'text-emerald-700'
-                      }`}>
-                      ₹{Math.max(0, newOfflineSale.totalAmount - newOfflineSale.amountPaid)}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Date & Notes */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-600 mb-1">Date of Sale</label>
-                    <input
-                      type="date"
-                      value={newOfflineSale.saleDate}
-                      onChange={(e) => setNewOfflineSale(prev => ({ ...prev, saleDate: e.target.value }))}
-                      className="w-full px-3 py-2 bg-[#FAF8F5] border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-600 mb-1">Notes / Remarks</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. Sent via courier or counter pickup"
-                      value={newOfflineSale.notes}
-                      onChange={(e) => setNewOfflineSale(prev => ({ ...prev, notes: e.target.value }))}
-                      className="w-full px-3 py-2 bg-[#FAF8F5] border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex justify-end space-x-2 pt-3 border-t border-slate-100">
-                  <button
-                    type="button"
-                    onClick={() => setIsAddOfflineModalOpen(false)}
-                    className="px-4 py-2 bg-slate-100 text-slate-700 font-bold rounded-xl cursor-pointer hover:bg-slate-200 transition"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-5 py-2 bg-forest-900 hover:bg-forest-950 text-gold-400 font-bold rounded-xl cursor-pointer shadow-sm transition"
-                  >
-                    Record Offline Sale
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )
-      }
-
-      {/* ====================================================================
-          MODAL 6: SETTLE OFFLINE PAYMENT / RECORD BALANCE SETTLEMENT
-          ==================================================================== */}
-      {
-        isRecordOfflinePaymentModalOpen && selectedOfflineSaleForPayment && (
-          <div className="space-y-6 w-full animate-fadeIn pb-12">
-            {/* Top Action Nav Bar with Back Button */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-4 sm:p-6 rounded-3xl border border-slate-200/90 shadow-xs">
-              <div className="flex items-center space-x-3 sm:space-x-4">
-                <button
-                  type="button"
-                  onClick={() => { setIsRecordOfflinePaymentModalOpen(false); setSelectedOfflineSaleForPayment(null); }}
-                  className="inline-flex items-center space-x-1.5 sm:space-x-2 px-3 py-1.5 sm:px-4 sm:py-2.5 rounded-xl bg-slate-100 hover:bg-forest-900 hover:text-gold-400 text-slate-700 font-bold text-xs sm:text-sm transition cursor-pointer shadow-xs group shrink-0"
-                >
-                  <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-                  <span>Back<span className="hidden sm:inline"> to Offline Sales</span></span>
-                </button>
-                <div className="h-6 w-px bg-slate-200 hidden sm:block" />
-                <div>
-                  <div className="flex items-center space-x-2">
-                    <span className="p-1.5 bg-forest-900/10 text-forest-900 rounded-lg">
-                      <CreditCard className="w-5 h-5 text-forest-900" />
-                    </span>
-                    <h2 className="font-serif text-lg sm:text-2xl font-black text-forest-950">
-                      {'Collect Payment / Settle Balance'}
-                    </h2>
-                  </div>
-                  <p className="text-xs text-slate-500 mt-0.5">{selectedOfflineSaleForPayment ? `Invoice: #${selectedOfflineSaleForPayment.invoiceNumber} • Customer: ${selectedOfflineSaleForPayment.customer?.name || 'Walk-in'}` : ''}</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Main Full-Page Content Card */}
-            <div className="bg-white rounded-3xl w-full p-6 sm:p-8 shadow-xs border border-slate-200/90 space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                <div className="flex items-center space-x-2">
-                  <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-800 flex items-center justify-center font-bold">
-                    <CheckCircle2 className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <h3 className="font-serif text-sm font-bold text-forest-950">Collect Payment / Settle Balance</h3>
-                    <p className="text-[10.5px] text-slate-400">{selectedOfflineSaleForPayment.saleId}</p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => setIsRecordOfflinePaymentModalOpen(false)}
-                  className="p-1 text-slate-400 hover:text-slate-700 cursor-pointer"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-
-              <div className="p-3.5 bg-[#FAF8F5] rounded-2xl border border-slate-200/80 space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Customer:</span>
-                  <span className="font-bold text-slate-800">{selectedOfflineSaleForPayment.customerName}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Total Bill Amount:</span>
-                  <span className="font-mono font-bold text-slate-800">₹{selectedOfflineSaleForPayment.totalAmount}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Already Paid:</span>
-                  <span className="font-mono font-bold text-emerald-700">₹{selectedOfflineSaleForPayment.amountPaid}</span>
-                </div>
-                <div className="flex justify-between border-t border-slate-200 pt-1.5 font-bold">
-                  <span className="text-rose-700">Outstanding Due:</span>
-                  <span className="font-mono text-rose-700">₹{selectedOfflineSaleForPayment.amountDue}</span>
-                </div>
-              </div>
-
-              <form onSubmit={handleUpdateOfflinePayment} className="space-y-3">
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                    Amount Paid Now (₹)
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    max={selectedOfflineSaleForPayment.amountDue}
-                    required
-                    value={offlinePaymentAmount}
-                    onChange={(e) => setOfflinePaymentAmount(Number(e.target.value))}
-                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-mono font-black text-emerald-800 focus:outline-none focus:ring-1 focus:ring-forest-900"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                    Payment Mode
-                  </label>
-                  <AdminSelect
-                    value={offlinePaymentMode}
-                    onChange={setOfflinePaymentMode}
-                    options={SETTLE_OFFLINE_PAYMENT_OPTIONS}
-                    size="md"
-                    className="w-full"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                    Payment Notes / Reference
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Paid via GPay, settled full amount"
-                    value={offlinePaymentNotes}
-                    onChange={(e) => setOfflinePaymentNotes(e.target.value)}
-                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-forest-900"
-                  />
-                </div>
-
-                <div className="flex justify-end space-x-2 pt-3 border-t border-slate-100">
-                  <button
-                    type="button"
-                    onClick={() => setIsRecordOfflinePaymentModalOpen(false)}
-                    className="px-4 py-2 bg-slate-100 text-slate-700 font-bold rounded-xl cursor-pointer hover:bg-slate-200 transition"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-5 py-2 bg-forest-900 hover:bg-forest-950 text-gold-400 font-bold rounded-xl cursor-pointer shadow-sm transition"
-                  >
-                    Record Payment
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )
-      }
-
-      {/* ====================================================================
-          MODAL 7: VIEW OFFLINE SALE DETAILS & AUDIT CHANGE LOG
-          ==================================================================== */}
-      {
-        selectedOfflineSaleForView && !editingOfflineSale && (
-          <div className="space-y-6 w-full animate-fadeIn pb-12">
-            {/* Top Action Nav Bar with Back Button */}
-            <div className="bg-white p-3.5 sm:p-5 rounded-2xl sm:rounded-3xl border border-slate-200/90 shadow-xs">
-              <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-4 w-full">
-                <button
-                  type="button"
-                  onClick={() => setSelectedOfflineSaleForView(null)}
-                  className="inline-flex items-center space-x-1.5 sm:space-x-2 px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl bg-slate-100 hover:bg-forest-900 hover:text-gold-400 text-slate-700 font-bold text-xs sm:text-sm transition cursor-pointer shadow-xs group shrink-0 self-start sm:self-auto"
-                >
-                  <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-                  <span>Back<span className="hidden sm:inline"> to Offline Sales</span></span>
-                </button>
-                <div className="h-6 w-px bg-slate-200 hidden sm:block" />
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center space-x-2">
-                    <span className="p-1 sm:p-1.5 bg-forest-900/10 text-forest-900 rounded-lg shrink-0">
-                      <Store className="w-4 sm:w-5 h-4 sm:h-5 text-forest-900" />
-                    </span>
-                    <h2 className="font-serif text-base sm:text-xl font-bold text-forest-950 truncate">
-                      {`Offline Retail Sale Invoice`}
-                    </h2>
-                  </div>
-                  <p className="text-[11px] sm:text-xs text-slate-500 mt-0.5 truncate">{'Direct Store Counter Billing & Customer Ledger'}</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Main Full-Page Content Card */}
-            <div className="bg-[#FDFBF7] rounded-3xl w-full shadow-xs border border-amber-900/15 overflow-hidden">
-              {/* STICKY LUXURY HEADER */}
-              <div className="px-4 sm:px-6 py-4 sm:py-5 bg-gradient-to-r from-forest-950 via-[#0B2316] to-forest-900 text-white flex items-center justify-between gap-3 shrink-0 border-b border-gold-400/20 shadow-md">
-                <div className="flex items-center space-x-2.5 sm:space-x-3.5 min-w-0">
-                  <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl sm:rounded-2xl bg-gold-400/10 border border-gold-400/30 text-gold-400 flex items-center justify-center font-bold shadow-xs shrink-0">
-                    <Store className="w-4 sm:w-5 h-4 sm:h-5 text-gold-400" />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="px-2 py-0.5 rounded-md bg-gold-400/20 text-gold-300 border border-gold-400/30 font-mono text-[11px] sm:text-xs font-bold">
-                        #{selectedOfflineSaleForView.saleId}
-                      </span>
-                      <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] uppercase tracking-wider ${selectedOfflineSaleForView.paymentStatus === 'PAID'
-                        ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-400/30'
-                        : selectedOfflineSaleForView.paymentStatus === 'PARTIAL'
-                          ? 'bg-amber-500/20 text-amber-300 border border-amber-400/30'
-                          : 'bg-rose-500/20 text-rose-300 border border-rose-400/30'
-                        }`}>
-                        {selectedOfflineSaleForView.paymentStatus}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center space-x-1.5 sm:space-x-2 shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const s = selectedOfflineSaleForView;
-                      setSelectedOfflineSaleForView(null);
-                      handleOpenEditOfflineSale(s);
-                    }}
-                    className="p-2 text-gold-300 hover:text-forest-950 bg-gold-400/10 hover:bg-gold-400 rounded-xl border border-gold-400/30 transition cursor-pointer shadow-xs"
-                    title="Edit Invoice"
-                  >
-                    <Edit2 className="w-4 h-4" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const s = selectedOfflineSaleForView;
-                      setSelectedOfflineSaleForView(null);
-                      handleDeleteOfflineSale(s._id, s.saleId);
-                    }}
-                    className="p-2 text-slate-300 hover:text-rose-400 bg-white/5 hover:bg-rose-500/10 rounded-xl border border-white/10 hover:border-rose-500/20 transition cursor-pointer"
-                    title="Delete sale record"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedOfflineSaleForView(null)}
-                    className="p-2 text-slate-300 hover:text-white bg-white/5 hover:bg-white/10 rounded-xl border border-white/10 transition cursor-pointer"
-                    title="Close"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-
-              {/* SCROLLABLE BODY */}
-              <div className="space-y-6 p-5 sm:p-7 space-y-6 bg-[#FCFBF8]">
-
-                {/* 1. FINANCIAL SUMMARY RIBBON (4 LUXURY CARDS) */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5">
-                  <div className="p-4 bg-white rounded-2xl border border-amber-900/10 shadow-xs">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block font-sans">
-                      Total Gross Bill
-                    </span>
-                    <span className="text-xl sm:text-2xl font-black text-forest-950 font-mono mt-1 block">
-                      ₹{Number(selectedOfflineSaleForView.totalAmount || 0).toLocaleString('en-IN')}
-                    </span>
-                    <span className="text-[10px] text-slate-500 mt-0.5 block">Full invoice value</span>
-                  </div>
-
-                  <div className="p-4 bg-white rounded-2xl border border-emerald-900/10 shadow-xs">
-                    <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider block font-sans">
-                      Amount Collected
-                    </span>
-                    <span className="text-xl sm:text-2xl font-black text-emerald-700 font-mono mt-1 block">
-                      ₹{Number(selectedOfflineSaleForView.amountPaid || 0).toLocaleString('en-IN')}
-                    </span>
-                    <span className="text-[10px] text-emerald-600 font-semibold mt-0.5 block">Realized cash/UPI</span>
-                  </div>
-
-                  <div className={`p-4 bg-white rounded-2xl shadow-xs border ${selectedOfflineSaleForView.amountDue > 0 ? 'border-rose-200 bg-rose-50/20' : 'border-amber-900/10'
-                    }`}>
-                    <span className={`text-[10px] font-bold uppercase tracking-wider block font-sans ${selectedOfflineSaleForView.amountDue > 0 ? 'text-rose-600' : 'text-slate-400'
-                      }`}>
-                      Outstanding Due
-                    </span>
-                    <span className={`text-xl sm:text-2xl font-black font-mono mt-1 block ${selectedOfflineSaleForView.amountDue > 0 ? 'text-rose-600' : 'text-slate-400'
-                      }`}>
-                      ₹{Number(selectedOfflineSaleForView.amountDue || 0).toLocaleString('en-IN')}
-                    </span>
-                    <span className={`text-[10px] font-medium mt-0.5 block ${selectedOfflineSaleForView.amountDue > 0 ? 'text-rose-600' : 'text-slate-500'
-                      }`}>
-                      {selectedOfflineSaleForView.amountDue > 0 ? 'Pending credit balance settlement' : 'Fully settled (Nil)'}
-                    </span>
-                  </div>
-
-                  <div className="p-4 bg-white rounded-2xl border border-amber-900/10 shadow-xs">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block font-sans">
-                      Payment Mode
-                    </span>
-                    <span className="text-sm font-bold text-slate-800 font-mono mt-1.5 block">
-                      {selectedOfflineSaleForView.paymentMode}
-                    </span>
-                    <span className="text-[10px] text-slate-500 mt-0.5 block">Settlement channel</span>
-                  </div>
-                </div>
-
-                {/* 2. CUSTOMER & BILL INFO CARD */}
-                <div className="p-5 bg-white rounded-2xl border border-slate-200/90 shadow-xs space-y-3">
-                  <div className="flex items-center space-x-2 pb-2 border-b border-slate-100">
-                    <User className="w-4 h-4 text-forest-900" />
-                    <h4 className="font-serif font-bold text-xs uppercase tracking-wider text-forest-950">
-                      Customer & Billing Details
-                    </h4>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-                    <div className="space-y-1">
-                      <span className="text-[11px] font-semibold text-slate-500 block">Customer / Shop Name</span>
-                      <p className="text-sm font-bold text-slate-900">{selectedOfflineSaleForView.customerName}</p>
-                    </div>
-
-                    <div className="space-y-1">
-                      <span className="text-[11px] font-semibold text-slate-500 block">Phone Number</span>
-                      {selectedOfflineSaleForView.customerPhone ? (
-                        <div className="flex items-center space-x-2">
-                          <span className="font-mono font-bold text-slate-900 text-sm">
-                            +91 {selectedOfflineSaleForView.customerPhone}
-                          </span>
-                          <a
-                            href={`https://wa.me/91${selectedOfflineSaleForView.customerPhone}`}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-bold text-[10px] border border-emerald-200 transition"
-                          >
-                            WhatsApp
-                          </a>
-                        </div>
-                      ) : (
-                        <span className="text-slate-400 italic">Not provided</span>
-                      )}
-                    </div>
-
-                    <div className="space-y-1">
-                      <span className="text-[11px] font-semibold text-slate-500 block">Counter / Area Location</span>
-                      <p className="text-slate-800 font-medium">
-                        {selectedOfflineSaleForView.locationArea || 'Direct Store Counter, Sidhpur'}
-                      </p>
-                    </div>
-
-                    <div className="space-y-1">
-                      <span className="text-[11px] font-semibold text-slate-500 block">Physical Bill / Voucher Number</span>
-                      <p className="font-mono font-bold text-slate-800">
-                        {selectedOfflineSaleForView.billNumber || 'None (Counter POS)'}
-                      </p>
-                    </div>
-
-                    {selectedOfflineSaleForView.notes && (
-                      <div className="md:col-span-2 p-3 bg-amber-50/60 rounded-xl border border-amber-200/60 text-xs">
-                        <span className="font-bold text-amber-950 block text-[10.5px] uppercase tracking-wider mb-0.5">Voucher Notes:</span>
-                        <p className="text-amber-900">{selectedOfflineSaleForView.notes}</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* 3. ITEMS PURCHASED TABLE */}
-                <div className="space-y-2">
-                  <div className="flex items-center space-x-2">
-                    <Package className="w-4 h-4 text-forest-900" />
-                    <h4 className="font-serif font-bold text-xs uppercase tracking-wider text-forest-950">
-                      Items Purchased & Line Ledger
-                    </h4>
-                  </div>
-
-                  <div className="border border-slate-200/90 rounded-2xl overflow-hidden shadow-xs bg-white">
-                    <table className="w-full text-left text-xs">
-                      <thead className="bg-[#0B2316] text-gold-300 font-bold uppercase text-[10.5px] tracking-wider">
-                        <tr>
-                          <th className="py-3 px-4">Product Name</th>
-                          <th className="py-3 px-4 text-center">Quantity</th>
-                          <th className="py-3 px-4 text-right">Unit Price</th>
-                          <th className="py-3 px-4 text-right">Line Total</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100 font-mono">
-                        {selectedOfflineSaleForView.items?.map((item: any, i: number) => (
-                          <tr key={i} className="hover:bg-slate-50/80 transition">
-                            <td className="py-3 px-4 font-sans font-bold text-slate-900">
-                              {item.productName}
-                              {item.sku && (
-                                <span className="block text-[10px] text-slate-400 font-mono mt-0.5">SKU: {item.sku}</span>
-                              )}
-                            </td>
-                            <td className="py-3 px-4 text-center font-bold">
-                              <span className="px-2 py-0.5 bg-slate-100 rounded-md text-slate-800">{item.quantity}</span>
-                            </td>
-                            <td className="py-3 px-4 text-right font-medium text-slate-700">₹{item.unitPrice}</td>
-                            <td className="py-3 px-4 text-right font-bold text-forest-950">₹{item.totalPrice}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                      <tfoot className="bg-[#FAF8F5] border-t border-slate-200/90 font-mono font-bold text-xs">
-                        <tr>
-                          <td colSpan={3} className="py-3 px-4 text-right font-sans text-slate-600">Net Payable Total:</td>
-                          <td className="py-3 px-4 text-right text-forest-950 font-black text-sm">
-                            ₹{Number(selectedOfflineSaleForView.totalAmount || 0).toLocaleString('en-IN')}
-                          </td>
-                        </tr>
-                      </tfoot>
-                    </table>
-                  </div>
-                </div>
-
-                {/* 4. AUDIT CHANGE LOGS SECTION */}
-                <div className="p-5 bg-white rounded-2xl border border-slate-200/90 shadow-xs space-y-4">
-                  <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-                    <div className="flex items-center space-x-2">
-                      <History className="w-4 h-4 text-forest-900" />
-                      <h4 className="font-serif font-bold text-xs uppercase tracking-wider text-forest-950">
-                        Official Audit Trail & Modification History
-                      </h4>
-                    </div>
-                    <span className="px-2.5 py-0.5 bg-slate-100 text-slate-700 rounded-full font-mono text-[10px] font-bold border border-slate-200">
-                      {selectedOfflineSaleForView.changeLogs?.length || 0} revisions recorded
-                    </span>
-                  </div>
-
-                  {!selectedOfflineSaleForView.changeLogs || selectedOfflineSaleForView.changeLogs.length === 0 ? (
-                    <div className="p-5 bg-slate-50/80 rounded-2xl border border-dashed border-slate-200 text-center">
-                      <CheckCircle2 className="w-6 h-6 text-emerald-600 mx-auto mb-1.5" />
-                      <p className="font-bold text-xs text-slate-700">Pristine Audit Record</p>
-                      <p className="text-[11px] text-slate-400 mt-0.5">
-                        No price, customer, or payment revisions have been recorded for this invoice since initial entry.
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      {selectedOfflineSaleForView.changeLogs.map((log: any, idx: number) => (
-                        <div key={idx} className="p-4 bg-amber-50/40 border border-amber-200/70 rounded-2xl space-y-2">
-                          <div className="flex items-center justify-between text-xs flex-wrap gap-2">
-                            <span className="px-2 py-0.5 bg-amber-200 text-amber-900 rounded-md font-bold font-sans text-[10px] tracking-wide uppercase">
-                              {log.label || log.field}
-                            </span>
-                            <span className="text-slate-400 font-mono text-[11px]">
-                              {new Date(log.changedAt).toLocaleString('en-IN', {
-                                day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
-                              })}
-                            </span>
-                          </div>
-
-                          <div className="flex items-center space-x-3 text-xs font-mono py-1">
-                            <div className="flex items-center space-x-1.5">
-                              <span className="text-[10px] uppercase font-bold text-slate-400 font-sans">Old:</span>
-                              <span className="line-through text-slate-400 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
-                                {String(log.oldValue ?? '')}
-                              </span>
-                            </div>
-                            <ArrowRight className="w-4 h-4 text-forest-800 shrink-0" />
-                            <div className="flex items-center space-x-1.5">
-                              <span className="text-[10px] uppercase font-bold text-emerald-700 font-sans">New:</span>
-                              <span className="font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded shadow-2xs">
-                                {String(log.newValue ?? '')}
-                              </span>
-                            </div>
-                          </div>
-
-                          {log.description && (
-                            <p className="text-[11.5px] text-slate-700 font-sans bg-white p-2.5 rounded-xl border border-slate-200/60">
-                              {log.description}
-                            </p>
-                          )}
-
-                          <div className="text-[10.5px] text-slate-400 pt-0.5 flex items-center space-x-1">
-                            <span>Modified by:</span>
-                            <span className="font-bold text-slate-800">{log.changedBy?.name || 'Administrator'}</span>
-                            <span>({log.changedBy?.email || 'admin@novise.in'})</span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-              </div>
-
-              {/* STICKY LUXURY FOOTER */}
-              <div className="px-6 py-4 bg-white border-t border-slate-200/80 flex items-center justify-between shrink-0">
-                <p className="text-[11px] text-slate-400 font-sans">
-                  Novise Herbal Financial Cell • Computer Generated Ledger Entry
-                </p>
-                <button
-                  onClick={() => setSelectedOfflineSaleForView(null)}
-                  className="px-6 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl cursor-pointer transition text-xs"
-                >
-                  Close Invoice
-                </button>
-              </div>
-            </div>
-          </div>
-        )
-      }
-
-      {/* ====================================================================
-          MODAL 8: EDIT OFFLINE SALE & PRESERVE CHANGE LOG
-          ==================================================================== */}
-      {
-        editingOfflineSale && (
-          <div className="space-y-6 w-full animate-fadeIn pb-12">
-            {/* Top Action Nav Bar with Back Button */}
-            <div className="bg-white p-3.5 sm:p-5 rounded-2xl sm:rounded-3xl border border-slate-200/90 shadow-xs">
-              <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-4 w-full">
-                <button
-                  type="button"
-                  onClick={() => setEditingOfflineSale(null)}
-                  className="inline-flex items-center space-x-1.5 sm:space-x-2 px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl bg-slate-100 hover:bg-forest-900 hover:text-gold-400 text-slate-700 font-bold text-xs sm:text-sm transition cursor-pointer shadow-xs group shrink-0 self-start sm:self-auto"
-                >
-                  <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-                  <span>Back<span className="hidden sm:inline">{selectedOfflineSaleForView ? ' to Invoice View' : ' to Offline Sales'}</span></span>
-                </button>
-                <div className="h-6 w-px bg-slate-200 hidden sm:block" />
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center space-x-2">
-                    <span className="p-1 sm:p-1.5 bg-forest-900/10 text-forest-900 rounded-lg shrink-0">
-                      <Edit2 className="w-4 sm:w-5 h-4 sm:h-5 text-forest-900" />
-                    </span>
-                    <h2 className="font-serif text-base sm:text-xl font-bold text-forest-950 truncate">
-                      {`Edit Offline Sale`}
-                    </h2>
-                  </div>
-                  <p className="text-[11px] sm:text-xs text-slate-500 mt-0.5 break-words">
-                    {'Revise customer info, purchased items, unit prices, or payment logs.'}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Main Full-Page Content Card */}
-            <div className="bg-[#FDFBF7] rounded-3xl w-full shadow-xs border border-amber-900/15 overflow-hidden">
-              {/* STICKY LUXURY HEADER */}
-              <div className="px-6 py-6 bg-gradient-to-r from-forest-950 via-[#0B2316] to-forest-900 text-white flex items-center justify-between shrink-0 border-b border-gold-400/20 shadow-md">
-                <div className="flex items-center space-x-3.5">
-                  <div>
-                    <div className="flex items-center space-x-2.5">
-                      <h3 className="font-serif text-lg sm:text-xl font-bold tracking-wide text-white">
-                        Edit Offline Sale & Price Log
-                      </h3>
-                      <span className="px-3 py-1.5  rounded-md bg-gold-400/20 text-gold-300 border border-gold-400/30 font-mono text-xs font-bold">
-                        #{editingOfflineSale.saleId}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                <button
-                  onClick={() => setEditingOfflineSale(null)}
-                  className="p-2 text-slate-300 hover:text-white rounded-xl hover:bg-white/10 transition cursor-pointer"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              {/* SCROLLABLE BODY FORM */}
-              <form id="editOfflineSaleForm" onSubmit={handleUpdateOfflineSale} className="space-y-6 p-5 sm:p-7 space-y-5 bg-[#FCFBF8]">
-
-                {/* Notice Banner */}
-                <div className="p-4 bg-amber-50/70 border border-amber-200 rounded-2xl flex items-start space-x-3">
-                  <AlertTriangle className="w-5 h-5 text-amber-700 shrink-0 mt-0.5" />
-                  <div className="text-xs text-amber-950">
-                    <p className="font-bold">Audit Preservation Notice</p>
-                    <p className="text-amber-900 mt-0.5">
-                      Any changes made to total bill, cash paid, or customer credentials will be recorded with old and new values in the change log.
-                    </p>
-                  </div>
-                </div>
-
-                {/* Section 1: Customer Details */}
-                <div className="p-5 bg-white rounded-2xl border border-slate-200/90 shadow-xs space-y-4">
-                  <h4 className="font-serif font-bold text-xs uppercase tracking-wider text-forest-950 flex items-center space-x-2">
-                    <User className="w-4 h-4 text-forest-900" />
-                    <span>Customer & Contact Information</span>
-                  </h4>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                        Customer / Shop Name <span className="text-rose-500">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        value={editingOfflineSale.customerName}
-                        onChange={(e) => setEditingOfflineSale({ ...editingOfflineSale, customerName: e.target.value })}
-                        className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-forest-900/15 focus:border-forest-900"
-                      />
-                    </div>
-
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                       <div className="flex justify-between items-center mb-1">
-                        <label className="block text-[11px] font-bold text-slate-700">Phone Number</label>
+                        <label className="block font-bold text-slate-700">Vendor Contact Phone</label>
                         <span className="text-[10px] text-slate-400 font-mono">
-                          {editingOfflineSale.customerPhone ? `${editingOfflineSale.customerPhone.length}/10 digits` : '10 digits'}
+                          {newMfg.vendorContact ? `${newMfg.vendorContact.length}/10 digits` : '10 digits'}
                         </span>
                       </div>
                       <div className="relative">
-                        <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs">+91</span>
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs">+91</span>
                         <input
                           type="tel"
                           inputMode="numeric"
                           pattern="[6-9][0-9]{9}"
                           maxLength={10}
                           placeholder="9876543210"
-                          value={editingOfflineSale.customerPhone}
-                          onChange={(e) => setEditingOfflineSale({
-                            ...editingOfflineSale,
-                            customerPhone: sanitizePhoneNumber(e.target.value)
-                          })}
+                          value={newMfg.vendorContact}
+                          onChange={(e) => setNewMfg({ ...newMfg, vendorContact: sanitizePhoneNumber(e.target.value) })}
                           onKeyDown={handlePhoneKeyDown}
-                          className="w-full pl-12 pr-4 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-mono text-slate-900 focus:outline-none focus:ring-2 focus:ring-forest-900/15 focus:border-forest-900"
+                          className="w-full pl-11 pr-3 py-2 bg-[#FAF8F5] border border-slate-300 rounded-xl font-mono focus:outline-none focus:ring-1 focus:ring-forest-900"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block font-bold text-slate-700 mb-1">Invoice / Bill Number</label>
+                      <input
+                        type="text"
+                        placeholder="INV-2026-90"
+                        value={newMfg.invoiceNumber}
+                        onChange={(e) => setNewMfg({ ...newMfg, invoiceNumber: e.target.value })}
+                        className="w-full px-3 py-2 bg-[#FAF8F5] border border-slate-300 rounded-xl font-mono focus:outline-none focus:ring-1 focus:ring-forest-900"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Notes / Quality Remarks</label>
+                    <textarea
+                      rows={2}
+                      placeholder="e.g. QC passed, bottle caps verified, batch expiry 2028."
+                      value={newMfg.notes}
+                      onChange={(e) => setNewMfg({ ...newMfg, notes: e.target.value })}
+                      className="w-full px-3 py-2 bg-[#FAF8F5] border border-slate-300 rounded-xl focus:outline-none focus:ring-1 focus:ring-forest-900"
+                    />
+                  </div>
+
+                  <div className="flex justify-end space-x-2 pt-2 border-t border-slate-100">
+                    <button
+                      type="button"
+                      onClick={() => setIsAddMfgModalOpen(false)}
+                      className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="px-5 py-2 bg-forest-900 hover:bg-forest-950 text-gold-400 font-bold rounded-xl cursor-pointer"
+                    >
+                      Save Batch
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )
+        }
+
+        {/* ====================================================================
+          MODAL 2: RECORD SUPPLIER PAYMENT
+          ==================================================================== */}
+        {
+          isRecordPaymentModalOpen && selectedMfgForPayment && (
+            <div className="space-y-6 w-full animate-fadeIn pb-12">
+              {/* Top Action Nav Bar with Back Button */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-4 sm:p-6 rounded-3xl border border-slate-200/90 shadow-xs">
+                <div className="flex items-center space-x-3 sm:space-x-4">
+                  <button
+                    type="button"
+                    onClick={() => { setIsRecordPaymentModalOpen(false); setSelectedMfgForPayment(null); }}
+                    className="inline-flex items-center space-x-2 px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-xl bg-slate-100 hover:bg-forest-900 hover:text-gold-400 text-slate-700 font-bold text-xs sm:text-sm transition cursor-pointer shadow-xs group"
+                  >
+                    <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+                    <span>Back<span className="hidden sm:inline"> to Manufacturing</span></span>
+                  </button>
+                  <div className="h-6 w-px bg-slate-200 hidden sm:block" />
+                  <div>
+                    <div className="flex items-center space-x-2">
+                      <span className="p-1.5 bg-forest-900/10 text-forest-900 rounded-lg">
+                        <CreditCard className="w-5 h-5 text-forest-900" />
+                      </span>
+                      <h2 className="font-serif text-lg sm:text-2xl font-black text-forest-950">
+                        {'Record Supplier Payment'}
+                      </h2>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-0.5">{selectedMfgForPayment ? `Vendor: ${selectedMfgForPayment.vendorName} • Batch: #${selectedMfgForPayment.batchNumber}` : ''}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Main Full-Page Content Card */}
+              <div className="bg-white rounded-3xl w-full p-6 sm:p-8 shadow-xs border border-slate-200/90 space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                  <h3 className="font-serif text-base font-bold text-forest-950">Record Supplier Payment</h3>
+                  <button onClick={() => setIsRecordPaymentModalOpen(false)} className="p-1 text-slate-400 hover:text-slate-700">
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1">
+                  <p className="font-bold text-slate-800">{selectedMfgForPayment.productName}</p>
+                  <p className="text-[11px] text-slate-500 font-mono">{selectedMfgForPayment.batchNumber} • Vendor: {selectedMfgForPayment.vendorName}</p>
+                  <p className="text-xs font-bold text-rose-700 font-mono">Current Outstanding Due: ₹{selectedMfgForPayment.amountDue}</p>
+                </div>
+
+                <form onSubmit={handleRecordPayment} className="space-y-3">
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Payment Amount (₹) *</label>
+                    <input
+                      type="number"
+                      min="1"
+                      max={selectedMfgForPayment.amountDue}
+                      required
+                      value={paymentAmount}
+                      onChange={(e) => setPaymentAmount(Number(e.target.value))}
+                      className="w-full px-3 py-2 bg-[#FAF8F5] border border-slate-300 rounded-xl font-mono text-sm font-bold text-forest-950 focus:outline-none focus:ring-1 focus:ring-forest-900"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Payment Mode</label>
+                    <AdminSelect
+                      value={paymentMode}
+                      onChange={setPaymentMode}
+                      options={PAYMENT_MODE_OPTIONS}
+                      size="md"
+                      className="w-full"
+                    />
+                  </div>
+
+                  <div className="flex justify-end space-x-2 pt-2 border-t border-slate-100">
+                    <button
+                      type="button"
+                      onClick={() => setIsRecordPaymentModalOpen(false)}
+                      className="px-4 py-2 bg-slate-100 text-slate-700 font-bold rounded-xl"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded-xl"
+                    >
+                      Confirm Payment
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )
+        }
+
+        {/* ====================================================================
+          MODAL 3: RECORD SUPPLIER RETURN & REFUND
+          ==================================================================== */}
+        {
+          isRecordReturnModalOpen && selectedMfgForReturn && (
+            <div className="space-y-6 w-full animate-fadeIn pb-12">
+              {/* Top Action Nav Bar with Back Button */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-4 sm:p-6 rounded-3xl border border-slate-200/90 shadow-xs">
+                <div className="flex items-center space-x-3 sm:space-x-4">
+                  <button
+                    type="button"
+                    onClick={() => { setIsRecordReturnModalOpen(false); setSelectedMfgForReturn(null); }}
+                    className="inline-flex items-center space-x-2 px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-xl bg-slate-100 hover:bg-forest-900 hover:text-gold-400 text-slate-700 font-bold text-xs sm:text-sm transition cursor-pointer shadow-xs group"
+                  >
+                    <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+                    <span>Back<span className="hidden sm:inline"> to Manufacturing</span></span>
+                  </button>
+                  <div className="h-6 w-px bg-slate-200 hidden sm:block" />
+                  <div>
+                    <div className="flex items-center space-x-2">
+                      <span className="p-1.5 bg-forest-900/10 text-forest-900 rounded-lg">
+                        <RotateCcw className="w-5 h-5 text-forest-900" />
+                      </span>
+                      <h2 className="font-serif text-lg sm:text-2xl font-black text-forest-950">
+                        {'Return Batch to Supplier'}
+                      </h2>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-0.5">{selectedMfgForReturn ? `Vendor: ${selectedMfgForReturn.vendorName} • Batch: #${selectedMfgForReturn.batchNumber}` : ''}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Main Full-Page Content Card */}
+              <div className="bg-white rounded-3xl w-full p-6 sm:p-8 shadow-xs border border-slate-200/90 space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                  <h3 className="font-serif text-base font-bold text-forest-950">Return Batch to Supplier</h3>
+                  <button onClick={() => setIsRecordReturnModalOpen(false)} className="p-1 text-slate-400 hover:text-slate-700">
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <div className="p-3 bg-purple-50 border border-purple-200 rounded-xl space-y-1">
+                  <p className="font-bold text-purple-950">{selectedMfgForReturn.productName}</p>
+                  <p className="text-[11px] text-purple-700">Unit Cost: ₹{selectedMfgForReturn.unitCost} • Vendor: {selectedMfgForReturn.vendorName}</p>
+                </div>
+
+                <form onSubmit={handleRecordReturn} className="space-y-3">
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Return Quantity (Units) *</label>
+                    <input
+                      type="number"
+                      min="1"
+                      max={selectedMfgForReturn.quantity}
+                      required
+                      value={returnQty}
+                      onChange={(e) => {
+                        const q = Number(e.target.value);
+                        setReturnQty(q);
+                        setRefundAmount(q * selectedMfgForReturn.unitCost);
+                      }}
+                      className="w-full px-3 py-2 bg-[#FAF8F5] border border-slate-300 rounded-xl font-mono text-sm font-bold text-slate-900 focus:outline-none focus:ring-1 focus:ring-forest-900"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Refund Amount Credited (₹) *</label>
+                    <input
+                      type="number"
+                      min="0"
+                      required
+                      value={refundAmount}
+                      onChange={(e) => setRefundAmount(Number(e.target.value))}
+                      className="w-full px-3 py-2 bg-[#FAF8F5] border border-slate-300 rounded-xl font-mono text-sm font-bold text-purple-900 focus:outline-none focus:ring-1 focus:ring-forest-900"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Reason for Return *</label>
+                    <textarea
+                      rows={2}
+                      required
+                      placeholder="e.g. Cap leakage detected, bottle label defect, batch QC rejection"
+                      value={returnReason}
+                      onChange={(e) => setReturnReason(e.target.value)}
+                      className="w-full px-3 py-2 bg-[#FAF8F5] border border-slate-300 rounded-xl focus:outline-none focus:ring-1 focus:ring-forest-900"
+                    />
+                  </div>
+
+                  <div className="flex justify-end space-x-2 pt-2 border-t border-slate-100">
+                    <button
+                      type="button"
+                      onClick={() => setIsRecordReturnModalOpen(false)}
+                      className="px-4 py-2 bg-slate-100 text-slate-700 font-bold rounded-xl"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="px-4 py-2 bg-purple-700 hover:bg-purple-800 text-white font-bold rounded-xl"
+                    >
+                      Process Return & Credit
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )
+        }
+
+        {/* ====================================================================
+          MODAL 4: RECORD OPERATING OVERHEAD EXPENSE
+          ==================================================================== */}
+        {
+          isAddOperatingModalOpen && (
+            <div className="space-y-6 w-full animate-fadeIn pb-12">
+              {/* Top Action Nav Bar with Back Button */}
+              <div className="bg-white p-3.5 sm:p-5 rounded-2xl sm:rounded-3xl border border-slate-200/90 shadow-xs">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-4 w-full">
+                  <button
+                    type="button"
+                    onClick={() => setIsAddOperatingModalOpen(false)}
+                    className="inline-flex items-center space-x-1.5 sm:space-x-2 px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl bg-slate-100 hover:bg-forest-900 hover:text-gold-400 text-slate-700 font-bold text-xs sm:text-sm transition cursor-pointer shadow-xs group shrink-0 self-start sm:self-auto"
+                  >
+                    <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+                    <span>Back<span className="hidden sm:inline"> to Shop & Overhead</span></span>
+                  </button>
+                  <div className="h-6 w-px bg-slate-200 hidden sm:block" />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center space-x-2">
+                      <span className="p-1.5 bg-forest-900/10 text-forest-900 rounded-lg shrink-0">
+                        <Store className="w-5 h-5 text-forest-900" />
+                      </span>
+                      <h2 className="font-serif text-base sm:text-xl font-bold text-forest-950">
+                        {'Record Shop & Overhead Expense'}
+                      </h2>
+                    </div>
+                    <p className="text-[11px] sm:text-xs text-slate-500 mt-0.5">{'Log shop and warehouse operational expenses, utilities, payroll, packaging, or petty cash.'}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Main Full-Page Content Card */}
+              <div className="bg-white rounded-3xl w-full p-6 sm:p-8 shadow-xs border border-slate-200/90 space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                  <div className="flex items-center space-x-2">
+                    <Receipt className="w-5 h-5 text-forest-900" />
+                    <h3 className="font-serif text-lg font-bold text-forest-950">
+                      Record Shop & Overhead Expense
+                    </h3>
+                  </div>
+                  <button
+                    onClick={() => setIsAddOperatingModalOpen(false)}
+                    className="p-1.5 text-slate-400 hover:text-slate-800 rounded-lg hover:bg-slate-100"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <form onSubmit={handleCreateOperating} className="space-y-3.5">
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Expense Category *</label>
+                    <AdminSelect
+                      value={newOperating.category}
+                      onChange={(val) => setNewOperating({ ...newOperating, category: val })}
+                      options={OPERATING_CATEGORY_OPTIONS}
+                      size="md"
+                      searchable={true}
+                      className="w-full"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Expense Title / Description (Optional)</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Torrent Power October Bill, Staff Morning Tea"
+                      value={newOperating.title}
+                      onChange={(e) => setNewOperating({ ...newOperating, title: e.target.value })}
+                      className="w-full px-3 py-2 bg-[#FAF8F5] border border-slate-300 rounded-xl focus:outline-none focus:ring-1 focus:ring-forest-900"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block font-bold text-slate-700 mb-1">Amount (₹) *</label>
+                      <input
+                        type="number"
+                        min="1"
+                        required
+                        placeholder="2500"
+                        value={newOperating.amount}
+                        onChange={(e) => setNewOperating({ ...newOperating, amount: e.target.value })}
+                        className="w-full px-3 py-2 bg-[#FAF8F5] border border-slate-300 rounded-xl font-mono text-sm font-bold text-forest-950 focus:outline-none focus:ring-1 focus:ring-forest-900"
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-bold text-slate-700 mb-1">Payment Mode</label>
+                      <AdminSelect
+                        value={newOperating.paymentMode}
+                        onChange={(val) => setNewOperating({ ...newOperating, paymentMode: val })}
+                        options={PAYMENT_MODE_OPTIONS}
+                        size="md"
+                        className="w-full"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block font-bold text-slate-700 mb-1">Paid To (Vendor/Person)</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Torrent Power Ltd., Local Canteen"
+                        value={newOperating.paidTo}
+                        onChange={(e) => setNewOperating({ ...newOperating, paidTo: e.target.value })}
+                        className="w-full px-3 py-2 bg-[#FAF8F5] border border-slate-300 rounded-xl focus:outline-none focus:ring-1 focus:ring-forest-900"
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-bold text-slate-700 mb-1">Bill / Voucher Number</label>
+                      <input
+                        type="text"
+                        placeholder="ELE-90218"
+                        value={newOperating.billNumber}
+                        onChange={(e) => setNewOperating({ ...newOperating, billNumber: e.target.value })}
+                        className="w-full px-3 py-2 bg-[#FAF8F5] border border-slate-300 rounded-xl font-mono focus:outline-none focus:ring-1 focus:ring-forest-900"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Notes / Remarks</label>
+                    <textarea
+                      rows={2}
+                      placeholder="Optional billing details or ledger notes"
+                      value={newOperating.notes}
+                      onChange={(e) => setNewOperating({ ...newOperating, notes: e.target.value })}
+                      className="w-full px-3 py-2 bg-[#FAF8F5] border border-slate-300 rounded-xl focus:outline-none focus:ring-1 focus:ring-forest-900"
+                    />
+                  </div>
+
+                  <div className="flex justify-end space-x-2 pt-2 border-t border-slate-100">
+                    <button
+                      type="button"
+                      onClick={() => setIsAddOperatingModalOpen(false)}
+                      className="px-4 py-2 bg-slate-100 text-slate-700 font-bold rounded-xl"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="px-5 py-2 bg-forest-900 hover:bg-forest-950 text-gold-400 font-bold rounded-xl"
+                    >
+                      Record Expense
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )
+        }
+
+        {/* ====================================================================
+          MODAL 5: RECORD OFFLINE SALE (LOCAL RETAIL / DIRECT SALE)
+          ==================================================================== */}
+        {
+          isAddOfflineModalOpen && (
+            <div className="space-y-6 w-full animate-fadeIn pb-12">
+              {/* Top Action Nav Bar with Back Button */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-4 sm:p-6 rounded-3xl border border-slate-200/90 shadow-xs">
+                <div className="flex items-center space-x-3 sm:space-x-4">
+                  <button
+                    type="button"
+                    onClick={() => setIsAddOfflineModalOpen(false)}
+                    className="inline-flex items-center space-x-2 px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-xl bg-slate-100 hover:bg-forest-900 hover:text-gold-400 text-slate-700 font-bold text-xs sm:text-sm transition cursor-pointer shadow-xs group"
+                  >
+                    <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+                    <span>Back<span className="hidden sm:inline"> to Offline Sales</span></span>
+                  </button>
+                  <div className="h-6 w-px bg-slate-200 hidden sm:block" />
+                  <div>
+                    <div className="flex items-center space-x-2">
+                      <span className="p-1.5 bg-forest-900/10 text-forest-900 rounded-lg">
+                        <Store className="w-5 h-5 text-forest-900" />
+                      </span>
+                      <h2 className="font-serif text-lg sm:text-2xl font-black text-forest-950">
+                        {'Record Offline Retail Sale'}
+                      </h2>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Main Full-Page Content Card */}
+              <div className="bg-white rounded-3xl w-full p-6 sm:p-8 shadow-xs border border-slate-200/90 space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                  <div className="flex items-center space-x-2">
+                    <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-800 flex items-center justify-center font-bold">
+                      <Store className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h3 className="font-serif text-sm font-bold text-forest-950">Record Offline Sale</h3>
+                      <p className="text-[11px] text-slate-400">Log local counter order, retail bill or credit sale</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setIsAddOfflineModalOpen(false)}
+                    className="p-1.5 text-slate-400 hover:text-slate-800 rounded-lg hover:bg-slate-100 transition cursor-pointer"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <form onSubmit={handleCreateOfflineSale} className="space-y-4">
+                  {/* Customer Details */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                        Customer / Shop Name <span className="text-rose-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="e.g. Ramesh Bhai Patel / Shreenath Store"
+                        value={newOfflineSale.customerName}
+                        onChange={(e) => setNewOfflineSale(prev => ({ ...prev, customerName: e.target.value }))}
+                        className="w-full px-3 py-2 bg-[#FAF8F5] border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-forest-900"
+                      />
+                    </div>
+
+                    <div>
+                      <div className="flex justify-between items-center mb-1">
+                        <label className="block text-[11px] font-bold text-slate-600">
+                          Phone Number
+                        </label>
+                        <span className="text-[10px] text-slate-400 font-mono">
+                          {newOfflineSale.customerPhone ? `${newOfflineSale.customerPhone.length}/10 digits` : '10 digits'}
+                        </span>
+                      </div>
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs">+91</span>
+                        <input
+                          type="tel"
+                          inputMode="numeric"
+                          pattern="[6-9][0-9]{9}"
+                          maxLength={10}
+                          placeholder="9876543210"
+                          value={newOfflineSale.customerPhone}
+                          onChange={(e) => setNewOfflineSale(prev => ({
+                            ...prev,
+                            customerPhone: sanitizePhoneNumber(e.target.value)
+                          }))}
+                          onKeyDown={handlePhoneKeyDown}
+                          className="w-full pl-11 pr-3 py-2 bg-[#FAF8F5] border border-slate-200 rounded-xl text-xs text-slate-800 font-mono focus:outline-none focus:ring-1 focus:ring-forest-900"
                         />
                       </div>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-[11px] font-bold text-slate-700 mb-1">Area / Location</label>
+                      <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                        Area / Location
+                      </label>
                       <input
                         type="text"
                         placeholder="e.g. Sidhpur Station Road, Ahmedabad"
-                        value={editingOfflineSale.locationArea}
-                        onChange={(e) => setEditingOfflineSale({ ...editingOfflineSale, locationArea: e.target.value })}
-                        className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-forest-900/15 focus:border-forest-900"
+                        value={newOfflineSale.locationArea}
+                        onChange={(e) => setNewOfflineSale(prev => ({ ...prev, locationArea: e.target.value }))}
+                        className="w-full px-3 py-2 bg-[#FAF8F5] border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-forest-900"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-[11px] font-bold text-slate-700 mb-1">Physical Bill / Receipt #</label>
+                      <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                        Physical Bill / Invoice # (Optional)
+                      </label>
                       <input
                         type="text"
                         placeholder="e.g. BILL-102"
-                        value={editingOfflineSale.billNumber}
-                        onChange={(e) => setEditingOfflineSale({ ...editingOfflineSale, billNumber: e.target.value })}
-                        className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-mono text-slate-900 focus:outline-none focus:ring-2 focus:ring-forest-900/15 focus:border-forest-900"
+                        value={newOfflineSale.billNumber}
+                        onChange={(e) => setNewOfflineSale(prev => ({ ...prev, billNumber: e.target.value }))}
+                        className="w-full px-3 py-2 bg-[#FAF8F5] border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-forest-900"
                       />
                     </div>
                   </div>
-                </div>
 
-                {/* Section 2: Product & Quantity Sold */}
-                <div className="p-5 bg-white rounded-2xl border border-slate-200/90 shadow-xs space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h4 className="font-serif font-bold text-xs uppercase tracking-wider text-forest-950 flex items-center space-x-2">
-                      <Package className="w-4 h-4 text-forest-900" />
-                      <span>Product & Quantity Sold</span>
-                    </h4>
-                    <span className="text-[10.5px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200/60">
-                      Auto Stock Sync Active
-                    </span>
-                  </div>
+                  {/* Product Selection */}
+                  <div className="p-3 bg-[#FAF8F5] rounded-2xl border border-slate-200/80 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-forest-950 text-xs flex items-center space-x-1">
+                        <Package className="w-3.5 h-3.5 text-forest-700" />
+                        <span>Product Sold</span>
+                      </span>
+                      <span className="text-[10.5px] text-slate-400">Select catalog item or enter name</span>
+                    </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="md:col-span-1">
-                      <label className="block text-[11px] font-bold text-slate-700 mb-1">Product</label>
-                      {availableProducts.length > 0 ? (
+                    {availableProducts.length > 0 && (
+                      <div>
                         <AdminSelect
-                          value={editingOfflineSale.productId || ''}
-                          onChange={(val) => {
-                            const found = availableProducts.find(p => p._id === val);
-                            if (found) {
-                              const unitPrice = Number(found.sellingPrice ?? found.price) || 0;
-                              const qty = Number(editingOfflineSale.quantity) || 1;
-                              const total = qty * unitPrice;
-                              setEditingOfflineSale({
-                                ...editingOfflineSale,
-                                productId: found._id,
-                                productName: found.name,
-                                productSku: found.sku || '',
-                                unitPrice,
-                                totalAmount: total,
-                                amountPaid: editingOfflineSale.paymentMode === 'CREDIT_UDHAAR' ? 0 : total
-                              });
-                            }
-                          }}
+                          value={newOfflineSale.productId}
+                          onChange={handleSelectOfflineProduct}
+                          placeholder="-- Choose from Botanical Catalog --"
                           options={[
+                            { value: '', label: '-- Choose from Botanical Catalog --' },
                             ...availableProducts.map(p => ({
                               value: p._id,
                               label: `${p.name} (₹${p.sellingPrice ?? p.price ?? 0})`,
@@ -4685,1286 +4563,1633 @@ export const AdminFinance: React.FC = () => {
                           searchable={true}
                           className="w-full"
                         />
-                      ) : (
+                      </div>
+                    )}
+
+                    <div>
+                      <label className="block text-[10.5px] font-bold text-slate-600 mb-1">Product Name</label>
+                      <input
+                        type="text"
+                        value={newOfflineSale.productName}
+                        onChange={(e) => setNewOfflineSale(prev => ({ ...prev, productName: e.target.value }))}
+                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-forest-900"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2">
+                      <div>
+                        <label className="block text-[10.5px] font-bold text-slate-600 mb-1">Quantity</label>
                         <input
-                          type="text"
-                          disabled
-                          value={editingOfflineSale.productName}
-                          className="w-full px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800"
+                          type="number"
+                          min="1"
+                          required
+                          value={newOfflineSale.quantity}
+                          onFocus={(e) => e.target.select()}
+                          onChange={(e) => handleOfflineQuantityChange(e.target.value)}
+                          onBlur={() => {
+                            if (!newOfflineSale.quantity || Number(newOfflineSale.quantity) < 1) {
+                              handleOfflineQuantityChange(1);
+                            }
+                          }}
+                          className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-mono font-bold text-slate-800 focus:outline-none focus:ring-1 focus:ring-forest-900"
                         />
-                      )}
-                    </div>
-
-                    <div>
-                      <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                        Quantity Sold <span className="text-rose-500">*</span>
-                      </label>
-                      <input
-                        type="number"
-                        min="1"
-                        required
-                        value={editingOfflineSale.quantity}
-                        onFocus={(e) => e.target.select()}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          if (val === '') {
-                            setEditingOfflineSale({
-                              ...editingOfflineSale,
-                              quantity: '' as any,
-                              totalAmount: 0,
-                              amountPaid: 0
-                            });
-                            return;
-                          }
-                          const num = parseInt(val, 10);
-                          const newQty = isNaN(num) ? ('' as any) : Math.max(0, num);
-                          const unitPrice = Number(editingOfflineSale.unitPrice) || 0;
-                          const newTotal = (typeof newQty === 'number' ? newQty : 0) * unitPrice;
-                          setEditingOfflineSale({
-                            ...editingOfflineSale,
-                            quantity: newQty,
-                            totalAmount: newTotal,
-                            amountPaid: editingOfflineSale.paymentMode === 'CREDIT_UDHAAR' ? 0 : newTotal
-                          });
-                        }}
-                        onBlur={() => {
-                          if (!editingOfflineSale.quantity || Number(editingOfflineSale.quantity) < 1) {
-                            const unitPrice = Number(editingOfflineSale.unitPrice) || 0;
-                            setEditingOfflineSale({
-                              ...editingOfflineSale,
-                              quantity: 1,
-                              totalAmount: unitPrice,
-                              amountPaid: editingOfflineSale.paymentMode === 'CREDIT_UDHAAR' ? 0 : unitPrice
-                            });
-                          }
-                        }}
-                        className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-forest-900/15 focus:border-forest-900"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-[11px] font-bold text-slate-700 mb-1">Unit Price (₹)</label>
-                      <input
-                        type="number"
-                        min="0"
-                        value={editingOfflineSale.unitPrice}
-                        onFocus={(e) => e.target.select()}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          if (val === '') {
-                            setEditingOfflineSale({
-                              ...editingOfflineSale,
-                              unitPrice: '' as any,
-                              totalAmount: 0,
-                              amountPaid: 0
-                            });
-                            return;
-                          }
-                          const num = parseFloat(val);
-                          const newPrice = isNaN(num) ? ('' as any) : Math.max(0, num);
-                          const qty = Number(editingOfflineSale.quantity) || 1;
-                          const newTotal = qty * (typeof newPrice === 'number' ? newPrice : 0);
-                          setEditingOfflineSale({
-                            ...editingOfflineSale,
-                            unitPrice: newPrice,
-                            totalAmount: newTotal,
-                            amountPaid: editingOfflineSale.paymentMode === 'CREDIT_UDHAAR' ? 0 : newTotal
-                          });
-                        }}
-                        onBlur={() => {
-                          if (editingOfflineSale.unitPrice === '' || Number(editingOfflineSale.unitPrice) < 0) {
-                            setEditingOfflineSale({
-                              ...editingOfflineSale,
-                              unitPrice: 0,
-                              totalAmount: 0,
-                              amountPaid: 0
-                            });
-                          }
-                        }}
-                        className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-forest-900/15 focus:border-forest-900"
-                      />
-                    </div>
-                  </div>
-                  <p className="text-[10.5px] text-slate-500 italic">
-                    Changing quantity sold will automatically update the product warehouse stock by the difference (delta).
-                  </p>
-                </div>
-
-                {/* Section 3: Billing & Financials */}
-                <div className="p-5 bg-white rounded-2xl border border-slate-200/90 shadow-xs space-y-4">
-                  <h4 className="font-serif font-bold text-xs uppercase tracking-wider text-forest-950 flex items-center space-x-2">
-                    <DollarSign className="w-4 h-4 text-forest-900" />
-                    <span>Financials & Settlement Status</span>
-                  </h4>
-
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div>
-                      <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                        Total Bill Amount (₹) <span className="text-rose-500">*</span>
-                      </label>
-                      <div className="relative">
-                        <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 font-bold">₹</span>
+                      </div>
+                      <div>
+                        <label className="block text-[10.5px] font-bold text-slate-600 mb-1">Unit Price (₹)</label>
                         <input
                           type="number"
                           min="0"
                           required
-                          value={editingOfflineSale.totalAmount}
-                          onChange={(e) => setEditingOfflineSale({ ...editingOfflineSale, totalAmount: Number(e.target.value) })}
+                          value={newOfflineSale.unitPrice}
+                          onFocus={(e) => e.target.select()}
+                          onChange={(e) => handleOfflineUnitPriceChange(e.target.value)}
+                          onBlur={() => {
+                            if (newOfflineSale.unitPrice === '' || Number(newOfflineSale.unitPrice) < 0) {
+                              handleOfflineUnitPriceChange(0);
+                            }
+                          }}
+                          className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-mono font-bold text-slate-800 focus:outline-none focus:ring-1 focus:ring-forest-900"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10.5px] font-bold text-slate-600 mb-1">Total Bill (₹)</label>
+                        <input
+                          type="number"
+                          readOnly
+                          value={newOfflineSale.totalAmount}
+                          className="w-full px-3 py-2 bg-slate-100 border border-slate-200 rounded-xl text-xs font-mono font-black text-forest-950 focus:outline-none cursor-not-allowed"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex items-center space-x-2 pt-1">
+                      <input
+                        type="checkbox"
+                        id="deductStockCheckbox"
+                        checked={newOfflineSale.deductStock}
+                        onChange={(e) => setNewOfflineSale(prev => ({ ...prev, deductStock: e.target.checked }))}
+                        className="rounded text-forest-900 focus:ring-forest-900 cursor-pointer"
+                      />
+                      <label htmlFor="deductStockCheckbox" className="text-[11px] text-slate-600 font-medium cursor-pointer">
+                        Auto-deduct items from warehouse inventory stock
+                      </label>
+                    </div>
+                  </div>
+
+                  {/* Payment Mode & Amount Paid */}
+                  <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                          Payment Mode
+                        </label>
+                        <AdminSelect
+                          value={newOfflineSale.paymentMode}
+                          onChange={handleOfflinePaymentModeChange}
+                          options={OFFLINE_PAYMENT_MODE_OPTIONS}
+                          size="md"
+                          className="w-full"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                          Amount Received Now (₹)
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          max={newOfflineSale.totalAmount}
+                          value={newOfflineSale.amountPaid}
+                          onChange={(e) => setNewOfflineSale(prev => ({ ...prev, amountPaid: Number(e.target.value) }))}
+                          className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-mono font-bold text-emerald-800 focus:outline-none"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-200/60">
+                      <span className="text-slate-500 font-medium">Remaining Pending / Due:</span>
+                      <span className={`font-mono font-bold ${(newOfflineSale.totalAmount - newOfflineSale.amountPaid) > 0 ? 'text-rose-700' : 'text-emerald-700'
+                        }`}>
+                        ₹{Math.max(0, newOfflineSale.totalAmount - newOfflineSale.amountPaid)}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Date & Notes */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-600 mb-1">Date of Sale</label>
+                      <input
+                        type="date"
+                        value={newOfflineSale.saleDate}
+                        onChange={(e) => setNewOfflineSale(prev => ({ ...prev, saleDate: e.target.value }))}
+                        className="w-full px-3 py-2 bg-[#FAF8F5] border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-600 mb-1">Notes / Remarks</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Sent via courier or counter pickup"
+                        value={newOfflineSale.notes}
+                        onChange={(e) => setNewOfflineSale(prev => ({ ...prev, notes: e.target.value }))}
+                        className="w-full px-3 py-2 bg-[#FAF8F5] border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end space-x-2 pt-3 border-t border-slate-100">
+                    <button
+                      type="button"
+                      onClick={() => setIsAddOfflineModalOpen(false)}
+                      className="px-4 py-2 bg-slate-100 text-slate-700 font-bold rounded-xl cursor-pointer hover:bg-slate-200 transition"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="px-5 py-2 bg-forest-900 hover:bg-forest-950 text-gold-400 font-bold rounded-xl cursor-pointer shadow-sm transition"
+                    >
+                      Record Offline Sale
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )
+        }
+
+        {/* ====================================================================
+          MODAL 6: SETTLE OFFLINE PAYMENT / RECORD BALANCE SETTLEMENT
+          ==================================================================== */}
+        {
+          isRecordOfflinePaymentModalOpen && selectedOfflineSaleForPayment && (
+            <div className="space-y-6 w-full animate-fadeIn pb-12">
+              {/* Top Action Nav Bar with Back Button */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-4 sm:p-6 rounded-3xl border border-slate-200/90 shadow-xs">
+                <div className="flex items-center space-x-3 sm:space-x-4">
+                  <button
+                    type="button"
+                    onClick={() => { setIsRecordOfflinePaymentModalOpen(false); setSelectedOfflineSaleForPayment(null); }}
+                    className="inline-flex items-center space-x-1.5 sm:space-x-2 px-3 py-1.5 sm:px-4 sm:py-2.5 rounded-xl bg-slate-100 hover:bg-forest-900 hover:text-gold-400 text-slate-700 font-bold text-xs sm:text-sm transition cursor-pointer shadow-xs group shrink-0"
+                  >
+                    <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+                    <span>Back<span className="hidden sm:inline"> to Offline Sales</span></span>
+                  </button>
+                  <div className="h-6 w-px bg-slate-200 hidden sm:block" />
+                  <div>
+                    <div className="flex items-center space-x-2">
+                      <span className="p-1.5 bg-forest-900/10 text-forest-900 rounded-lg">
+                        <CreditCard className="w-5 h-5 text-forest-900" />
+                      </span>
+                      <h2 className="font-serif text-lg sm:text-2xl font-black text-forest-950">
+                        {'Collect Payment / Settle Balance'}
+                      </h2>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-0.5">{selectedOfflineSaleForPayment ? `Invoice: #${selectedOfflineSaleForPayment.invoiceNumber} • Customer: ${selectedOfflineSaleForPayment.customer?.name || 'Walk-in'}` : ''}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Main Full-Page Content Card */}
+              <div className="bg-white rounded-3xl w-full p-6 sm:p-8 shadow-xs border border-slate-200/90 space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                  <div className="flex items-center space-x-2">
+                    <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-800 flex items-center justify-center font-bold">
+                      <CheckCircle2 className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h3 className="font-serif text-sm font-bold text-forest-950">Collect Payment / Settle Balance</h3>
+                      <p className="text-[10.5px] text-slate-400">{selectedOfflineSaleForPayment.saleId}</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setIsRecordOfflinePaymentModalOpen(false)}
+                    className="p-1 text-slate-400 hover:text-slate-700 cursor-pointer"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <div className="p-3.5 bg-[#FAF8F5] rounded-2xl border border-slate-200/80 space-y-2">
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Customer:</span>
+                    <span className="font-bold text-slate-800">{selectedOfflineSaleForPayment.customerName}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Total Bill Amount:</span>
+                    <span className="font-mono font-bold text-slate-800">₹{selectedOfflineSaleForPayment.totalAmount}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Already Paid:</span>
+                    <span className="font-mono font-bold text-emerald-700">₹{selectedOfflineSaleForPayment.amountPaid}</span>
+                  </div>
+                  <div className="flex justify-between border-t border-slate-200 pt-1.5 font-bold">
+                    <span className="text-rose-700">Outstanding Due:</span>
+                    <span className="font-mono text-rose-700">₹{selectedOfflineSaleForPayment.amountDue}</span>
+                  </div>
+                </div>
+
+                <form onSubmit={handleUpdateOfflinePayment} className="space-y-3">
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                      Amount Paid Now (₹)
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      max={selectedOfflineSaleForPayment.amountDue}
+                      required
+                      value={offlinePaymentAmount}
+                      onChange={(e) => setOfflinePaymentAmount(Number(e.target.value))}
+                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-mono font-black text-emerald-800 focus:outline-none focus:ring-1 focus:ring-forest-900"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                      Payment Mode
+                    </label>
+                    <AdminSelect
+                      value={offlinePaymentMode}
+                      onChange={setOfflinePaymentMode}
+                      options={SETTLE_OFFLINE_PAYMENT_OPTIONS}
+                      size="md"
+                      className="w-full"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                      Payment Notes / Reference
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Paid via GPay, settled full amount"
+                      value={offlinePaymentNotes}
+                      onChange={(e) => setOfflinePaymentNotes(e.target.value)}
+                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-forest-900"
+                    />
+                  </div>
+
+                  <div className="flex justify-end space-x-2 pt-3 border-t border-slate-100">
+                    <button
+                      type="button"
+                      onClick={() => setIsRecordOfflinePaymentModalOpen(false)}
+                      className="px-4 py-2 bg-slate-100 text-slate-700 font-bold rounded-xl cursor-pointer hover:bg-slate-200 transition"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="px-5 py-2 bg-forest-900 hover:bg-forest-950 text-gold-400 font-bold rounded-xl cursor-pointer shadow-sm transition"
+                    >
+                      Record Payment
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )
+        }
+
+        {/* ====================================================================
+          MODAL 7: VIEW OFFLINE SALE DETAILS & AUDIT CHANGE LOG
+          ==================================================================== */}
+        {
+          selectedOfflineSaleForView && !editingOfflineSale && (
+            <div className="space-y-6 w-full animate-fadeIn pb-12">
+              {/* Top Action Nav Bar with Back Button */}
+              <div className="bg-white p-3.5 sm:p-5 rounded-2xl sm:rounded-3xl border border-slate-200/90 shadow-xs">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-4 w-full">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedOfflineSaleForView(null)}
+                    className="inline-flex items-center space-x-1.5 sm:space-x-2 px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl bg-slate-100 hover:bg-forest-900 hover:text-gold-400 text-slate-700 font-bold text-xs sm:text-sm transition cursor-pointer shadow-xs group shrink-0 self-start sm:self-auto"
+                  >
+                    <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+                    <span>Back<span className="hidden sm:inline"> to Offline Sales</span></span>
+                  </button>
+                  <div className="h-6 w-px bg-slate-200 hidden sm:block" />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center space-x-2">
+                      <span className="p-1 sm:p-1.5 bg-forest-900/10 text-forest-900 rounded-lg shrink-0">
+                        <Store className="w-4 sm:w-5 h-4 sm:h-5 text-forest-900" />
+                      </span>
+                      <h2 className="font-serif text-base sm:text-xl font-bold text-forest-950 truncate">
+                        {`Offline Retail Sale Invoice`}
+                      </h2>
+                    </div>
+                    <p className="text-[11px] sm:text-xs text-slate-500 mt-0.5 truncate">{'Direct Store Counter Billing & Customer Ledger'}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Main Full-Page Content Card */}
+              <div className="bg-[#FDFBF7] rounded-3xl w-full shadow-xs border border-amber-900/15 overflow-hidden">
+                {/* STICKY LUXURY HEADER */}
+                <div className="px-4 sm:px-6 py-4 sm:py-5 bg-gradient-to-r from-forest-950 via-[#0B2316] to-forest-900 text-white flex items-center justify-between gap-3 shrink-0 border-b border-gold-400/20 shadow-md">
+                  <div className="flex items-center space-x-2.5 sm:space-x-3.5 min-w-0">
+                    <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl sm:rounded-2xl bg-gold-400/10 border border-gold-400/30 text-gold-400 flex items-center justify-center font-bold shadow-xs shrink-0">
+                      <Store className="w-4 sm:w-5 h-4 sm:h-5 text-gold-400" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="px-2 py-0.5 rounded-md bg-gold-400/20 text-gold-300 border border-gold-400/30 font-mono text-[11px] sm:text-xs font-bold">
+                          #{selectedOfflineSaleForView.saleId}
+                        </span>
+                        <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] uppercase tracking-wider ${selectedOfflineSaleForView.paymentStatus === 'PAID'
+                          ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-400/30'
+                          : selectedOfflineSaleForView.paymentStatus === 'PARTIAL'
+                            ? 'bg-amber-500/20 text-amber-300 border border-amber-400/30'
+                            : 'bg-rose-500/20 text-rose-300 border border-rose-400/30'
+                          }`}>
+                          {selectedOfflineSaleForView.paymentStatus}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center space-x-1.5 sm:space-x-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const s = selectedOfflineSaleForView;
+                        setSelectedOfflineSaleForView(null);
+                        handleOpenEditOfflineSale(s);
+                      }}
+                      className="p-2 text-gold-300 hover:text-forest-950 bg-gold-400/10 hover:bg-gold-400 rounded-xl border border-gold-400/30 transition cursor-pointer shadow-xs"
+                      title="Edit Invoice"
+                    >
+                      <Edit2 className="w-4 h-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const s = selectedOfflineSaleForView;
+                        setSelectedOfflineSaleForView(null);
+                        handleDeleteOfflineSale(s._id, s.saleId);
+                      }}
+                      className="p-2 text-slate-300 hover:text-rose-400 bg-white/5 hover:bg-rose-500/10 rounded-xl border border-white/10 hover:border-rose-500/20 transition cursor-pointer"
+                      title="Delete sale record"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedOfflineSaleForView(null)}
+                      className="p-2 text-slate-300 hover:text-white bg-white/5 hover:bg-white/10 rounded-xl border border-white/10 transition cursor-pointer"
+                      title="Close"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* SCROLLABLE BODY */}
+                <div className="space-y-6 p-5 sm:p-7 space-y-6 bg-[#FCFBF8]">
+
+                  {/* 1. FINANCIAL SUMMARY RIBBON (4 LUXURY CARDS) */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5">
+                    <div className="p-4 bg-white rounded-2xl border border-amber-900/10 shadow-xs">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block font-sans">
+                        Total Gross Bill
+                      </span>
+                      <span className="text-xl sm:text-2xl font-black text-forest-950 font-mono mt-1 block">
+                        ₹{Number(selectedOfflineSaleForView.totalAmount || 0).toLocaleString('en-IN')}
+                      </span>
+                      <span className="text-[10px] text-slate-500 mt-0.5 block">Full invoice value</span>
+                    </div>
+
+                    <div className="p-4 bg-white rounded-2xl border border-emerald-900/10 shadow-xs">
+                      <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider block font-sans">
+                        Amount Collected
+                      </span>
+                      <span className="text-xl sm:text-2xl font-black text-emerald-700 font-mono mt-1 block">
+                        ₹{Number(selectedOfflineSaleForView.amountPaid || 0).toLocaleString('en-IN')}
+                      </span>
+                      <span className="text-[10px] text-emerald-600 font-semibold mt-0.5 block">Realized cash/UPI</span>
+                    </div>
+
+                    <div className={`p-4 bg-white rounded-2xl shadow-xs border ${selectedOfflineSaleForView.amountDue > 0 ? 'border-rose-200 bg-rose-50/20' : 'border-amber-900/10'
+                      }`}>
+                      <span className={`text-[10px] font-bold uppercase tracking-wider block font-sans ${selectedOfflineSaleForView.amountDue > 0 ? 'text-rose-600' : 'text-slate-400'
+                        }`}>
+                        Outstanding Due
+                      </span>
+                      <span className={`text-xl sm:text-2xl font-black font-mono mt-1 block ${selectedOfflineSaleForView.amountDue > 0 ? 'text-rose-600' : 'text-slate-400'
+                        }`}>
+                        ₹{Number(selectedOfflineSaleForView.amountDue || 0).toLocaleString('en-IN')}
+                      </span>
+                      <span className={`text-[10px] font-medium mt-0.5 block ${selectedOfflineSaleForView.amountDue > 0 ? 'text-rose-600' : 'text-slate-500'
+                        }`}>
+                        {selectedOfflineSaleForView.amountDue > 0 ? 'Pending credit balance settlement' : 'Fully settled (Nil)'}
+                      </span>
+                    </div>
+
+                    <div className="p-4 bg-white rounded-2xl border border-amber-900/10 shadow-xs">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block font-sans">
+                        Payment Mode
+                      </span>
+                      <span className="text-sm font-bold text-slate-800 font-mono mt-1.5 block">
+                        {selectedOfflineSaleForView.paymentMode}
+                      </span>
+                      <span className="text-[10px] text-slate-500 mt-0.5 block">Settlement channel</span>
+                    </div>
+                  </div>
+
+                  {/* 2. CUSTOMER & BILL INFO CARD */}
+                  <div className="p-5 bg-white rounded-2xl border border-slate-200/90 shadow-xs space-y-3">
+                    <div className="flex items-center space-x-2 pb-2 border-b border-slate-100">
+                      <User className="w-4 h-4 text-forest-900" />
+                      <h4 className="font-serif font-bold text-xs uppercase tracking-wider text-forest-950">
+                        Customer & Billing Details
+                      </h4>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                      <div className="space-y-1">
+                        <span className="text-[11px] font-semibold text-slate-500 block">Customer / Shop Name</span>
+                        <p className="text-sm font-bold text-slate-900">{selectedOfflineSaleForView.customerName}</p>
+                      </div>
+
+                      <div className="space-y-1">
+                        <span className="text-[11px] font-semibold text-slate-500 block">Phone Number</span>
+                        {selectedOfflineSaleForView.customerPhone ? (
+                          <div className="flex items-center space-x-2">
+                            <span className="font-mono font-bold text-slate-900 text-sm">
+                              +91 {selectedOfflineSaleForView.customerPhone}
+                            </span>
+                            <a
+                              href={`https://wa.me/91${selectedOfflineSaleForView.customerPhone}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-bold text-[10px] border border-emerald-200 transition"
+                            >
+                              WhatsApp
+                            </a>
+                          </div>
+                        ) : (
+                          <span className="text-slate-400 italic">Not provided</span>
+                        )}
+                      </div>
+
+                      <div className="space-y-1">
+                        <span className="text-[11px] font-semibold text-slate-500 block">Counter / Area Location</span>
+                        <p className="text-slate-800 font-medium">
+                          {selectedOfflineSaleForView.locationArea || 'Direct Store Counter, Sidhpur'}
+                        </p>
+                      </div>
+
+                      <div className="space-y-1">
+                        <span className="text-[11px] font-semibold text-slate-500 block">Physical Bill / Voucher Number</span>
+                        <p className="font-mono font-bold text-slate-800">
+                          {selectedOfflineSaleForView.billNumber || 'None (Counter POS)'}
+                        </p>
+                      </div>
+
+                      {selectedOfflineSaleForView.notes && (
+                        <div className="md:col-span-2 p-3 bg-amber-50/60 rounded-xl border border-amber-200/60 text-xs">
+                          <span className="font-bold text-amber-950 block text-[10.5px] uppercase tracking-wider mb-0.5">Voucher Notes:</span>
+                          <p className="text-amber-900">{selectedOfflineSaleForView.notes}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* 3. ITEMS PURCHASED TABLE */}
+                  <div className="space-y-2">
+                    <div className="flex items-center space-x-2">
+                      <Package className="w-4 h-4 text-forest-900" />
+                      <h4 className="font-serif font-bold text-xs uppercase tracking-wider text-forest-950">
+                        Items Purchased & Line Ledger
+                      </h4>
+                    </div>
+
+                    <div className="border border-slate-200/90 rounded-2xl overflow-hidden shadow-xs bg-white">
+                      <table className="w-full text-left text-xs">
+                        <thead className="bg-[#0B2316] text-gold-300 font-bold uppercase text-[10.5px] tracking-wider">
+                          <tr>
+                            <th className="py-3 px-4">Product Name</th>
+                            <th className="py-3 px-4 text-center">Quantity</th>
+                            <th className="py-3 px-4 text-right">Unit Price</th>
+                            <th className="py-3 px-4 text-right">Line Total</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 font-mono">
+                          {selectedOfflineSaleForView.items?.map((item: any, i: number) => (
+                            <tr key={i} className="hover:bg-slate-50/80 transition">
+                              <td className="py-3 px-4 font-sans font-bold text-slate-900">
+                                {item.productName}
+                                {item.sku && (
+                                  <span className="block text-[10px] text-slate-400 font-mono mt-0.5">SKU: {item.sku}</span>
+                                )}
+                              </td>
+                              <td className="py-3 px-4 text-center font-bold">
+                                <span className="px-2 py-0.5 bg-slate-100 rounded-md text-slate-800">{item.quantity}</span>
+                              </td>
+                              <td className="py-3 px-4 text-right font-medium text-slate-700">₹{item.unitPrice}</td>
+                              <td className="py-3 px-4 text-right font-bold text-forest-950">₹{item.totalPrice}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                        <tfoot className="bg-[#FAF8F5] border-t border-slate-200/90 font-mono font-bold text-xs">
+                          <tr>
+                            <td colSpan={3} className="py-3 px-4 text-right font-sans text-slate-600">Net Payable Total:</td>
+                            <td className="py-3 px-4 text-right text-forest-950 font-black text-sm">
+                              ₹{Number(selectedOfflineSaleForView.totalAmount || 0).toLocaleString('en-IN')}
+                            </td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* 4. AUDIT CHANGE LOGS SECTION */}
+                  <div className="p-5 bg-white rounded-2xl border border-slate-200/90 shadow-xs space-y-4">
+                    <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                      <div className="flex items-center space-x-2">
+                        <History className="w-4 h-4 text-forest-900" />
+                        <h4 className="font-serif font-bold text-xs uppercase tracking-wider text-forest-950">
+                          Official Audit Trail & Modification History
+                        </h4>
+                      </div>
+                      <span className="px-2.5 py-0.5 bg-slate-100 text-slate-700 rounded-full font-mono text-[10px] font-bold border border-slate-200">
+                        {selectedOfflineSaleForView.changeLogs?.length || 0} revisions recorded
+                      </span>
+                    </div>
+
+                    {!selectedOfflineSaleForView.changeLogs || selectedOfflineSaleForView.changeLogs.length === 0 ? (
+                      <div className="p-5 bg-slate-50/80 rounded-2xl border border-dashed border-slate-200 text-center">
+                        <CheckCircle2 className="w-6 h-6 text-emerald-600 mx-auto mb-1.5" />
+                        <p className="font-bold text-xs text-slate-700">Pristine Audit Record</p>
+                        <p className="text-[11px] text-slate-400 mt-0.5">
+                          No price, customer, or payment revisions have been recorded for this invoice since initial entry.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {selectedOfflineSaleForView.changeLogs.map((log: any, idx: number) => (
+                          <div key={idx} className="p-4 bg-amber-50/40 border border-amber-200/70 rounded-2xl space-y-2">
+                            <div className="flex items-center justify-between text-xs flex-wrap gap-2">
+                              <span className="px-2 py-0.5 bg-amber-200 text-amber-900 rounded-md font-bold font-sans text-[10px] tracking-wide uppercase">
+                                {log.label || log.field}
+                              </span>
+                              <span className="text-slate-400 font-mono text-[11px]">
+                                {new Date(log.changedAt).toLocaleString('en-IN', {
+                                  day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
+                                })}
+                              </span>
+                            </div>
+
+                            <div className="flex items-center space-x-3 text-xs font-mono py-1">
+                              <div className="flex items-center space-x-1.5">
+                                <span className="text-[10px] uppercase font-bold text-slate-400 font-sans">Old:</span>
+                                <span className="line-through text-slate-400 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                                  {String(log.oldValue ?? '')}
+                                </span>
+                              </div>
+                              <ArrowRight className="w-4 h-4 text-forest-800 shrink-0" />
+                              <div className="flex items-center space-x-1.5">
+                                <span className="text-[10px] uppercase font-bold text-emerald-700 font-sans">New:</span>
+                                <span className="font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded shadow-2xs">
+                                  {String(log.newValue ?? '')}
+                                </span>
+                              </div>
+                            </div>
+
+                            {log.description && (
+                              <p className="text-[11.5px] text-slate-700 font-sans bg-white p-2.5 rounded-xl border border-slate-200/60">
+                                {log.description}
+                              </p>
+                            )}
+
+                            <div className="text-[10.5px] text-slate-400 pt-0.5 flex items-center space-x-1">
+                              <span>Modified by:</span>
+                              <span className="font-bold text-slate-800">{log.changedBy?.name || 'Administrator'}</span>
+                              <span>({log.changedBy?.email || 'admin@novise.in'})</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                </div>
+
+                {/* STICKY LUXURY FOOTER */}
+                <div className="px-6 py-4 bg-white border-t border-slate-200/80 flex items-center justify-between shrink-0">
+                  <p className="text-[11px] text-slate-400 font-sans">
+                    Novise Herbal Financial Cell • Computer Generated Ledger Entry
+                  </p>
+                  <button
+                    onClick={() => setSelectedOfflineSaleForView(null)}
+                    className="px-6 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl cursor-pointer transition text-xs"
+                  >
+                    Close Invoice
+                  </button>
+                </div>
+              </div>
+            </div>
+          )
+        }
+
+        {/* ====================================================================
+          MODAL 8: EDIT OFFLINE SALE & PRESERVE CHANGE LOG
+          ==================================================================== */}
+        {
+          editingOfflineSale && (
+            <div className="space-y-6 w-full animate-fadeIn pb-12">
+              {/* Top Action Nav Bar with Back Button */}
+              <div className="bg-white p-3.5 sm:p-5 rounded-2xl sm:rounded-3xl border border-slate-200/90 shadow-xs">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-4 w-full">
+                  <button
+                    type="button"
+                    onClick={() => setEditingOfflineSale(null)}
+                    className="inline-flex items-center space-x-1.5 sm:space-x-2 px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl bg-slate-100 hover:bg-forest-900 hover:text-gold-400 text-slate-700 font-bold text-xs sm:text-sm transition cursor-pointer shadow-xs group shrink-0 self-start sm:self-auto"
+                  >
+                    <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+                    <span>Back<span className="hidden sm:inline">{selectedOfflineSaleForView ? ' to Invoice View' : ' to Offline Sales'}</span></span>
+                  </button>
+                  <div className="h-6 w-px bg-slate-200 hidden sm:block" />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center space-x-2">
+                      <span className="p-1 sm:p-1.5 bg-forest-900/10 text-forest-900 rounded-lg shrink-0">
+                        <Edit2 className="w-4 sm:w-5 h-4 sm:h-5 text-forest-900" />
+                      </span>
+                      <h2 className="font-serif text-base sm:text-xl font-bold text-forest-950 truncate">
+                        {`Edit Offline Sale`}
+                      </h2>
+                    </div>
+                    <p className="text-[11px] sm:text-xs text-slate-500 mt-0.5 break-words">
+                      {'Revise customer info, purchased items, unit prices, or payment logs.'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Main Full-Page Content Card */}
+              <div className="bg-[#FDFBF7] rounded-3xl w-full shadow-xs border border-amber-900/15 overflow-hidden">
+                {/* STICKY LUXURY HEADER */}
+                <div className="px-6 py-6 bg-gradient-to-r from-forest-950 via-[#0B2316] to-forest-900 text-white flex items-center justify-between shrink-0 border-b border-gold-400/20 shadow-md">
+                  <div className="flex items-center space-x-3.5">
+                    <div>
+                      <div className="flex items-center space-x-2.5">
+                        <h3 className="font-serif text-lg sm:text-xl font-bold tracking-wide text-white">
+                          Edit Offline Sale & Price Log
+                        </h3>
+                        <span className="px-3 py-1.5  rounded-md bg-gold-400/20 text-gold-300 border border-gold-400/30 font-mono text-xs font-bold">
+                          #{editingOfflineSale.saleId}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => setEditingOfflineSale(null)}
+                    className="p-2 text-slate-300 hover:text-white rounded-xl hover:bg-white/10 transition cursor-pointer"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                {/* SCROLLABLE BODY FORM */}
+                <form id="editOfflineSaleForm" onSubmit={handleUpdateOfflineSale} className="space-y-6 p-5 sm:p-7 space-y-5 bg-[#FCFBF8]">
+
+                  {/* Notice Banner */}
+                  <div className="p-4 bg-amber-50/70 border border-amber-200 rounded-2xl flex items-start space-x-3">
+                    <AlertTriangle className="w-5 h-5 text-amber-700 shrink-0 mt-0.5" />
+                    <div className="text-xs text-amber-950">
+                      <p className="font-bold">Audit Preservation Notice</p>
+                      <p className="text-amber-900 mt-0.5">
+                        Any changes made to total bill, cash paid, or customer credentials will be recorded with old and new values in the change log.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Section 1: Customer Details */}
+                  <div className="p-5 bg-white rounded-2xl border border-slate-200/90 shadow-xs space-y-4">
+                    <h4 className="font-serif font-bold text-xs uppercase tracking-wider text-forest-950 flex items-center space-x-2">
+                      <User className="w-4 h-4 text-forest-900" />
+                      <span>Customer & Contact Information</span>
+                    </h4>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                          Customer / Shop Name <span className="text-rose-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={editingOfflineSale.customerName}
+                          onChange={(e) => setEditingOfflineSale({ ...editingOfflineSale, customerName: e.target.value })}
+                          className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-forest-900/15 focus:border-forest-900"
+                        />
+                      </div>
+
+                      <div>
+                        <div className="flex justify-between items-center mb-1">
+                          <label className="block text-[11px] font-bold text-slate-700">Phone Number</label>
+                          <span className="text-[10px] text-slate-400 font-mono">
+                            {editingOfflineSale.customerPhone ? `${editingOfflineSale.customerPhone.length}/10 digits` : '10 digits'}
+                          </span>
+                        </div>
+                        <div className="relative">
+                          <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs">+91</span>
+                          <input
+                            type="tel"
+                            inputMode="numeric"
+                            pattern="[6-9][0-9]{9}"
+                            maxLength={10}
+                            placeholder="9876543210"
+                            value={editingOfflineSale.customerPhone}
+                            onChange={(e) => setEditingOfflineSale({
+                              ...editingOfflineSale,
+                              customerPhone: sanitizePhoneNumber(e.target.value)
+                            })}
+                            onKeyDown={handlePhoneKeyDown}
+                            className="w-full pl-12 pr-4 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-mono text-slate-900 focus:outline-none focus:ring-2 focus:ring-forest-900/15 focus:border-forest-900"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 mb-1">Area / Location</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Sidhpur Station Road, Ahmedabad"
+                          value={editingOfflineSale.locationArea}
+                          onChange={(e) => setEditingOfflineSale({ ...editingOfflineSale, locationArea: e.target.value })}
+                          className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-forest-900/15 focus:border-forest-900"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 mb-1">Physical Bill / Receipt #</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. BILL-102"
+                          value={editingOfflineSale.billNumber}
+                          onChange={(e) => setEditingOfflineSale({ ...editingOfflineSale, billNumber: e.target.value })}
+                          className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-mono text-slate-900 focus:outline-none focus:ring-2 focus:ring-forest-900/15 focus:border-forest-900"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Section 2: Product & Quantity Sold */}
+                  <div className="p-5 bg-white rounded-2xl border border-slate-200/90 shadow-xs space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-serif font-bold text-xs uppercase tracking-wider text-forest-950 flex items-center space-x-2">
+                        <Package className="w-4 h-4 text-forest-900" />
+                        <span>Product & Quantity Sold</span>
+                      </h4>
+                      <span className="text-[10.5px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200/60">
+                        Auto Stock Sync Active
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="md:col-span-1">
+                        <label className="block text-[11px] font-bold text-slate-700 mb-1">Product</label>
+                        {availableProducts.length > 0 ? (
+                          <AdminSelect
+                            value={editingOfflineSale.productId || ''}
+                            onChange={(val) => {
+                              const found = availableProducts.find(p => p._id === val);
+                              if (found) {
+                                const unitPrice = Number(found.sellingPrice ?? found.price) || 0;
+                                const qty = Number(editingOfflineSale.quantity) || 1;
+                                const total = qty * unitPrice;
+                                setEditingOfflineSale({
+                                  ...editingOfflineSale,
+                                  productId: found._id,
+                                  productName: found.name,
+                                  productSku: found.sku || '',
+                                  unitPrice,
+                                  totalAmount: total,
+                                  amountPaid: editingOfflineSale.paymentMode === 'CREDIT_UDHAAR' ? 0 : total
+                                });
+                              }
+                            }}
+                            options={[
+                              ...availableProducts.map(p => ({
+                                value: p._id,
+                                label: `${p.name} (₹${p.sellingPrice ?? p.price ?? 0})`,
+                                badge: `Stock: ${p.stock ?? p.stockQuantity ?? 0}`
+                              }))
+                            ]}
+                            size="md"
+                            searchable={true}
+                            className="w-full"
+                          />
+                        ) : (
+                          <input
+                            type="text"
+                            disabled
+                            value={editingOfflineSale.productName}
+                            className="w-full px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800"
+                          />
+                        )}
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                          Quantity Sold <span className="text-rose-500">*</span>
+                        </label>
+                        <input
+                          type="number"
+                          min="1"
+                          required
+                          value={editingOfflineSale.quantity}
+                          onFocus={(e) => e.target.select()}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (val === '') {
+                              setEditingOfflineSale({
+                                ...editingOfflineSale,
+                                quantity: '' as any,
+                                totalAmount: 0,
+                                amountPaid: 0
+                              });
+                              return;
+                            }
+                            const num = parseInt(val, 10);
+                            const newQty = isNaN(num) ? ('' as any) : Math.max(0, num);
+                            const unitPrice = Number(editingOfflineSale.unitPrice) || 0;
+                            const newTotal = (typeof newQty === 'number' ? newQty : 0) * unitPrice;
+                            setEditingOfflineSale({
+                              ...editingOfflineSale,
+                              quantity: newQty,
+                              totalAmount: newTotal,
+                              amountPaid: editingOfflineSale.paymentMode === 'CREDIT_UDHAAR' ? 0 : newTotal
+                            });
+                          }}
+                          onBlur={() => {
+                            if (!editingOfflineSale.quantity || Number(editingOfflineSale.quantity) < 1) {
+                              const unitPrice = Number(editingOfflineSale.unitPrice) || 0;
+                              setEditingOfflineSale({
+                                ...editingOfflineSale,
+                                quantity: 1,
+                                totalAmount: unitPrice,
+                                amountPaid: editingOfflineSale.paymentMode === 'CREDIT_UDHAAR' ? 0 : unitPrice
+                              });
+                            }
+                          }}
+                          className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-forest-900/15 focus:border-forest-900"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 mb-1">Unit Price (₹)</label>
+                        <input
+                          type="number"
+                          min="0"
+                          value={editingOfflineSale.unitPrice}
+                          onFocus={(e) => e.target.select()}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (val === '') {
+                              setEditingOfflineSale({
+                                ...editingOfflineSale,
+                                unitPrice: '' as any,
+                                totalAmount: 0,
+                                amountPaid: 0
+                              });
+                              return;
+                            }
+                            const num = parseFloat(val);
+                            const newPrice = isNaN(num) ? ('' as any) : Math.max(0, num);
+                            const qty = Number(editingOfflineSale.quantity) || 1;
+                            const newTotal = qty * (typeof newPrice === 'number' ? newPrice : 0);
+                            setEditingOfflineSale({
+                              ...editingOfflineSale,
+                              unitPrice: newPrice,
+                              totalAmount: newTotal,
+                              amountPaid: editingOfflineSale.paymentMode === 'CREDIT_UDHAAR' ? 0 : newTotal
+                            });
+                          }}
+                          onBlur={() => {
+                            if (editingOfflineSale.unitPrice === '' || Number(editingOfflineSale.unitPrice) < 0) {
+                              setEditingOfflineSale({
+                                ...editingOfflineSale,
+                                unitPrice: 0,
+                                totalAmount: 0,
+                                amountPaid: 0
+                              });
+                            }
+                          }}
+                          className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-forest-900/15 focus:border-forest-900"
+                        />
+                      </div>
+                    </div>
+                    <p className="text-[10.5px] text-slate-500 italic">
+                      Changing quantity sold will automatically update the product warehouse stock by the difference (delta).
+                    </p>
+                  </div>
+
+                  {/* Section 3: Billing & Financials */}
+                  <div className="p-5 bg-white rounded-2xl border border-slate-200/90 shadow-xs space-y-4">
+                    <h4 className="font-serif font-bold text-xs uppercase tracking-wider text-forest-950 flex items-center space-x-2">
+                      <DollarSign className="w-4 h-4 text-forest-900" />
+                      <span>Financials & Settlement Status</span>
+                    </h4>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                          Total Bill Amount (₹) <span className="text-rose-500">*</span>
+                        </label>
+                        <div className="relative">
+                          <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 font-bold">₹</span>
+                          <input
+                            type="number"
+                            min="0"
+                            required
+                            value={editingOfflineSale.totalAmount}
+                            onChange={(e) => setEditingOfflineSale({ ...editingOfflineSale, totalAmount: Number(e.target.value) })}
+                            className="w-full pl-8 pr-4 py-2.5 bg-white border border-slate-300 rounded-xl text-sm font-mono font-bold text-forest-950 focus:outline-none focus:ring-2 focus:ring-forest-900/15 focus:border-forest-900"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                          Amount Paid Now (₹) <span className="text-rose-500">*</span>
+                        </label>
+                        <div className="relative">
+                          <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-emerald-600 font-bold">₹</span>
+                          <input
+                            type="number"
+                            min="0"
+                            required
+                            value={editingOfflineSale.amountPaid}
+                            onChange={(e) => setEditingOfflineSale({ ...editingOfflineSale, amountPaid: Number(e.target.value) })}
+                            className="w-full pl-8 pr-4 py-2.5 bg-white border border-slate-300 rounded-xl text-sm font-mono font-bold text-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-700/15 focus:border-emerald-700"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 mb-1">Payment Mode</label>
+                        <AdminSelect
+                          value={editingOfflineSale.paymentMode}
+                          onChange={(val) => setEditingOfflineSale({ ...editingOfflineSale, paymentMode: val })}
+                          options={OFFLINE_PAYMENT_MODE_OPTIONS}
+                          size="md"
+                          className="w-full"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Calculated Balance Pill */}
+                    <div className="p-3 bg-[#FAF8F5] rounded-xl border border-slate-200/80 flex items-center justify-between text-xs">
+                      <span className="font-semibold text-slate-600">Calculated Remaining Due:</span>
+                      <span className={`font-mono font-black text-sm ${(editingOfflineSale.totalAmount - editingOfflineSale.amountPaid) > 0 ? 'text-rose-600' : 'text-emerald-700'
+                        }`}>
+                        ₹{Math.max(0, editingOfflineSale.totalAmount - editingOfflineSale.amountPaid).toLocaleString('en-IN')}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Section 3: Date & Revision Reason */}
+                  <div className="p-5 bg-white rounded-2xl border border-slate-200/90 shadow-xs space-y-4">
+                    <h4 className="font-serif font-bold text-xs uppercase tracking-wider text-forest-950 flex items-center space-x-2">
+                      <Calendar className="w-4 h-4 text-forest-900" />
+                      <span>Audit Reason & Date</span>
+                    </h4>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 mb-1">Invoice Date</label>
+                        <input
+                          type="date"
+                          value={editingOfflineSale.saleDate}
+                          onChange={(e) => setEditingOfflineSale({ ...editingOfflineSale, saleDate: e.target.value })}
+                          className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-mono text-slate-900 focus:outline-none focus:ring-2 focus:ring-forest-900/15 focus:border-forest-900"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                          Reason for Modification (Logged in Audit Trail)
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Corrected invoice price from ₹100 to ₹200 as per counter register"
+                          value={editingOfflineSale.notes}
+                          onChange={(e) => setEditingOfflineSale({ ...editingOfflineSale, notes: e.target.value })}
+                          className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-forest-900/15 focus:border-forest-900"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                </form>
+
+                {/* STICKY LUXURY FOOTER */}
+                <div className="px-6 py-4 bg-white border-t border-slate-200/80 flex items-center justify-between shrink-0">
+                  <span className="text-[11px] text-slate-400 font-sans hidden sm:inline">
+                    All changes are cryptographically timestamped and signed with your administrator identity.
+                  </span>
+                  <div className="flex items-center space-x-3 ml-auto">
+                    <button
+                      type="button"
+                      onClick={() => setEditingOfflineSale(null)}
+                      className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl cursor-pointer transition text-xs"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      form="editOfflineSaleForm"
+                      disabled={isUpdatingOfflineSale}
+                      className="px-6 py-2.5 bg-gradient-to-r from-forest-900 to-forest-950 hover:from-forest-950 hover:to-black text-gold-400 font-bold rounded-xl shadow-md transition transform hover:scale-[1.01] cursor-pointer disabled:opacity-50 text-xs"
+                    >
+                      {isUpdatingOfflineSale ? 'Saving & Logging...' : 'Save Changes & Log Audit'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )
+        }
+
+        {/* ====================================================================
+          MODAL 9: VIEW MANUFACTURING BATCH DETAILS & AUDIT CHANGE LOG
+          ==================================================================== */}
+        {
+          selectedMfgForView && !editingMfg && (
+            <div className="space-y-6 w-full animate-fadeIn pb-12">
+              {/* Top Action Nav Bar with Back Button */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 bg-white p-3.5 sm:p-6 rounded-2xl sm:rounded-3xl border border-slate-200/90 shadow-xs">
+                <div className="flex items-center gap-2.5 sm:gap-4 min-w-0">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedMfgForView(null)}
+                    className="inline-flex items-center space-x-1.5 sm:space-x-2 px-3 py-1.5 sm:px-4 sm:py-2.5 rounded-xl bg-slate-100 hover:bg-forest-900 hover:text-gold-400 text-slate-700 font-bold text-xs sm:text-sm transition cursor-pointer shadow-xs group shrink-0"
+                  >
+                    <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+                    <span>Back<span className="hidden sm:inline"> to Manufacturing</span></span>
+                  </button>
+                  <div className="h-6 w-px bg-slate-200 hidden sm:block" />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center space-x-2">
+                      <span className="p-1 sm:p-1.5 bg-forest-900/10 text-forest-900 rounded-lg shrink-0">
+                        <Factory className="w-4 sm:w-5 h-4 sm:h-5 text-forest-900" />
+                      </span>
+                      <h2 className="font-serif text-base sm:text-2xl font-black text-forest-950 truncate">
+                        {selectedMfgForView?.productName || 'Procurement Batch'}
+                      </h2>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Main Full-Page Content Card */}
+              <div className="bg-[#FDFBF7] rounded-3xl w-full shadow-xs border border-amber-900/15 overflow-hidden">
+                {/* STICKY LUXURY HEADER */}
+                <div className="px-4 sm:px-6 py-4 sm:py-6 bg-gradient-to-r from-forest-950 via-[#0B2316] to-forest-900 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 shrink-0 border-b border-gold-400/20 shadow-md">
+                  <div className="flex items-start sm:items-center space-x-3 min-w-0">
+                    <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl sm:rounded-2xl bg-purple-400/10 border border-purple-400/30 text-purple-300 flex items-center justify-center font-bold shadow-xs shrink-0 mt-0.5 sm:mt-0">
+                      <Factory className="w-4 sm:w-5 h-4 sm:h-5 text-purple-300" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="font-serif text-base sm:text-xl font-bold tracking-wide text-white truncate">
+                          {selectedMfgForView.productName}
+                        </h3>
+                        <span className="px-2 py-0.5 rounded-md bg-purple-400/20 text-purple-200 border border-purple-400/30 font-mono text-[11px] sm:text-xs font-bold">
+                          {selectedMfgForView.batchNumber}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-300 font-sans mt-0.5 flex items-center gap-x-2 flex-wrap">
+                        <span>Procured on {new Date(selectedMfgForView.expenseDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
+                        <span>•</span>
+                        <span>Supplier: {selectedMfgForView.vendorName}</span>
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className=" pl-12 flex items-center space-x-1.5 sm:space-x-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const m = selectedMfgForView;
+                        setSelectedMfgForView(null);
+                        handleOpenEditMfg(m);
+                      }}
+                      className="p-2 text-gold-300 hover:text-forest-950 bg-gold-400/10 hover:bg-gold-400 rounded-xl border border-gold-400/30 transition cursor-pointer shadow-xs"
+                      title="Edit Batch"
+                    >
+                      <Edit2 className="w-4 h-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const m = selectedMfgForView;
+                        setSelectedMfgForView(null);
+                        handleDeleteMfg(m._id, m.batchNumber);
+                      }}
+                      className="p-2 text-slate-300 hover:text-rose-400 bg-white/5 hover:bg-rose-500/10 rounded-xl border border-white/10 hover:border-rose-500/20 transition cursor-pointer"
+                      title="Delete procurement record"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedMfgForView(null)}
+                      className="p-2 text-slate-300 hover:text-white bg-white/5 hover:bg-white/10 rounded-xl border border-white/10 transition cursor-pointer"
+                      title="Close"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* SCROLLABLE BODY */}
+                <div className="space-y-6 p-5 sm:p-7 bg-[#FCFBF8]">
+
+                  {/* 1. FINANCIAL SUMMARY RIBBON */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5">
+                    <div className="p-4 bg-white rounded-2xl border border-amber-900/10 shadow-xs">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block font-sans">
+                        Total Sourcing Cost
+                      </span>
+                      <span className="text-xl sm:text-2xl font-black text-forest-950 font-mono mt-1 block">
+                        ₹{Number(selectedMfgForView.totalCost || 0).toLocaleString('en-IN')}
+                      </span>
+                      <span className="text-[10px] text-slate-500 mt-0.5 block">{selectedMfgForView.quantity} units @ ₹{selectedMfgForView.unitCost}</span>
+                    </div>
+
+                    <div className="p-4 bg-white rounded-2xl border border-emerald-900/10 shadow-xs">
+                      <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider block font-sans">
+                        Amount Paid
+                      </span>
+                      <span className="text-xl sm:text-2xl font-black text-emerald-700 font-mono mt-1 block">
+                        ₹{Number(selectedMfgForView.amountPaid || 0).toLocaleString('en-IN')}
+                      </span>
+                      <span className="text-[10px] text-emerald-600 font-semibold mt-0.5 block">Disbursed to supplier</span>
+                    </div>
+
+                    <div className={`p-4 bg-white rounded-2xl shadow-xs border ${selectedMfgForView.amountDue > 0 ? 'border-rose-200 bg-rose-50/20' : 'border-amber-900/10'
+                      }`}>
+                      <span className={`text-[10px] font-bold uppercase tracking-wider block font-sans ${selectedMfgForView.amountDue > 0 ? 'text-rose-600' : 'text-slate-400'
+                        }`}>
+                        Outstanding Due
+                      </span>
+                      <span className={`text-xl sm:text-2xl font-black font-mono mt-1 block ${selectedMfgForView.amountDue > 0 ? 'text-rose-700' : 'text-slate-700'
+                        }`}>
+                        ₹{Number(selectedMfgForView.amountDue || 0).toLocaleString('en-IN')}
+                      </span>
+                      <span className="text-[10px] text-slate-500 mt-0.5 block">Accounts Payable</span>
+                    </div>
+
+                    <div className="p-4 bg-white rounded-2xl border border-amber-900/10 shadow-xs">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block font-sans">
+                        Procurement Status
+                      </span>
+                      <div className="mt-1 flex items-center space-x-2">
+                        <span className={`px-3 py-1 rounded-full font-black text-xs uppercase tracking-wider inline-block ${selectedMfgForView.status === 'PAID'
+                          ? 'bg-emerald-100 text-emerald-900'
+                          : selectedMfgForView.status === 'PARTIAL'
+                            ? 'bg-amber-100 text-amber-900'
+                            : 'bg-rose-100 text-rose-900'
+                          }`}>
+                          {selectedMfgForView.status}
+                        </span>
+                      </div>
+                      <span className="text-[10px] text-slate-400 mt-0.5 block">Payment lifecycle</span>
+                    </div>
+                  </div>
+
+                  {/* 2. SPECIFICATION & SUPPLIER CARD */}
+                  <div className="bg-white rounded-2xl p-6 border border-amber-900/10 shadow-xs space-y-4">
+                    <h4 className="font-serif text-sm font-bold text-forest-950 flex items-center space-x-2 border-b border-slate-100 pb-3">
+                      <Package className="w-4 h-4 text-forest-900" />
+                      <span>Procurement & Supplier Dossier</span>
+                    </h4>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
+                      <div>
+                        <span className="text-slate-400 text-[11px] block">Product Name</span>
+                        <span className="font-bold text-slate-900 font-sans mt-0.5 block">{selectedMfgForView.productName}</span>
+                      </div>
+
+                      <div>
+                        <span className="text-slate-400 text-[11px] block">Batch Number</span>
+                        <span className="font-mono font-bold text-forest-950 mt-0.5 block">{selectedMfgForView.batchNumber}</span>
+                      </div>
+
+                      <div>
+                        <span className="text-slate-400 text-[11px] block">Vendor / Supplier</span>
+                        <span className="font-bold text-slate-900 mt-0.5 block">{selectedMfgForView.vendorName}</span>
+                      </div>
+
+                      <div>
+                        <span className="text-slate-400 text-[11px] block">Vendor Phone</span>
+                        <span className="font-mono text-slate-700 mt-0.5 block">{selectedMfgForView.vendorPhone || 'Not provided'}</span>
+                      </div>
+
+                      <div>
+                        <span className="text-slate-400 text-[11px] block">Quantity Procured</span>
+                        <span className="font-mono font-bold text-slate-900 mt-0.5 block">{selectedMfgForView.quantity} Units</span>
+                      </div>
+
+                      <div>
+                        <span className="text-slate-400 text-[11px] block">Unit Sourcing Cost</span>
+                        <span className="font-mono font-bold text-forest-900 mt-0.5 block">₹{selectedMfgForView.unitCost}</span>
+                      </div>
+
+                      <div>
+                        <span className="text-slate-400 text-[11px] block">Payment Mode</span>
+                        <span className="font-bold text-slate-800 mt-0.5 block">{selectedMfgForView.paymentMode}</span>
+                      </div>
+
+                      <div>
+                        <span className="text-slate-400 text-[11px] block">Invoice / Challan #</span>
+                        <span className="font-mono text-slate-700 mt-0.5 block">{selectedMfgForView.invoiceNumber || 'N/A'}</span>
+                      </div>
+
+                      {selectedMfgForView.notes && (
+                        <div className="col-span-2 sm:col-span-4 bg-amber-50/50 p-3.5 rounded-xl border border-amber-900/10">
+                          <span className="text-slate-400 text-[11px] block mb-1">Procurement Notes / Remarks</span>
+                          <p className="text-slate-700 font-sans text-xs">{selectedMfgForView.notes}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* 3. AUDIT CHANGE LOGS SECTION */}
+                  <div className="bg-white rounded-2xl p-6 border border-amber-900/10 shadow-xs space-y-4">
+                    <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                      <h4 className="font-serif text-sm font-bold text-forest-950 flex items-center space-x-2">
+                        <History className="w-4 h-4 text-forest-900" />
+                        <span>Batch History & Audit Trail ({selectedMfgForView.changeLogs?.length || 0} Events)</span>
+                      </h4>
+                      <span className="text-[10px] text-slate-400 font-mono">Immutable Log Ledger</span>
+                    </div>
+
+                    {!selectedMfgForView.changeLogs || selectedMfgForView.changeLogs.length === 0 ? (
+                      <div className="py-8 text-center text-slate-400 text-xs italic">
+                        No change logs recorded. This batch remains exactly as originally created.
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {selectedMfgForView.changeLogs.map((log: any, idx: number) => (
+                          <div key={idx} className="p-4 bg-slate-50/70 rounded-2xl border border-slate-200/80 space-y-2 text-xs">
+                            <div className="flex items-center justify-between">
+                              <span className="font-bold text-forest-950 uppercase tracking-wider text-[11px]">
+                                {log.label || log.field} Changed
+                              </span>
+                              <span className="text-[10.5px] text-slate-400 font-mono">
+                                {new Date(log.changedAt).toLocaleString('en-IN', {
+                                  day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
+                                })}
+                              </span>
+                            </div>
+
+                            <div className="flex items-center space-x-3 text-xs font-mono">
+                              <span className="px-2 py-0.5 rounded bg-rose-50 text-rose-700 line-through">
+                                {String(log.oldValue)}
+                              </span>
+                              <span className="text-slate-400 font-sans">→</span>
+                              <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 font-bold">
+                                {String(log.newValue)}
+                              </span>
+                            </div>
+
+                            {log.description && (
+                              <p className="text-[11.5px] text-slate-700 font-sans bg-white p-2.5 rounded-xl border border-slate-200/60">
+                                {log.description}
+                              </p>
+                            )}
+
+                            <div className="text-[10.5px] text-slate-400 pt-0.5 flex items-center space-x-1">
+                              <span>Modified by:</span>
+                              <span className="font-bold text-slate-800">{log.changedBy?.name || 'Administrator'}</span>
+                              <span>({log.changedBy?.email || 'admin@novise.in'})</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                </div>
+
+                {/* STICKY LUXURY FOOTER */}
+                <div className="px-6 py-4 bg-white border-t border-slate-200/80 flex items-center justify-between shrink-0">
+                  <p className="text-[11px] text-slate-400 font-sans hidden sm:block">
+                    Novise Herbal Procurement Cell • Batch Quality Verified
+                  </p>
+                  <button
+                    onClick={() => setSelectedMfgForView(null)}
+                    className="px-6 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl cursor-pointer transition text-xs ml-auto"
+                  >
+                    Close Batch
+                  </button>
+                </div>
+              </div>
+            </div>
+          )
+        }
+
+        {/* ====================================================================
+          MODAL 10: EDIT MANUFACTURING BATCH & PRESERVE CHANGE LOG
+          ==================================================================== */}
+        {
+          editingMfg && (
+            <div className="space-y-6 w-full animate-fadeIn pb-12">
+              {/* Top Action Nav Bar with Back Button */}
+              <div className="bg-white p-3.5 sm:p-5 rounded-2xl sm:rounded-3xl border border-slate-200/90 shadow-xs">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-4 w-full">
+                  <button
+                    type="button"
+                    onClick={() => setEditingMfg(null)}
+                    className="inline-flex items-center space-x-1.5 sm:space-x-2 px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl bg-slate-100 hover:bg-forest-900 hover:text-gold-400 text-slate-700 font-bold text-xs sm:text-sm transition cursor-pointer shadow-xs group shrink-0 self-start sm:self-auto"
+                  >
+                    <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+                    <span>Back<span className="hidden sm:inline">{selectedMfgForView ? ' to Batch View' : ' to Manufacturing'}</span></span>
+                  </button>
+                  <div className="h-6 w-px bg-slate-200 hidden sm:block" />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center space-x-2">
+                      <span className="p-1 sm:p-1.5 bg-forest-900/10 text-forest-900 rounded-lg shrink-0">
+                        <Edit2 className="w-4 sm:w-5 h-4 sm:h-5 text-forest-900" />
+                      </span>
+                      <h2 className="font-serif text-base sm:text-xl font-bold text-forest-950">
+                        Edit Procurement Batch
+                      </h2>
+                    </div>
+                    <p className="text-[11px] sm:text-xs text-slate-500 mt-0.5 ml-10">
+                      {editingMfg ? `${editingMfg.batchNumber} • ${editingMfg.productName}` : ''}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Main Full-Page Content Card */}
+              <div className="bg-[#FDFBF7] rounded-3xl w-full shadow-xs border border-amber-900/15 overflow-hidden">
+                {/* STICKY LUXURY HEADER */}
+                <div className="px-4 sm:px-6 py-4 sm:py-6 bg-gradient-to-r from-forest-950 via-[#0B2316] to-forest-900 text-white flex items-start sm:items-center justify-between gap-3 shrink-0 border-b border-gold-400/20 shadow-md">
+                  <div className="flex items-start sm:items-center space-x-3 min-w-0">
+                    <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl sm:rounded-2xl bg-gold-400/10 border border-gold-400/30 text-gold-400 flex items-center justify-center font-bold shadow-xs shrink-0 mt-0.5 sm:mt-0">
+                      <Edit2 className="w-4 sm:w-5 h-4 sm:h-5 text-gold-400" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="font-serif text-sm sm:text-xl font-bold tracking-wide text-white">
+                          Edit Procurement Batch & Price
+                        </h3>
+                      </div>
+                      <p className="text-[10.5px] sm:text-[11px] text-slate-300 font-sans mt-0.5 leading-snug line-clamp-2 sm:line-clamp-none">
+                        Quantity revisions synchronize inventory stock; price edits are logged in audit trail.
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => setEditingMfg(null)}
+                    className="p-1.5 sm:p-2 text-slate-300 hover:text-white rounded-xl hover:bg-white/10 transition cursor-pointer shrink-0"
+                  >
+                    <X className="w-4 sm:w-5 h-4 sm:h-5" />
+                  </button>
+                </div>
+
+                {/* SCROLLABLE BODY FORM */}
+                <form id="editMfgForm" onSubmit={handleUpdateMfg} className="space-y-6 p-5 sm:p-7 bg-[#FCFBF8]">
+
+                  {/* Notice Banner */}
+                  <div className="p-4 bg-purple-50/70 border border-purple-200 rounded-2xl flex items-start space-x-3">
+                    <AlertTriangle className="w-5 h-5 text-purple-700 shrink-0 mt-0.5" />
+                    <div className="text-xs text-purple-900 leading-relaxed">
+                      <span className="font-bold">Audit Preservation Mode:</span> Any change to unit price, quantity, or payment status generates an immutable historical audit record tagged with your admin credentials and timestamps.
+                    </div>
+                  </div>
+
+                  {/* Section A: Product & Vendor */}
+                  <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-xs space-y-4">
+                    <div className="flex items-center space-x-2 text-forest-900 font-serif font-bold text-xs uppercase tracking-wider">
+                      <Package className="w-4 h-4 text-forest-800" />
+                      <span>Product Identification & Batch Tag</span>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 mb-1">Product Name *</label>
+                        <input
+                          type="text"
+                          required
+                          value={editingMfg.productName}
+                          onChange={(e) => setEditingMfg({ ...editingMfg, productName: e.target.value })}
+                          className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-forest-900/15 focus:border-forest-900"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 mb-1">Batch Number</label>
+                        <input
+                          type="text"
+                          disabled
+                          value={editingMfg.batchNumber}
+                          className="w-full px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-xl text-xs font-mono font-bold text-slate-500 cursor-not-allowed"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 mb-1">Manufacturer / Vendor Name *</label>
+                        <input
+                          type="text"
+                          required
+                          value={editingMfg.vendorName}
+                          onChange={(e) => setEditingMfg({ ...editingMfg, vendorName: e.target.value })}
+                          className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-forest-900/15 focus:border-forest-900"
+                        />
+                      </div>
+                      <div>
+                        <div className="flex justify-between items-center mb-1">
+                          <label className="block text-[11px] font-bold text-slate-700">Vendor Contact Phone</label>
+                          <span className="text-[10px] text-slate-400">10 digits</span>
+                        </div>
+                        <input
+                          type="tel"
+                          placeholder="+91 9876543210"
+                          value={editingMfg.vendorPhone || ''}
+                          onChange={(e) => setEditingMfg({ ...editingMfg, vendorPhone: e.target.value })}
+                          className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-mono text-slate-900 focus:outline-none focus:ring-2 focus:ring-forest-900/15 focus:border-forest-900"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Section B: Financial Sourcing Costs */}
+                  <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-xs space-y-4">
+                    <div className="flex items-center space-x-2 text-forest-900 font-serif font-bold text-xs uppercase tracking-wider">
+                      <DollarSign className="w-4 h-4 text-forest-800" />
+                      <span>Procurement Costs & Supplier Settlement</span>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 mb-1">Quantity (Units) *</label>
+                        <input
+                          type="number"
+                          min="1"
+                          required
+                          value={editingMfg.quantity}
+                          onChange={(e) => {
+                            const val = e.target.value === '' ? '' : Number(e.target.value);
+                            const qty = Number(val) || 0;
+                            const unit = Number(editingMfg.unitCost) || 0;
+                            const newTotal = (qty > 0 && unit >= 0) ? Math.round(qty * unit * 100) / 100 : '';
+                            setEditingMfg({
+                              ...editingMfg,
+                              quantity: val as any,
+                              totalCost: newTotal as any
+                            });
+                          }}
+                          className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-mono font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-forest-900/15 focus:border-forest-900"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 mb-1">Unit Cost (₹) *</label>
+                        <div className="relative">
+                          <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 font-bold">₹</span>
+                          <input
+                            type="number"
+                            step="any"
+                            min="0"
+                            required
+                            value={editingMfg.unitCost}
+                            onChange={(e) => {
+                              const val = e.target.value === '' ? '' : Number(e.target.value);
+                              const unit = Number(val) || 0;
+                              const qty = Number(editingMfg.quantity) || 0;
+                              const newTotal = (qty > 0 && unit >= 0) ? Math.round(qty * unit * 100) / 100 : '';
+                              setEditingMfg({
+                                ...editingMfg,
+                                unitCost: val as any,
+                                totalCost: newTotal as any
+                              });
+                            }}
+                            className="w-full pl-8 pr-4 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-mono font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-forest-900/15 focus:border-forest-900"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Calculated Total Sourcing Cost (Interactive Input Field) */}
+                    <div>
+                      <div className="flex justify-between items-center mb-1">
+                        <label className="block text-[11px] font-bold text-slate-700">
+                          Calculated Total Sourcing Cost (₹) *
+                        </label>
+                        <span className="text-[10px] text-slate-400 font-medium">
+                          Auto-calculates Unit Cost when edited
+                        </span>
+                      </div>
+                      <div className="relative">
+                        <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 font-bold font-mono text-sm">₹</span>
+                        <input
+                          type="number"
+                          step="any"
+                          min="0"
+                          required
+                          placeholder="0"
+                          value={editingMfg.totalCost !== undefined ? editingMfg.totalCost : ((Number(editingMfg.quantity) || 0) * (Number(editingMfg.unitCost) || 0))}
+                          onChange={(e) => {
+                            const val = e.target.value === '' ? '' : Number(e.target.value);
+                            const total = Number(val) || 0;
+                            const qty = Number(editingMfg.quantity) || 0;
+                            let newUnitCost = editingMfg.unitCost;
+                            if (qty > 0 && total >= 0) {
+                              newUnitCost = Number((total / qty).toFixed(2));
+                            }
+                            setEditingMfg({
+                              ...editingMfg,
+                              totalCost: val as any,
+                              unitCost: newUnitCost
+                            });
+                          }}
                           className="w-full pl-8 pr-4 py-2.5 bg-white border border-slate-300 rounded-xl text-sm font-mono font-bold text-forest-950 focus:outline-none focus:ring-2 focus:ring-forest-900/15 focus:border-forest-900"
                         />
                       </div>
                     </div>
 
-                    <div>
-                      <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                        Amount Paid Now (₹) <span className="text-rose-500">*</span>
-                      </label>
-                      <div className="relative">
-                        <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-emerald-600 font-bold">₹</span>
-                        <input
-                          type="number"
-                          min="0"
-                          required
-                          value={editingOfflineSale.amountPaid}
-                          onChange={(e) => setEditingOfflineSale({ ...editingOfflineSale, amountPaid: Number(e.target.value) })}
-                          className="w-full pl-8 pr-4 py-2.5 bg-white border border-slate-300 rounded-xl text-sm font-mono font-bold text-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-700/15 focus:border-emerald-700"
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-[11px] font-bold text-slate-700 mb-1">Payment Mode</label>
-                      <AdminSelect
-                        value={editingOfflineSale.paymentMode}
-                        onChange={(val) => setEditingOfflineSale({ ...editingOfflineSale, paymentMode: val })}
-                        options={OFFLINE_PAYMENT_MODE_OPTIONS}
-                        size="md"
-                        className="w-full"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Calculated Balance Pill */}
-                  <div className="p-3 bg-[#FAF8F5] rounded-xl border border-slate-200/80 flex items-center justify-between text-xs">
-                    <span className="font-semibold text-slate-600">Calculated Remaining Due:</span>
-                    <span className={`font-mono font-black text-sm ${(editingOfflineSale.totalAmount - editingOfflineSale.amountPaid) > 0 ? 'text-rose-600' : 'text-emerald-700'
-                      }`}>
-                      ₹{Math.max(0, editingOfflineSale.totalAmount - editingOfflineSale.amountPaid).toLocaleString('en-IN')}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Section 3: Date & Revision Reason */}
-                <div className="p-5 bg-white rounded-2xl border border-slate-200/90 shadow-xs space-y-4">
-                  <h4 className="font-serif font-bold text-xs uppercase tracking-wider text-forest-950 flex items-center space-x-2">
-                    <Calendar className="w-4 h-4 text-forest-900" />
-                    <span>Audit Reason & Date</span>
-                  </h4>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-[11px] font-bold text-slate-700 mb-1">Invoice Date</label>
-                      <input
-                        type="date"
-                        value={editingOfflineSale.saleDate}
-                        onChange={(e) => setEditingOfflineSale({ ...editingOfflineSale, saleDate: e.target.value })}
-                        className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-mono text-slate-900 focus:outline-none focus:ring-2 focus:ring-forest-900/15 focus:border-forest-900"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                        Reason for Modification (Logged in Audit Trail)
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="e.g. Corrected invoice price from ₹100 to ₹200 as per counter register"
-                        value={editingOfflineSale.notes}
-                        onChange={(e) => setEditingOfflineSale({ ...editingOfflineSale, notes: e.target.value })}
-                        className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-forest-900/15 focus:border-forest-900"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-              </form>
-
-              {/* STICKY LUXURY FOOTER */}
-              <div className="px-6 py-4 bg-white border-t border-slate-200/80 flex items-center justify-between shrink-0">
-                <span className="text-[11px] text-slate-400 font-sans hidden sm:inline">
-                  All changes are cryptographically timestamped and signed with your administrator identity.
-                </span>
-                <div className="flex items-center space-x-3 ml-auto">
-                  <button
-                    type="button"
-                    onClick={() => setEditingOfflineSale(null)}
-                    className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl cursor-pointer transition text-xs"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    form="editOfflineSaleForm"
-                    disabled={isUpdatingOfflineSale}
-                    className="px-6 py-2.5 bg-gradient-to-r from-forest-900 to-forest-950 hover:from-forest-950 hover:to-black text-gold-400 font-bold rounded-xl shadow-md transition transform hover:scale-[1.01] cursor-pointer disabled:opacity-50 text-xs"
-                  >
-                    {isUpdatingOfflineSale ? 'Saving & Logging...' : 'Save Changes & Log Audit'}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )
-      }
-
-      {/* ====================================================================
-          MODAL 9: VIEW MANUFACTURING BATCH DETAILS & AUDIT CHANGE LOG
-          ==================================================================== */}
-      {
-        selectedMfgForView && !editingMfg && (
-          <div className="space-y-6 w-full animate-fadeIn pb-12">
-            {/* Top Action Nav Bar with Back Button */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 bg-white p-3.5 sm:p-6 rounded-2xl sm:rounded-3xl border border-slate-200/90 shadow-xs">
-              <div className="flex items-center gap-2.5 sm:gap-4 min-w-0">
-                <button
-                  type="button"
-                  onClick={() => setSelectedMfgForView(null)}
-                  className="inline-flex items-center space-x-1.5 sm:space-x-2 px-3 py-1.5 sm:px-4 sm:py-2.5 rounded-xl bg-slate-100 hover:bg-forest-900 hover:text-gold-400 text-slate-700 font-bold text-xs sm:text-sm transition cursor-pointer shadow-xs group shrink-0"
-                >
-                  <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-                  <span>Back<span className="hidden sm:inline"> to Manufacturing</span></span>
-                </button>
-                <div className="h-6 w-px bg-slate-200 hidden sm:block" />
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center space-x-2">
-                    <span className="p-1 sm:p-1.5 bg-forest-900/10 text-forest-900 rounded-lg shrink-0">
-                      <Factory className="w-4 sm:w-5 h-4 sm:h-5 text-forest-900" />
-                    </span>
-                    <h2 className="font-serif text-base sm:text-2xl font-black text-forest-950 truncate">
-                      {selectedMfgForView?.productName || 'Procurement Batch'}
-                    </h2>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Main Full-Page Content Card */}
-            <div className="bg-[#FDFBF7] rounded-3xl w-full shadow-xs border border-amber-900/15 overflow-hidden">
-              {/* STICKY LUXURY HEADER */}
-              <div className="px-4 sm:px-6 py-4 sm:py-6 bg-gradient-to-r from-forest-950 via-[#0B2316] to-forest-900 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 shrink-0 border-b border-gold-400/20 shadow-md">
-                <div className="flex items-start sm:items-center space-x-3 min-w-0">
-                  <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl sm:rounded-2xl bg-purple-400/10 border border-purple-400/30 text-purple-300 flex items-center justify-center font-bold shadow-xs shrink-0 mt-0.5 sm:mt-0">
-                    <Factory className="w-4 sm:w-5 h-4 sm:h-5 text-purple-300" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="font-serif text-base sm:text-xl font-bold tracking-wide text-white truncate">
-                        {selectedMfgForView.productName}
-                      </h3>
-                      <span className="px-2 py-0.5 rounded-md bg-purple-400/20 text-purple-200 border border-purple-400/30 font-mono text-[11px] sm:text-xs font-bold">
-                        {selectedMfgForView.batchNumber}
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-slate-300 font-sans mt-0.5 flex items-center gap-x-2 flex-wrap">
-                      <span>Procured on {new Date(selectedMfgForView.expenseDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
-                      <span>•</span>
-                      <span>Supplier: {selectedMfgForView.vendorName}</span>
-                    </p>
-                  </div>
-                </div>
-
-                <div className=" pl-12 flex items-center space-x-1.5 sm:space-x-2 shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const m = selectedMfgForView;
-                      setSelectedMfgForView(null);
-                      handleOpenEditMfg(m);
-                    }}
-                    className="p-2 text-gold-300 hover:text-forest-950 bg-gold-400/10 hover:bg-gold-400 rounded-xl border border-gold-400/30 transition cursor-pointer shadow-xs"
-                    title="Edit Batch"
-                  >
-                    <Edit2 className="w-4 h-4" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const m = selectedMfgForView;
-                      setSelectedMfgForView(null);
-                      handleDeleteMfg(m._id, m.batchNumber);
-                    }}
-                    className="p-2 text-slate-300 hover:text-rose-400 bg-white/5 hover:bg-rose-500/10 rounded-xl border border-white/10 hover:border-rose-500/20 transition cursor-pointer"
-                    title="Delete procurement record"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedMfgForView(null)}
-                    className="p-2 text-slate-300 hover:text-white bg-white/5 hover:bg-white/10 rounded-xl border border-white/10 transition cursor-pointer"
-                    title="Close"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-
-              {/* SCROLLABLE BODY */}
-              <div className="space-y-6 p-5 sm:p-7 bg-[#FCFBF8]">
-
-                {/* 1. FINANCIAL SUMMARY RIBBON */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5">
-                  <div className="p-4 bg-white rounded-2xl border border-amber-900/10 shadow-xs">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block font-sans">
-                      Total Sourcing Cost
-                    </span>
-                    <span className="text-xl sm:text-2xl font-black text-forest-950 font-mono mt-1 block">
-                      ₹{Number(selectedMfgForView.totalCost || 0).toLocaleString('en-IN')}
-                    </span>
-                    <span className="text-[10px] text-slate-500 mt-0.5 block">{selectedMfgForView.quantity} units @ ₹{selectedMfgForView.unitCost}</span>
-                  </div>
-
-                  <div className="p-4 bg-white rounded-2xl border border-emerald-900/10 shadow-xs">
-                    <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider block font-sans">
-                      Amount Paid
-                    </span>
-                    <span className="text-xl sm:text-2xl font-black text-emerald-700 font-mono mt-1 block">
-                      ₹{Number(selectedMfgForView.amountPaid || 0).toLocaleString('en-IN')}
-                    </span>
-                    <span className="text-[10px] text-emerald-600 font-semibold mt-0.5 block">Disbursed to supplier</span>
-                  </div>
-
-                  <div className={`p-4 bg-white rounded-2xl shadow-xs border ${selectedMfgForView.amountDue > 0 ? 'border-rose-200 bg-rose-50/20' : 'border-amber-900/10'
-                    }`}>
-                    <span className={`text-[10px] font-bold uppercase tracking-wider block font-sans ${selectedMfgForView.amountDue > 0 ? 'text-rose-600' : 'text-slate-400'
-                      }`}>
-                      Outstanding Due
-                    </span>
-                    <span className={`text-xl sm:text-2xl font-black font-mono mt-1 block ${selectedMfgForView.amountDue > 0 ? 'text-rose-700' : 'text-slate-700'
-                      }`}>
-                      ₹{Number(selectedMfgForView.amountDue || 0).toLocaleString('en-IN')}
-                    </span>
-                    <span className="text-[10px] text-slate-500 mt-0.5 block">Accounts Payable</span>
-                  </div>
-
-                  <div className="p-4 bg-white rounded-2xl border border-amber-900/10 shadow-xs">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block font-sans">
-                      Procurement Status
-                    </span>
-                    <div className="mt-1 flex items-center space-x-2">
-                      <span className={`px-3 py-1 rounded-full font-black text-xs uppercase tracking-wider inline-block ${selectedMfgForView.status === 'PAID'
-                        ? 'bg-emerald-100 text-emerald-900'
-                        : selectedMfgForView.status === 'PARTIAL'
-                          ? 'bg-amber-100 text-amber-900'
-                          : 'bg-rose-100 text-rose-900'
-                        }`}>
-                        {selectedMfgForView.status}
-                      </span>
-                    </div>
-                    <span className="text-[10px] text-slate-400 mt-0.5 block">Payment lifecycle</span>
-                  </div>
-                </div>
-
-                {/* 2. SPECIFICATION & SUPPLIER CARD */}
-                <div className="bg-white rounded-2xl p-6 border border-amber-900/10 shadow-xs space-y-4">
-                  <h4 className="font-serif text-sm font-bold text-forest-950 flex items-center space-x-2 border-b border-slate-100 pb-3">
-                    <Package className="w-4 h-4 text-forest-900" />
-                    <span>Procurement & Supplier Dossier</span>
-                  </h4>
-
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
-                    <div>
-                      <span className="text-slate-400 text-[11px] block">Product Name</span>
-                      <span className="font-bold text-slate-900 font-sans mt-0.5 block">{selectedMfgForView.productName}</span>
-                    </div>
-
-                    <div>
-                      <span className="text-slate-400 text-[11px] block">Batch Number</span>
-                      <span className="font-mono font-bold text-forest-950 mt-0.5 block">{selectedMfgForView.batchNumber}</span>
-                    </div>
-
-                    <div>
-                      <span className="text-slate-400 text-[11px] block">Vendor / Supplier</span>
-                      <span className="font-bold text-slate-900 mt-0.5 block">{selectedMfgForView.vendorName}</span>
-                    </div>
-
-                    <div>
-                      <span className="text-slate-400 text-[11px] block">Vendor Phone</span>
-                      <span className="font-mono text-slate-700 mt-0.5 block">{selectedMfgForView.vendorPhone || 'Not provided'}</span>
-                    </div>
-
-                    <div>
-                      <span className="text-slate-400 text-[11px] block">Quantity Procured</span>
-                      <span className="font-mono font-bold text-slate-900 mt-0.5 block">{selectedMfgForView.quantity} Units</span>
-                    </div>
-
-                    <div>
-                      <span className="text-slate-400 text-[11px] block">Unit Sourcing Cost</span>
-                      <span className="font-mono font-bold text-forest-900 mt-0.5 block">₹{selectedMfgForView.unitCost}</span>
-                    </div>
-
-                    <div>
-                      <span className="text-slate-400 text-[11px] block">Payment Mode</span>
-                      <span className="font-bold text-slate-800 mt-0.5 block">{selectedMfgForView.paymentMode}</span>
-                    </div>
-
-                    <div>
-                      <span className="text-slate-400 text-[11px] block">Invoice / Challan #</span>
-                      <span className="font-mono text-slate-700 mt-0.5 block">{selectedMfgForView.invoiceNumber || 'N/A'}</span>
-                    </div>
-
-                    {selectedMfgForView.notes && (
-                      <div className="col-span-2 sm:col-span-4 bg-amber-50/50 p-3.5 rounded-xl border border-amber-900/10">
-                        <span className="text-slate-400 text-[11px] block mb-1">Procurement Notes / Remarks</span>
-                        <p className="text-slate-700 font-sans text-xs">{selectedMfgForView.notes}</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* 3. AUDIT CHANGE LOGS SECTION */}
-                <div className="bg-white rounded-2xl p-6 border border-amber-900/10 shadow-xs space-y-4">
-                  <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                    <h4 className="font-serif text-sm font-bold text-forest-950 flex items-center space-x-2">
-                      <History className="w-4 h-4 text-forest-900" />
-                      <span>Batch History & Audit Trail ({selectedMfgForView.changeLogs?.length || 0} Events)</span>
-                    </h4>
-                    <span className="text-[10px] text-slate-400 font-mono">Immutable Log Ledger</span>
-                  </div>
-
-                  {!selectedMfgForView.changeLogs || selectedMfgForView.changeLogs.length === 0 ? (
-                    <div className="py-8 text-center text-slate-400 text-xs italic">
-                      No change logs recorded. This batch remains exactly as originally created.
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      {selectedMfgForView.changeLogs.map((log: any, idx: number) => (
-                        <div key={idx} className="p-4 bg-slate-50/70 rounded-2xl border border-slate-200/80 space-y-2 text-xs">
-                          <div className="flex items-center justify-between">
-                            <span className="font-bold text-forest-950 uppercase tracking-wider text-[11px]">
-                              {log.label || log.field} Changed
-                            </span>
-                            <span className="text-[10.5px] text-slate-400 font-mono">
-                              {new Date(log.changedAt).toLocaleString('en-IN', {
-                                day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
-                              })}
-                            </span>
-                          </div>
-
-                          <div className="flex items-center space-x-3 text-xs font-mono">
-                            <span className="px-2 py-0.5 rounded bg-rose-50 text-rose-700 line-through">
-                              {String(log.oldValue)}
-                            </span>
-                            <span className="text-slate-400 font-sans">→</span>
-                            <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 font-bold">
-                              {String(log.newValue)}
-                            </span>
-                          </div>
-
-                          {log.description && (
-                            <p className="text-[11.5px] text-slate-700 font-sans bg-white p-2.5 rounded-xl border border-slate-200/60">
-                              {log.description}
-                            </p>
-                          )}
-
-                          <div className="text-[10.5px] text-slate-400 pt-0.5 flex items-center space-x-1">
-                            <span>Modified by:</span>
-                            <span className="font-bold text-slate-800">{log.changedBy?.name || 'Administrator'}</span>
-                            <span>({log.changedBy?.email || 'admin@novise.in'})</span>
-                          </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <div className="flex justify-between items-center mb-1">
+                          <label className="block text-[11px] font-bold text-slate-700">Amount Paid to Supplier (₹)</label>
+                          <span className="text-[10px] text-slate-400">Optional</span>
                         </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-              </div>
-
-              {/* STICKY LUXURY FOOTER */}
-              <div className="px-6 py-4 bg-white border-t border-slate-200/80 flex items-center justify-between shrink-0">
-                <p className="text-[11px] text-slate-400 font-sans hidden sm:block">
-                  Novise Herbal Procurement Cell • Batch Quality Verified
-                </p>
-                <button
-                  onClick={() => setSelectedMfgForView(null)}
-                  className="px-6 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl cursor-pointer transition text-xs ml-auto"
-                >
-                  Close Batch
-                </button>
-              </div>
-            </div>
-          </div>
-        )
-      }
-
-      {/* ====================================================================
-          MODAL 10: EDIT MANUFACTURING BATCH & PRESERVE CHANGE LOG
-          ==================================================================== */}
-      {
-        editingMfg && (
-          <div className="space-y-6 w-full animate-fadeIn pb-12">
-            {/* Top Action Nav Bar with Back Button */}
-            <div className="bg-white p-3.5 sm:p-5 rounded-2xl sm:rounded-3xl border border-slate-200/90 shadow-xs">
-              <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-4 w-full">
-                <button
-                  type="button"
-                  onClick={() => setEditingMfg(null)}
-                  className="inline-flex items-center space-x-1.5 sm:space-x-2 px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl bg-slate-100 hover:bg-forest-900 hover:text-gold-400 text-slate-700 font-bold text-xs sm:text-sm transition cursor-pointer shadow-xs group shrink-0 self-start sm:self-auto"
-                >
-                  <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-                  <span>Back<span className="hidden sm:inline">{selectedMfgForView ? ' to Batch View' : ' to Manufacturing'}</span></span>
-                </button>
-                <div className="h-6 w-px bg-slate-200 hidden sm:block" />
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center space-x-2">
-                    <span className="p-1 sm:p-1.5 bg-forest-900/10 text-forest-900 rounded-lg shrink-0">
-                      <Edit2 className="w-4 sm:w-5 h-4 sm:h-5 text-forest-900" />
-                    </span>
-                    <h2 className="font-serif text-base sm:text-xl font-bold text-forest-950">
-                      Edit Procurement Batch
-                    </h2>
-                  </div>
-                  <p className="text-[11px] sm:text-xs text-slate-500 mt-0.5 ml-10">
-                    {editingMfg ? `${editingMfg.batchNumber} • ${editingMfg.productName}` : ''}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Main Full-Page Content Card */}
-            <div className="bg-[#FDFBF7] rounded-3xl w-full shadow-xs border border-amber-900/15 overflow-hidden">
-              {/* STICKY LUXURY HEADER */}
-              <div className="px-4 sm:px-6 py-4 sm:py-6 bg-gradient-to-r from-forest-950 via-[#0B2316] to-forest-900 text-white flex items-start sm:items-center justify-between gap-3 shrink-0 border-b border-gold-400/20 shadow-md">
-                <div className="flex items-start sm:items-center space-x-3 min-w-0">
-                  <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl sm:rounded-2xl bg-gold-400/10 border border-gold-400/30 text-gold-400 flex items-center justify-center font-bold shadow-xs shrink-0 mt-0.5 sm:mt-0">
-                    <Edit2 className="w-4 sm:w-5 h-4 sm:h-5 text-gold-400" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="font-serif text-sm sm:text-xl font-bold tracking-wide text-white">
-                        Edit Procurement Batch & Price
-                      </h3>
-                    </div>
-                    <p className="text-[10.5px] sm:text-[11px] text-slate-300 font-sans mt-0.5 leading-snug line-clamp-2 sm:line-clamp-none">
-                      Quantity revisions synchronize inventory stock; price edits are logged in audit trail.
-                    </p>
-                  </div>
-                </div>
-
-                <button
-                  onClick={() => setEditingMfg(null)}
-                  className="p-1.5 sm:p-2 text-slate-300 hover:text-white rounded-xl hover:bg-white/10 transition cursor-pointer shrink-0"
-                >
-                  <X className="w-4 sm:w-5 h-4 sm:h-5" />
-                </button>
-              </div>
-
-              {/* SCROLLABLE BODY FORM */}
-              <form id="editMfgForm" onSubmit={handleUpdateMfg} className="space-y-6 p-5 sm:p-7 bg-[#FCFBF8]">
-
-                {/* Notice Banner */}
-                <div className="p-4 bg-purple-50/70 border border-purple-200 rounded-2xl flex items-start space-x-3">
-                  <AlertTriangle className="w-5 h-5 text-purple-700 shrink-0 mt-0.5" />
-                  <div className="text-xs text-purple-900 leading-relaxed">
-                    <span className="font-bold">Audit Preservation Mode:</span> Any change to unit price, quantity, or payment status generates an immutable historical audit record tagged with your admin credentials and timestamps.
-                  </div>
-                </div>
-
-                {/* Section A: Product & Vendor */}
-                <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-xs space-y-4">
-                  <div className="flex items-center space-x-2 text-forest-900 font-serif font-bold text-xs uppercase tracking-wider">
-                    <Package className="w-4 h-4 text-forest-800" />
-                    <span>Product Identification & Batch Tag</span>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-[11px] font-bold text-slate-700 mb-1">Product Name *</label>
-                      <input
-                        type="text"
-                        required
-                        value={editingMfg.productName}
-                        onChange={(e) => setEditingMfg({ ...editingMfg, productName: e.target.value })}
-                        className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-forest-900/15 focus:border-forest-900"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[11px] font-bold text-slate-700 mb-1">Batch Number</label>
-                      <input
-                        type="text"
-                        disabled
-                        value={editingMfg.batchNumber}
-                        className="w-full px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-xl text-xs font-mono font-bold text-slate-500 cursor-not-allowed"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-[11px] font-bold text-slate-700 mb-1">Manufacturer / Vendor Name *</label>
-                      <input
-                        type="text"
-                        required
-                        value={editingMfg.vendorName}
-                        onChange={(e) => setEditingMfg({ ...editingMfg, vendorName: e.target.value })}
-                        className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-forest-900/15 focus:border-forest-900"
-                      />
-                    </div>
-                    <div>
-                      <div className="flex justify-between items-center mb-1">
-                        <label className="block text-[11px] font-bold text-slate-700">Vendor Contact Phone</label>
-                        <span className="text-[10px] text-slate-400">10 digits</span>
-                      </div>
-                      <input
-                        type="tel"
-                        placeholder="+91 9876543210"
-                        value={editingMfg.vendorPhone || ''}
-                        onChange={(e) => setEditingMfg({ ...editingMfg, vendorPhone: e.target.value })}
-                        className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-mono text-slate-900 focus:outline-none focus:ring-2 focus:ring-forest-900/15 focus:border-forest-900"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Section B: Financial Sourcing Costs */}
-                <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-xs space-y-4">
-                  <div className="flex items-center space-x-2 text-forest-900 font-serif font-bold text-xs uppercase tracking-wider">
-                    <DollarSign className="w-4 h-4 text-forest-800" />
-                    <span>Procurement Costs & Supplier Settlement</span>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-[11px] font-bold text-slate-700 mb-1">Quantity (Units) *</label>
-                      <input
-                        type="number"
-                        min="1"
-                        required
-                        value={editingMfg.quantity}
-                        onChange={(e) => {
-                          const val = e.target.value === '' ? '' : Number(e.target.value);
-                          const qty = Number(val) || 0;
-                          const unit = Number(editingMfg.unitCost) || 0;
-                          const newTotal = (qty > 0 && unit >= 0) ? Math.round(qty * unit * 100) / 100 : '';
-                          setEditingMfg({
-                            ...editingMfg,
-                            quantity: val as any,
-                            totalCost: newTotal as any
-                          });
-                        }}
-                        className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-mono font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-forest-900/15 focus:border-forest-900"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[11px] font-bold text-slate-700 mb-1">Unit Cost (₹) *</label>
-                      <div className="relative">
-                        <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 font-bold">₹</span>
-                        <input
-                          type="number"
-                          step="any"
-                          min="0"
-                          required
-                          value={editingMfg.unitCost}
-                          onChange={(e) => {
-                            const val = e.target.value === '' ? '' : Number(e.target.value);
-                            const unit = Number(val) || 0;
-                            const qty = Number(editingMfg.quantity) || 0;
-                            const newTotal = (qty > 0 && unit >= 0) ? Math.round(qty * unit * 100) / 100 : '';
-                            setEditingMfg({
-                              ...editingMfg,
-                              unitCost: val as any,
-                              totalCost: newTotal as any
-                            });
-                          }}
-                          className="w-full pl-8 pr-4 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-mono font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-forest-900/15 focus:border-forest-900"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Calculated Total Sourcing Cost (Interactive Input Field) */}
-                  <div>
-                    <div className="flex justify-between items-center mb-1">
-                      <label className="block text-[11px] font-bold text-slate-700">
-                        Calculated Total Sourcing Cost (₹) *
-                      </label>
-                      <span className="text-[10px] text-slate-400 font-medium">
-                        Auto-calculates Unit Cost when edited
-                      </span>
-                    </div>
-                    <div className="relative">
-                      <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 font-bold font-mono text-sm">₹</span>
-                      <input
-                        type="number"
-                        step="any"
-                        min="0"
-                        required
-                        placeholder="0"
-                        value={editingMfg.totalCost !== undefined ? editingMfg.totalCost : ((Number(editingMfg.quantity) || 0) * (Number(editingMfg.unitCost) || 0))}
-                        onChange={(e) => {
-                          const val = e.target.value === '' ? '' : Number(e.target.value);
-                          const total = Number(val) || 0;
-                          const qty = Number(editingMfg.quantity) || 0;
-                          let newUnitCost = editingMfg.unitCost;
-                          if (qty > 0 && total >= 0) {
-                            newUnitCost = Number((total / qty).toFixed(2));
-                          }
-                          setEditingMfg({
-                            ...editingMfg,
-                            totalCost: val as any,
-                            unitCost: newUnitCost
-                          });
-                        }}
-                        className="w-full pl-8 pr-4 py-2.5 bg-white border border-slate-300 rounded-xl text-sm font-mono font-bold text-forest-950 focus:outline-none focus:ring-2 focus:ring-forest-900/15 focus:border-forest-900"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <div className="flex justify-between items-center mb-1">
-                        <label className="block text-[11px] font-bold text-slate-700">Amount Paid to Supplier (₹)</label>
-                        <span className="text-[10px] text-slate-400">Optional</span>
-                      </div>
-                      <div className="relative">
-                        <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-emerald-600 font-bold">₹</span>
-                        <input
-                          type="number"
-                          step="any"
-                          min="0"
-                          placeholder="0"
-                          value={editingMfg.amountPaid ?? ''}
-                          onChange={(e) => {
-                            const val = e.target.value === '' ? '' : Number(e.target.value);
-                            setEditingMfg({
-                              ...editingMfg,
-                              amountPaid: val as any
-                            });
-                          }}
-                          className="w-full pl-8 pr-4 py-2.5 bg-white border border-slate-300 rounded-xl text-sm font-mono font-bold text-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-700/15 focus:border-emerald-700"
-                        />
-                      </div>
-                      <div className="mt-1 flex items-center justify-between text-[11px] font-mono">
-                        <span className="text-slate-500">
-                          Due: ₹{Math.max(0, (Number(editingMfg.totalCost !== undefined ? editingMfg.totalCost : (Number(editingMfg.quantity || 0) * Number(editingMfg.unitCost || 0))) - (Number(editingMfg.amountPaid) || 0))).toLocaleString('en-IN')}
-                        </span>
-                        {Number(editingMfg.amountPaid) > 0 && Number(editingMfg.amountPaid) >= Number(editingMfg.totalCost !== undefined ? editingMfg.totalCost : (Number(editingMfg.quantity) * Number(editingMfg.unitCost))) ? (
-                          <span className="text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.5 rounded">Fully Paid</span>
-                        ) : Number(editingMfg.amountPaid) > 0 ? (
-                          <span className="text-amber-700 font-bold bg-amber-50 px-1.5 py-0.5 rounded">Partial</span>
-                        ) : (
-                          <span className="text-slate-500 font-medium bg-slate-100 px-1.5 py-0.5 rounded">Unpaid</span>
-                        )}
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-[11px] font-bold text-slate-700 mb-1">Payment Mode</label>
-                      <AdminSelect
-                        value={editingMfg.paymentMode}
-                        onChange={(val) => setEditingMfg({ ...editingMfg, paymentMode: val })}
-                        options={PAYMENT_MODE_OPTIONS}
-                        size="md"
-                        className="w-full"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-[11px] font-bold text-slate-700 mb-1">Invoice / Challan Number</label>
-                      <input
-                        type="text"
-                        placeholder="e.g. INV-2026-90"
-                        value={editingMfg.invoiceNumber}
-                        onChange={(e) => setEditingMfg({ ...editingMfg, invoiceNumber: e.target.value })}
-                        className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-mono text-slate-900 focus:outline-none focus:ring-2 focus:ring-forest-900/15 focus:border-forest-900"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[11px] font-bold text-slate-700 mb-1">Procurement Date</label>
-                      <input
-                        type="date"
-                        value={editingMfg.expenseDate}
-                        onChange={(e) => setEditingMfg({ ...editingMfg, expenseDate: e.target.value })}
-                        className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-mono text-slate-900 focus:outline-none focus:ring-2 focus:ring-forest-900/15 focus:border-forest-900"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                      Reason for Revision / Notes (Logged in Audit Trail)
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="e.g. Supplier invoice corrected, payment adjusted from ₹100 to ₹200"
-                      value={editingMfg.notes}
-                      onChange={(e) => setEditingMfg({ ...editingMfg, notes: e.target.value })}
-                      className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-forest-900/15 focus:border-forest-900"
-                    />
-                  </div>
-                </div>
-
-              </form>
-
-              {/* STICKY LUXURY FOOTER */}
-              <div className="px-6 py-4 bg-white border-t border-slate-200/80 flex items-center justify-between shrink-0">
-                <span className="text-[11px] text-slate-400 font-sans hidden sm:inline">
-                  Inventory stock is adjusted by the delta of batch quantity change automatically.
-                </span>
-                <div className="flex items-center space-x-3 ml-auto">
-                  <button
-                    type="button"
-                    onClick={() => setEditingMfg(null)}
-                    className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl cursor-pointer transition text-xs"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    form="editMfgForm"
-                    disabled={isUpdatingMfg}
-                    className="px-6 py-2.5 bg-gradient-to-r from-forest-900 to-forest-950 hover:from-forest-950 hover:to-black text-gold-400 font-bold rounded-xl shadow-md transition transform hover:scale-[1.01] cursor-pointer disabled:opacity-50 text-xs"
-                  >
-                    {isUpdatingMfg ? 'Updating...' : 'Save Changes & Log Audit'}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )
-      }
-
-      {/* ====================================================================
-          MODAL 11: VIEW OPERATING EXPENSE DETAILS & AUDIT CHANGE LOG
-          ==================================================================== */}
-      {
-        selectedOperatingForView && !editingOperating && (
-          <div className="space-y-6 w-full animate-fadeIn pb-12">
-            {/* Top Action Nav Bar with Back Button */}
-            <div className="bg-white p-3.5 sm:p-5 rounded-2xl sm:rounded-3xl border border-slate-200/90 shadow-xs">
-              <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-4 w-full">
-                <button
-                  type="button"
-                  onClick={() => setSelectedOperatingForView(null)}
-                  className="inline-flex items-center space-x-1.5 sm:space-x-2 px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl bg-slate-100 hover:bg-forest-900 hover:text-gold-400 text-slate-700 font-bold text-xs sm:text-sm transition cursor-pointer shadow-xs group shrink-0 self-start sm:self-auto"
-                >
-                  <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-                  <span>Back<span className="hidden sm:inline"> to Shop & Overhead</span></span>
-                </button>
-                <div className="h-6 w-px bg-slate-200 hidden sm:block" />
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center space-x-2">
-                    <span className="p-1 sm:p-1.5 bg-forest-900/10 text-forest-900 rounded-lg shrink-0">
-                      <Receipt className="w-4 sm:w-5 h-4 sm:h-5 text-forest-900" />
-                    </span>
-                    <h2 className="font-serif text-base sm:text-xl font-bold text-forest-950 truncate">
-                      {`Operating Expense: ${selectedOperatingForView?.title || 'Overhead Voucher'}`}
-                    </h2>
-                  </div>
-                  <p className="text-[11px] sm:text-xs text-slate-500 mt-0.5 truncate">{selectedOperatingForView ? `Category: ${selectedOperatingForView.category} • Voucher Date: ${new Date(selectedOperatingForView.expenseDate).toLocaleDateString('en-IN')}` : ''}</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Main Full-Page Content Card */}
-            <div className="bg-[#FDFBF7] rounded-3xl w-full shadow-xs border border-amber-900/15 overflow-hidden">
-              {/* STICKY LUXURY HEADER */}
-              <div className="px-6 py-6 bg-gradient-to-r from-forest-950 via-[#0B2316] to-forest-900 text-white flex items-center justify-between shrink-0 border-b border-gold-400/20 shadow-md">
-                <div className="flex items-center space-x-3.5">
-                  <div className="w-11 h-11 rounded-2xl bg-rose-400/10 border border-rose-400/30 text-rose-300 flex items-center justify-center font-bold shadow-xs shrink-0">
-                    <Receipt className="w-5 h-5 text-rose-300" />
-                  </div>
-                  <div>
-                    <div className="flex items-center space-x-2.5 flex-wrap">
-                      <h3 className="font-serif text-lg sm:text-xl font-bold tracking-wide text-white">
-                        {selectedOperatingForView.title}
-                      </h3>
-                      <span className="px-2.5 py-0.5 rounded-full bg-rose-500/20 text-rose-200 border border-rose-400/30 font-bold text-[10px] uppercase tracking-wider">
-                        {formatCategory(selectedOperatingForView.category)}
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-slate-300 font-sans mt-0.5 flex items-center space-x-2">
-                      <span>Voucher Date: {new Date(selectedOperatingForView.expenseDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
-                      <span>•</span>
-                      <span>Paid To: {selectedOperatingForView.paidTo || 'Local Vendor'}</span>
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center space-x-1.5 sm:space-x-2 shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const op = selectedOperatingForView;
-                      setSelectedOperatingForView(null);
-                      handleOpenEditOperating(op);
-                    }}
-                    className="p-2 text-gold-300 hover:text-forest-950 bg-gold-400/10 hover:bg-gold-400 rounded-xl border border-gold-400/30 transition cursor-pointer shadow-xs"
-                    title="Edit Expense"
-                  >
-                    <Edit2 className="w-4 h-4" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const op = selectedOperatingForView;
-                      setSelectedOperatingForView(null);
-                      handleDeleteOperating(op._id, op.title);
-                    }}
-                    className="p-2 text-slate-300 hover:text-rose-400 bg-white/5 hover:bg-rose-500/10 rounded-xl border border-white/10 hover:border-rose-500/20 transition cursor-pointer"
-                    title="Delete expense voucher"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedOperatingForView(null)}
-                    className="p-2 text-slate-300 hover:text-white bg-white/5 hover:bg-white/10 rounded-xl border border-white/10 transition cursor-pointer"
-                    title="Close"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-
-              {/* SCROLLABLE BODY */}
-              <div className="space-y-6 p-5 sm:p-7 space-y-6 bg-[#FCFBF8]">
-
-                {/* 1. FINANCIAL SUMMARY RIBBON */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
-                  <div className="p-4 bg-white rounded-2xl border border-rose-200 shadow-xs bg-rose-50/20">
-                    <span className="text-[10px] font-bold text-rose-600 uppercase tracking-wider block font-sans">
-                      Disbursed Amount
-                    </span>
-                    <span className="text-xl sm:text-2xl font-black text-rose-700 font-mono mt-1 block">
-                      ₹{Number(selectedOperatingForView.amount || 0).toLocaleString('en-IN')}
-                    </span>
-                    <span className="text-[10px] text-rose-500 mt-0.5 block">Operating overhead cost</span>
-                  </div>
-
-                  <div className="p-4 bg-white rounded-2xl border border-amber-900/10 shadow-xs">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block font-sans">
-                      Payment Mode
-                    </span>
-                    <span className="text-sm font-bold text-slate-800 font-mono mt-1.5 block">
-                      {selectedOperatingForView.paymentMode}
-                    </span>
-                    <span className="text-[10px] text-slate-500 mt-0.5 block">Settlement channel</span>
-                  </div>
-
-                  <div className="p-4 bg-white rounded-2xl border border-amber-900/10 shadow-xs">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block font-sans">
-                      Payee / Recipient
-                    </span>
-                    <span className="text-sm font-bold text-slate-800 font-sans mt-1.5 block">
-                      {selectedOperatingForView.paidTo || 'N/A'}
-                    </span>
-                    <span className="text-[10px] text-slate-500 mt-0.5 block">Beneficiary party</span>
-                  </div>
-                </div>
-
-                {/* 2. VOUCHER & SPECIFICATION DETAILS */}
-                <div className="p-5 bg-white rounded-2xl border border-slate-200/90 shadow-xs space-y-3">
-                  <div className="flex items-center space-x-2 pb-2 border-b border-slate-100">
-                    <Receipt className="w-4 h-4 text-forest-900" />
-                    <h4 className="font-serif font-bold text-xs uppercase tracking-wider text-forest-950">
-                      Voucher Specifications
-                    </h4>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-                    <div className="space-y-1">
-                      <span className="text-[11px] font-semibold text-slate-500 block">Expense Category</span>
-                      <p className="text-sm font-bold text-slate-900">{formatCategory(selectedOperatingForView.category)}</p>
-                    </div>
-
-                    <div className="space-y-1">
-                      <span className="text-[11px] font-semibold text-slate-500 block">Bill / Voucher Number</span>
-                      <p className="font-mono font-bold text-slate-800">
-                        {selectedOperatingForView.billNumber || 'None (Petty Cash)'}
-                      </p>
-                    </div>
-
-                    <div className="space-y-1">
-                      <span className="text-[11px] font-semibold text-slate-500 block">Voucher Date</span>
-                      <p className="text-slate-800 font-medium font-mono">
-                        {new Date(selectedOperatingForView.expenseDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
-                      </p>
-                    </div>
-
-                    <div className="space-y-1">
-                      <span className="text-[11px] font-semibold text-slate-500 block">Paid Beneficiary</span>
-                      <p className="text-slate-800 font-medium">
-                        {selectedOperatingForView.paidTo || 'Not specified'}
-                      </p>
-                    </div>
-
-                    {selectedOperatingForView.notes && (
-                      <div className="md:col-span-2 p-3 bg-amber-50/60 rounded-xl border border-amber-200/60 text-xs">
-                        <span className="font-bold text-amber-950 block text-[10.5px] uppercase tracking-wider mb-0.5">Voucher Notes:</span>
-                        <p className="text-amber-900">{selectedOperatingForView.notes}</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* 3. AUDIT CHANGE LOGS SECTION */}
-                <div className="p-5 bg-white rounded-2xl border border-slate-200/90 shadow-xs space-y-4">
-                  <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-                    <div className="flex items-center space-x-2">
-                      <History className="w-4 h-4 text-forest-900" />
-                      <h4 className="font-serif font-bold text-xs uppercase tracking-wider text-forest-950">
-                        Official Audit Trail & Modification History
-                      </h4>
-                    </div>
-                    <span className="px-2.5 py-0.5 bg-slate-100 text-slate-700 rounded-full font-mono text-[10px] font-bold border border-slate-200">
-                      {selectedOperatingForView.changeLogs?.length || 0} revisions recorded
-                    </span>
-                  </div>
-
-                  {!selectedOperatingForView.changeLogs || selectedOperatingForView.changeLogs.length === 0 ? (
-                    <div className="p-5 bg-slate-50/80 rounded-2xl border border-dashed border-slate-200 text-center">
-                      <CheckCircle2 className="w-6 h-6 text-emerald-600 mx-auto mb-1.5" />
-                      <p className="font-bold text-xs text-slate-700">Pristine Audit Record</p>
-                      <p className="text-[11px] text-slate-400 mt-0.5">
-                        No expense revisions or voucher amount changes have been recorded for this entry since initial entry.
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      {selectedOperatingForView.changeLogs.map((log: any, idx: number) => (
-                        <div key={idx} className="p-4 bg-rose-50/40 border border-rose-200/70 rounded-2xl space-y-2">
-                          <div className="flex items-center justify-between text-xs flex-wrap gap-2">
-                            <span className="px-2 py-0.5 bg-rose-200 text-rose-900 rounded-md font-bold font-sans text-[10px] tracking-wide uppercase">
-                              {log.label || log.field}
-                            </span>
-                            <span className="text-slate-400 font-mono text-[11px]">
-                              {new Date(log.changedAt).toLocaleString('en-IN', {
-                                day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
-                              })}
-                            </span>
-                          </div>
-
-                          <div className="flex items-center space-x-3 text-xs font-mono py-1">
-                            <div className="flex items-center space-x-1.5">
-                              <span className="text-[10px] uppercase font-bold text-slate-400 font-sans">Old:</span>
-                              <span className="line-through text-slate-400 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
-                                {String(log.oldValue ?? '')}
-                              </span>
-                            </div>
-                            <ArrowRight className="w-4 h-4 text-forest-800 shrink-0" />
-                            <div className="flex items-center space-x-1.5">
-                              <span className="text-[10px] uppercase font-bold text-emerald-700 font-sans">New:</span>
-                              <span className="font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded shadow-2xs">
-                                {String(log.newValue ?? '')}
-                              </span>
-                            </div>
-                          </div>
-
-                          {log.description && (
-                            <p className="text-[11.5px] text-slate-700 font-sans bg-white p-2.5 rounded-xl border border-slate-200/60">
-                              {log.description}
-                            </p>
-                          )}
-
-                          <div className="text-[10.5px] text-slate-400 pt-0.5 flex items-center space-x-1">
-                            <span>Modified by:</span>
-                            <span className="font-bold text-slate-800">{log.changedBy?.name || 'Administrator'}</span>
-                            <span>({log.changedBy?.email || 'admin@novise.in'})</span>
-                          </div>
+                        <div className="relative">
+                          <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-emerald-600 font-bold">₹</span>
+                          <input
+                            type="number"
+                            step="any"
+                            min="0"
+                            placeholder="0"
+                            value={editingMfg.amountPaid ?? ''}
+                            onChange={(e) => {
+                              const val = e.target.value === '' ? '' : Number(e.target.value);
+                              setEditingMfg({
+                                ...editingMfg,
+                                amountPaid: val as any
+                              });
+                            }}
+                            className="w-full pl-8 pr-4 py-2.5 bg-white border border-slate-300 rounded-xl text-sm font-mono font-bold text-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-700/15 focus:border-emerald-700"
+                          />
                         </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-              </div>
-
-              {/* STICKY LUXURY FOOTER */}
-              <div className="px-6 py-4 bg-white border-t border-slate-200/80 flex items-center justify-between shrink-0">
-                <p className="text-[11px] text-slate-400 font-sans">
-                  Novise Herbal Overhead Cell • Voucher Verified & Logged
-                </p>
-                <button
-                  onClick={() => setSelectedOperatingForView(null)}
-                  className="px-6 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl cursor-pointer transition text-xs"
-                >
-                  Close Voucher
-                </button>
-              </div>
-            </div>
-          </div>
-        )
-      }
-
-      {/* ====================================================================
-          MODAL 12: EDIT OPERATING EXPENSE & PRESERVE CHANGE LOG
-          ==================================================================== */}
-      {
-        editingOperating && (
-          <div className="space-y-6 w-full animate-fadeIn pb-12">
-            {/* Top Action Nav Bar with Back Button */}
-            <div className="bg-white p-3.5 sm:p-5 rounded-2xl sm:rounded-3xl border border-slate-200/90 shadow-xs">
-              <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-4 w-full">
-                <button
-                  type="button"
-                  onClick={() => setEditingOperating(null)}
-                  className="inline-flex items-center space-x-1.5 sm:space-x-2 px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl bg-slate-100 hover:bg-forest-900 hover:text-gold-400 text-slate-700 font-bold text-xs sm:text-sm transition cursor-pointer shadow-xs group shrink-0 self-start sm:self-auto"
-                >
-                  <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-                  <span>Back<span className="hidden sm:inline">{selectedOperatingForView ? ' to Expense View' : ' to Shop & Overhead'}</span></span>
-                </button>
-                <div className="h-6 w-px bg-slate-200 hidden sm:block" />
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center space-x-2">
-                    <span className="p-1 sm:p-1.5 bg-forest-900/10 text-forest-900 rounded-lg shrink-0">
-                      <Edit2 className="w-4 sm:w-5 h-4 sm:h-5 text-forest-900" />
-                    </span>
-                    <h2 className="font-serif text-base sm:text-xl font-bold text-forest-950 truncate">
-                      {`Edit Expense : ${editingOperating?.title || 'Overhead Expense'}`}
-                    </h2>
-                  </div>
-                  <p className="text-[11px] sm:text-xs text-slate-500 mt-0.5 break-word">
-                    {'Update category, payment mode, vendor, or voucher specs with revision logging.'}</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Main Full-Page Content Card */}
-            <div className="bg-[#FDFBF7] rounded-3xl w-full shadow-xs border border-amber-900/15 overflow-hidden">
-              {/* STICKY LUXURY HEADER */}
-              <div className="px-6 py-6 bg-gradient-to-r from-forest-950 via-[#0B2316] to-forest-900 text-white flex items-center justify-between shrink-0 border-b border-gold-400/20 shadow-md">
-                <div className="flex items-center space-x-3.5">
-                  <div className="w-11 h-11 rounded-2xl bg-gold-400/10 border border-gold-400/30 text-gold-400 flex items-center justify-center font-bold shadow-xs shrink-0">
-                    <Edit2 className="w-5 h-5 text-gold-400" />
-                  </div>
-                  <div>
-                    <div className="flex items-center space-x-2.5">
-                      <h3 className="font-serif text-lg sm:text-xl font-bold tracking-wide text-white">
-                        Edit Operating Overhead Expense
-                      </h3>
-                    </div>
-                  </div>
-                </div>
-
-                <button
-                  onClick={() => setEditingOperating(null)}
-                  className="p-2 text-slate-300 hover:text-white rounded-xl hover:bg-white/10 transition cursor-pointer"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              {/* SCROLLABLE BODY FORM */}
-              <form id="editOperatingForm" onSubmit={handleUpdateOperating} className="space-y-6 p-5 sm:p-7 space-y-5 bg-[#FCFBF8]">
-
-                {/* Notice Banner */}
-                <div className="p-4 bg-rose-50/70 border border-rose-200 rounded-2xl flex items-start space-x-3">
-                  <AlertTriangle className="w-5 h-5 text-rose-700 shrink-0 mt-0.5" />
-                  <div className="text-xs text-rose-950">
-                    <p className="font-bold">Overhead Audit Notice</p>
-                    <p className="text-rose-900 mt-0.5">
-                      Updating this voucher's payment amount or beneficiary will be preserved in the audit log with previous vs revised values.
-                    </p>
-                  </div>
-                </div>
-
-                {/* Section: Expense Classification & Details */}
-                <div className="p-5 bg-white rounded-2xl border border-slate-200/90 shadow-xs space-y-4">
-                  <h4 className="font-serif font-bold text-xs uppercase tracking-wider text-forest-950 flex items-center space-x-2">
-                    <Receipt className="w-4 h-4 text-forest-900" />
-                    <span>Expense Classification & Title</span>
-                  </h4>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                        Expense Category <span className="text-rose-500">*</span>
-                      </label>
-                      <AdminSelect
-                        value={editingOperating.category}
-                        onChange={(val) => setEditingOperating({ ...editingOperating, category: val })}
-                        options={OPERATING_CATEGORY_OPTIONS}
-                        size="md"
-                        searchable={true}
-                        className="w-full"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                        Expense Title / Description <span className="text-slate-400 font-normal">(Optional)</span>
-                      </label>
-                      <input
-                        type="text"
-                        value={editingOperating.title}
-                        onChange={(e) => setEditingOperating({ ...editingOperating, title: e.target.value })}
-                        className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-forest-900/15 focus:border-forest-900"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                        Expense Amount (₹) <span className="text-rose-500">*</span>
-                      </label>
-                      <div className="relative">
-                        <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-rose-600 font-bold">₹</span>
-                        <input
-                          type="number"
-                          min="1"
-                          required
-                          value={editingOperating.amount}
-                          onChange={(e) => setEditingOperating({ ...editingOperating, amount: Number(e.target.value) })}
-                          className="w-full pl-8 pr-4 py-2.5 bg-white border border-slate-300 rounded-xl text-sm font-mono font-bold text-rose-700 focus:outline-none focus:ring-2 focus:ring-rose-700/15 focus:border-rose-700"
+                        <div className="mt-1 flex items-center justify-between text-[11px] font-mono">
+                          <span className="text-slate-500">
+                            Due: ₹{Math.max(0, (Number(editingMfg.totalCost !== undefined ? editingMfg.totalCost : (Number(editingMfg.quantity || 0) * Number(editingMfg.unitCost || 0))) - (Number(editingMfg.amountPaid) || 0))).toLocaleString('en-IN')}
+                          </span>
+                          {Number(editingMfg.amountPaid) > 0 && Number(editingMfg.amountPaid) >= Number(editingMfg.totalCost !== undefined ? editingMfg.totalCost : (Number(editingMfg.quantity) * Number(editingMfg.unitCost))) ? (
+                            <span className="text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.5 rounded">Fully Paid</span>
+                          ) : Number(editingMfg.amountPaid) > 0 ? (
+                            <span className="text-amber-700 font-bold bg-amber-50 px-1.5 py-0.5 rounded">Partial</span>
+                          ) : (
+                            <span className="text-slate-500 font-medium bg-slate-100 px-1.5 py-0.5 rounded">Unpaid</span>
+                          )}
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 mb-1">Payment Mode</label>
+                        <AdminSelect
+                          value={editingMfg.paymentMode}
+                          onChange={(val) => setEditingMfg({ ...editingMfg, paymentMode: val })}
+                          options={PAYMENT_MODE_OPTIONS}
+                          size="md"
+                          className="w-full"
                         />
                       </div>
                     </div>
 
-                    <div>
-                      <label className="block text-[11px] font-bold text-slate-700 mb-1">Payment Mode</label>
-                      <AdminSelect
-                        value={editingOperating.paymentMode}
-                        onChange={(val) => setEditingOperating({ ...editingOperating, paymentMode: val })}
-                        options={PAYMENT_MODE_OPTIONS}
-                        size="md"
-                        className="w-full"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-[11px] font-bold text-slate-700 mb-1">Paid To (Vendor/Person)</label>
-                      <input
-                        type="text"
-                        value={editingOperating.paidTo}
-                        onChange={(e) => setEditingOperating({ ...editingOperating, paidTo: e.target.value })}
-                        className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-forest-900/15 focus:border-forest-900"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-[11px] font-bold text-slate-700 mb-1">Bill / Voucher #</label>
-                      <input
-                        type="text"
-                        value={editingOperating.billNumber}
-                        onChange={(e) => setEditingOperating({ ...editingOperating, billNumber: e.target.value })}
-                        className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-mono text-slate-900 focus:outline-none focus:ring-2 focus:ring-forest-900/15 focus:border-forest-900"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-[11px] font-bold text-slate-700 mb-1">Expense Date</label>
-                      <input
-                        type="date"
-                        value={editingOperating.expenseDate}
-                        onChange={(e) => setEditingOperating({ ...editingOperating, expenseDate: e.target.value })}
-                        className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-mono text-slate-900 focus:outline-none focus:ring-2 focus:ring-forest-900/15 focus:border-forest-900"
-                      />
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 mb-1">Invoice / Challan Number</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. INV-2026-90"
+                          value={editingMfg.invoiceNumber}
+                          onChange={(e) => setEditingMfg({ ...editingMfg, invoiceNumber: e.target.value })}
+                          className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-mono text-slate-900 focus:outline-none focus:ring-2 focus:ring-forest-900/15 focus:border-forest-900"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 mb-1">Procurement Date</label>
+                        <input
+                          type="date"
+                          value={editingMfg.expenseDate}
+                          onChange={(e) => setEditingMfg({ ...editingMfg, expenseDate: e.target.value })}
+                          className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-mono text-slate-900 focus:outline-none focus:ring-2 focus:ring-forest-900/15 focus:border-forest-900"
+                        />
+                      </div>
                     </div>
 
                     <div>
@@ -5973,56 +6198,534 @@ export const AdminFinance: React.FC = () => {
                       </label>
                       <input
                         type="text"
-                        placeholder="e.g. Corrected voucher from ₹100 to ₹200 as per counter receipt"
-                        value={editingOperating.notes}
-                        onChange={(e) => setEditingOperating({ ...editingOperating, notes: e.target.value })}
+                        placeholder="e.g. Supplier invoice corrected, payment adjusted from ₹100 to ₹200"
+                        value={editingMfg.notes}
+                        onChange={(e) => setEditingMfg({ ...editingMfg, notes: e.target.value })}
                         className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-forest-900/15 focus:border-forest-900"
                       />
                     </div>
                   </div>
+
+                </form>
+
+                {/* STICKY LUXURY FOOTER */}
+                <div className="px-6 py-4 bg-white border-t border-slate-200/80 flex items-center justify-between shrink-0">
+                  <span className="text-[11px] text-slate-400 font-sans hidden sm:inline">
+                    Inventory stock is adjusted by the delta of batch quantity change automatically.
+                  </span>
+                  <div className="flex items-center space-x-3 ml-auto">
+                    <button
+                      type="button"
+                      onClick={() => setEditingMfg(null)}
+                      className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl cursor-pointer transition text-xs"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      form="editMfgForm"
+                      disabled={isUpdatingMfg}
+                      className="px-6 py-2.5 bg-gradient-to-r from-forest-900 to-forest-950 hover:from-forest-950 hover:to-black text-gold-400 font-bold rounded-xl shadow-md transition transform hover:scale-[1.01] cursor-pointer disabled:opacity-50 text-xs"
+                    >
+                      {isUpdatingMfg ? 'Updating...' : 'Save Changes & Log Audit'}
+                    </button>
+                  </div>
                 </div>
+              </div>
+            </div>
+          )
+        }
 
-              </form>
-
-              {/* STICKY LUXURY FOOTER */}
-              <div className="px-6 py-4 bg-white border-t border-slate-200/80 flex items-center justify-between shrink-0">
-                <span className="text-[11px] text-slate-400 font-sans hidden sm:inline">
-                  Every overhead expense revision is strictly auditable by store administrators.
-                </span>
-                <div className="flex items-center space-x-3 ml-auto">
+        {/* ====================================================================
+          MODAL 11: VIEW OPERATING EXPENSE DETAILS & AUDIT CHANGE LOG
+          ==================================================================== */}
+        {
+          selectedOperatingForView && !editingOperating && (
+            <div className="space-y-6 w-full animate-fadeIn pb-12">
+              {/* Top Action Nav Bar with Back Button */}
+              <div className="bg-white p-3.5 sm:p-5 rounded-2xl sm:rounded-3xl border border-slate-200/90 shadow-xs">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-4 w-full">
                   <button
                     type="button"
-                    onClick={() => setEditingOperating(null)}
-                    className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl cursor-pointer transition text-xs"
+                    onClick={() => setSelectedOperatingForView(null)}
+                    className="inline-flex items-center space-x-1.5 sm:space-x-2 px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl bg-slate-100 hover:bg-forest-900 hover:text-gold-400 text-slate-700 font-bold text-xs sm:text-sm transition cursor-pointer shadow-xs group shrink-0 self-start sm:self-auto"
                   >
-                    Cancel
+                    <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+                    <span>Back<span className="hidden sm:inline"> to Shop & Overhead</span></span>
                   </button>
+                  <div className="h-6 w-px bg-slate-200 hidden sm:block" />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center space-x-2">
+                      <span className="p-1 sm:p-1.5 bg-forest-900/10 text-forest-900 rounded-lg shrink-0">
+                        <Receipt className="w-4 sm:w-5 h-4 sm:h-5 text-forest-900" />
+                      </span>
+                      <h2 className="font-serif text-base sm:text-xl font-bold text-forest-950 truncate">
+                        {`Operating Expense: ${selectedOperatingForView?.title || 'Overhead Voucher'}`}
+                      </h2>
+                    </div>
+                    <p className="text-[11px] sm:text-xs text-slate-500 mt-0.5 truncate">{selectedOperatingForView ? `Category: ${selectedOperatingForView.category} • Voucher Date: ${new Date(selectedOperatingForView.expenseDate).toLocaleDateString('en-IN')}` : ''}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Main Full-Page Content Card */}
+              <div className="bg-[#FDFBF7] rounded-3xl w-full shadow-xs border border-amber-900/15 overflow-hidden">
+                {/* STICKY LUXURY HEADER */}
+                <div className="px-6 py-6 bg-gradient-to-r from-forest-950 via-[#0B2316] to-forest-900 text-white flex items-center justify-between shrink-0 border-b border-gold-400/20 shadow-md">
+                  <div className="flex items-center space-x-3.5">
+                    <div className="w-11 h-11 rounded-2xl bg-rose-400/10 border border-rose-400/30 text-rose-300 flex items-center justify-center font-bold shadow-xs shrink-0">
+                      <Receipt className="w-5 h-5 text-rose-300" />
+                    </div>
+                    <div>
+                      <div className="flex items-center space-x-2.5 flex-wrap">
+                        <h3 className="font-serif text-lg sm:text-xl font-bold tracking-wide text-white">
+                          {selectedOperatingForView.title}
+                        </h3>
+                        <span className="px-2.5 py-0.5 rounded-full bg-rose-500/20 text-rose-200 border border-rose-400/30 font-bold text-[10px] uppercase tracking-wider">
+                          {formatCategory(selectedOperatingForView.category)}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-300 font-sans mt-0.5 flex items-center space-x-2">
+                        <span>Voucher Date: {new Date(selectedOperatingForView.expenseDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
+                        <span>•</span>
+                        <span>Paid To: {selectedOperatingForView.paidTo || 'Local Vendor'}</span>
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center space-x-1.5 sm:space-x-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const op = selectedOperatingForView;
+                        setSelectedOperatingForView(null);
+                        handleOpenEditOperating(op);
+                      }}
+                      className="p-2 text-gold-300 hover:text-forest-950 bg-gold-400/10 hover:bg-gold-400 rounded-xl border border-gold-400/30 transition cursor-pointer shadow-xs"
+                      title="Edit Expense"
+                    >
+                      <Edit2 className="w-4 h-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const op = selectedOperatingForView;
+                        setSelectedOperatingForView(null);
+                        handleDeleteOperating(op._id, op.title);
+                      }}
+                      className="p-2 text-slate-300 hover:text-rose-400 bg-white/5 hover:bg-rose-500/10 rounded-xl border border-white/10 hover:border-rose-500/20 transition cursor-pointer"
+                      title="Delete expense voucher"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedOperatingForView(null)}
+                      className="p-2 text-slate-300 hover:text-white bg-white/5 hover:bg-white/10 rounded-xl border border-white/10 transition cursor-pointer"
+                      title="Close"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* SCROLLABLE BODY */}
+                <div className="space-y-6 p-5 sm:p-7 space-y-6 bg-[#FCFBF8]">
+
+                  {/* 1. FINANCIAL SUMMARY RIBBON */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+                    <div className="p-4 bg-white rounded-2xl border border-rose-200 shadow-xs bg-rose-50/20">
+                      <span className="text-[10px] font-bold text-rose-600 uppercase tracking-wider block font-sans">
+                        Disbursed Amount
+                      </span>
+                      <span className="text-xl sm:text-2xl font-black text-rose-700 font-mono mt-1 block">
+                        ₹{Number(selectedOperatingForView.amount || 0).toLocaleString('en-IN')}
+                      </span>
+                      <span className="text-[10px] text-rose-500 mt-0.5 block">Operating overhead cost</span>
+                    </div>
+
+                    <div className="p-4 bg-white rounded-2xl border border-amber-900/10 shadow-xs">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block font-sans">
+                        Payment Mode
+                      </span>
+                      <span className="text-sm font-bold text-slate-800 font-mono mt-1.5 block">
+                        {selectedOperatingForView.paymentMode}
+                      </span>
+                      <span className="text-[10px] text-slate-500 mt-0.5 block">Settlement channel</span>
+                    </div>
+
+                    <div className="p-4 bg-white rounded-2xl border border-amber-900/10 shadow-xs">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block font-sans">
+                        Payee / Recipient
+                      </span>
+                      <span className="text-sm font-bold text-slate-800 font-sans mt-1.5 block">
+                        {selectedOperatingForView.paidTo || 'N/A'}
+                      </span>
+                      <span className="text-[10px] text-slate-500 mt-0.5 block">Beneficiary party</span>
+                    </div>
+                  </div>
+
+                  {/* 2. VOUCHER & SPECIFICATION DETAILS */}
+                  <div className="p-5 bg-white rounded-2xl border border-slate-200/90 shadow-xs space-y-3">
+                    <div className="flex items-center space-x-2 pb-2 border-b border-slate-100">
+                      <Receipt className="w-4 h-4 text-forest-900" />
+                      <h4 className="font-serif font-bold text-xs uppercase tracking-wider text-forest-950">
+                        Voucher Specifications
+                      </h4>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                      <div className="space-y-1">
+                        <span className="text-[11px] font-semibold text-slate-500 block">Expense Category</span>
+                        <p className="text-sm font-bold text-slate-900">{formatCategory(selectedOperatingForView.category)}</p>
+                      </div>
+
+                      <div className="space-y-1">
+                        <span className="text-[11px] font-semibold text-slate-500 block">Bill / Voucher Number</span>
+                        <p className="font-mono font-bold text-slate-800">
+                          {selectedOperatingForView.billNumber || 'None (Petty Cash)'}
+                        </p>
+                      </div>
+
+                      <div className="space-y-1">
+                        <span className="text-[11px] font-semibold text-slate-500 block">Voucher Date</span>
+                        <p className="text-slate-800 font-medium font-mono">
+                          {new Date(selectedOperatingForView.expenseDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                        </p>
+                      </div>
+
+                      <div className="space-y-1">
+                        <span className="text-[11px] font-semibold text-slate-500 block">Paid Beneficiary</span>
+                        <p className="text-slate-800 font-medium">
+                          {selectedOperatingForView.paidTo || 'Not specified'}
+                        </p>
+                      </div>
+
+                      {selectedOperatingForView.notes && (
+                        <div className="md:col-span-2 p-3 bg-amber-50/60 rounded-xl border border-amber-200/60 text-xs">
+                          <span className="font-bold text-amber-950 block text-[10.5px] uppercase tracking-wider mb-0.5">Voucher Notes:</span>
+                          <p className="text-amber-900">{selectedOperatingForView.notes}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* 3. AUDIT CHANGE LOGS SECTION */}
+                  <div className="p-5 bg-white rounded-2xl border border-slate-200/90 shadow-xs space-y-4">
+                    <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                      <div className="flex items-center space-x-2">
+                        <History className="w-4 h-4 text-forest-900" />
+                        <h4 className="font-serif font-bold text-xs uppercase tracking-wider text-forest-950">
+                          Official Audit Trail & Modification History
+                        </h4>
+                      </div>
+                      <span className="px-2.5 py-0.5 bg-slate-100 text-slate-700 rounded-full font-mono text-[10px] font-bold border border-slate-200">
+                        {selectedOperatingForView.changeLogs?.length || 0} revisions recorded
+                      </span>
+                    </div>
+
+                    {!selectedOperatingForView.changeLogs || selectedOperatingForView.changeLogs.length === 0 ? (
+                      <div className="p-5 bg-slate-50/80 rounded-2xl border border-dashed border-slate-200 text-center">
+                        <CheckCircle2 className="w-6 h-6 text-emerald-600 mx-auto mb-1.5" />
+                        <p className="font-bold text-xs text-slate-700">Pristine Audit Record</p>
+                        <p className="text-[11px] text-slate-400 mt-0.5">
+                          No expense revisions or voucher amount changes have been recorded for this entry since initial entry.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {selectedOperatingForView.changeLogs.map((log: any, idx: number) => (
+                          <div key={idx} className="p-4 bg-rose-50/40 border border-rose-200/70 rounded-2xl space-y-2">
+                            <div className="flex items-center justify-between text-xs flex-wrap gap-2">
+                              <span className="px-2 py-0.5 bg-rose-200 text-rose-900 rounded-md font-bold font-sans text-[10px] tracking-wide uppercase">
+                                {log.label || log.field}
+                              </span>
+                              <span className="text-slate-400 font-mono text-[11px]">
+                                {new Date(log.changedAt).toLocaleString('en-IN', {
+                                  day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
+                                })}
+                              </span>
+                            </div>
+
+                            <div className="flex items-center space-x-3 text-xs font-mono py-1">
+                              <div className="flex items-center space-x-1.5">
+                                <span className="text-[10px] uppercase font-bold text-slate-400 font-sans">Old:</span>
+                                <span className="line-through text-slate-400 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                                  {String(log.oldValue ?? '')}
+                                </span>
+                              </div>
+                              <ArrowRight className="w-4 h-4 text-forest-800 shrink-0" />
+                              <div className="flex items-center space-x-1.5">
+                                <span className="text-[10px] uppercase font-bold text-emerald-700 font-sans">New:</span>
+                                <span className="font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded shadow-2xs">
+                                  {String(log.newValue ?? '')}
+                                </span>
+                              </div>
+                            </div>
+
+                            {log.description && (
+                              <p className="text-[11.5px] text-slate-700 font-sans bg-white p-2.5 rounded-xl border border-slate-200/60">
+                                {log.description}
+                              </p>
+                            )}
+
+                            <div className="text-[10.5px] text-slate-400 pt-0.5 flex items-center space-x-1">
+                              <span>Modified by:</span>
+                              <span className="font-bold text-slate-800">{log.changedBy?.name || 'Administrator'}</span>
+                              <span>({log.changedBy?.email || 'admin@novise.in'})</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                </div>
+
+                {/* STICKY LUXURY FOOTER */}
+                <div className="px-6 py-4 bg-white border-t border-slate-200/80 flex items-center justify-between shrink-0">
+                  <p className="text-[11px] text-slate-400 font-sans">
+                    Novise Herbal Overhead Cell • Voucher Verified & Logged
+                  </p>
                   <button
-                    type="submit"
-                    form="editOperatingForm"
-                    disabled={isUpdatingOperating}
-                    className="px-6 py-2.5 bg-gradient-to-r from-forest-900 to-forest-950 hover:from-forest-950 hover:to-black text-gold-400 font-bold rounded-xl shadow-md transition transform hover:scale-[1.01] cursor-pointer disabled:opacity-50 text-xs"
+                    onClick={() => setSelectedOperatingForView(null)}
+                    className="px-6 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl cursor-pointer transition text-xs"
                   >
-                    {isUpdatingOperating ? 'Updating...' : 'Save Changes & Log Audit'}
+                    Close Voucher
                   </button>
                 </div>
               </div>
             </div>
-          </div>
-        )
-      }
+          )
+        }
 
-      {/* Global Confirmation Modal for Deletion of Offline Sales, Mfg, and Overhead */}
-      <AdminConfirmModal
-        isOpen={Boolean(deleteConfirmation)}
-        title={deleteConfirmation?.title}
-        message={deleteConfirmation?.message || 'Are you sure you want to delete this record?'}
-        itemName={deleteConfirmation?.itemName}
-        itemBadge={deleteConfirmation?.itemBadge}
-        isLoading={isDeletingFinanceItem}
-        onConfirm={handleConfirmDeleteFinanceItem}
-        onClose={() => !isDeletingFinanceItem && setDeleteConfirmation(null)}
-      />
+        {/* ====================================================================
+          MODAL 12: EDIT OPERATING EXPENSE & PRESERVE CHANGE LOG
+          ==================================================================== */}
+        {
+          editingOperating && (
+            <div className="space-y-6 w-full animate-fadeIn pb-12">
+              {/* Top Action Nav Bar with Back Button */}
+              <div className="bg-white p-3.5 sm:p-5 rounded-2xl sm:rounded-3xl border border-slate-200/90 shadow-xs">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-4 w-full">
+                  <button
+                    type="button"
+                    onClick={() => setEditingOperating(null)}
+                    className="inline-flex items-center space-x-1.5 sm:space-x-2 px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl bg-slate-100 hover:bg-forest-900 hover:text-gold-400 text-slate-700 font-bold text-xs sm:text-sm transition cursor-pointer shadow-xs group shrink-0 self-start sm:self-auto"
+                  >
+                    <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+                    <span>Back<span className="hidden sm:inline">{selectedOperatingForView ? ' to Expense View' : ' to Shop & Overhead'}</span></span>
+                  </button>
+                  <div className="h-6 w-px bg-slate-200 hidden sm:block" />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center space-x-2">
+                      <span className="p-1 sm:p-1.5 bg-forest-900/10 text-forest-900 rounded-lg shrink-0">
+                        <Edit2 className="w-4 sm:w-5 h-4 sm:h-5 text-forest-900" />
+                      </span>
+                      <h2 className="font-serif text-base sm:text-xl font-bold text-forest-950 truncate">
+                        {`Edit Expense : ${editingOperating?.title || 'Overhead Expense'}`}
+                      </h2>
+                    </div>
+                    <p className="text-[11px] sm:text-xs text-slate-500 mt-0.5 break-word">
+                      {'Update category, payment mode, vendor, or voucher specs with revision logging.'}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Main Full-Page Content Card */}
+              <div className="bg-[#FDFBF7] rounded-3xl w-full shadow-xs border border-amber-900/15 overflow-hidden">
+                {/* STICKY LUXURY HEADER */}
+                <div className="px-6 py-6 bg-gradient-to-r from-forest-950 via-[#0B2316] to-forest-900 text-white flex items-center justify-between shrink-0 border-b border-gold-400/20 shadow-md">
+                  <div className="flex items-center space-x-3.5">
+                    <div className="w-11 h-11 rounded-2xl bg-gold-400/10 border border-gold-400/30 text-gold-400 flex items-center justify-center font-bold shadow-xs shrink-0">
+                      <Edit2 className="w-5 h-5 text-gold-400" />
+                    </div>
+                    <div>
+                      <div className="flex items-center space-x-2.5">
+                        <h3 className="font-serif text-lg sm:text-xl font-bold tracking-wide text-white">
+                          Edit Operating Overhead Expense
+                        </h3>
+                      </div>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => setEditingOperating(null)}
+                    className="p-2 text-slate-300 hover:text-white rounded-xl hover:bg-white/10 transition cursor-pointer"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                {/* SCROLLABLE BODY FORM */}
+                <form id="editOperatingForm" onSubmit={handleUpdateOperating} className="space-y-6 p-5 sm:p-7 space-y-5 bg-[#FCFBF8]">
+
+                  {/* Notice Banner */}
+                  <div className="p-4 bg-rose-50/70 border border-rose-200 rounded-2xl flex items-start space-x-3">
+                    <AlertTriangle className="w-5 h-5 text-rose-700 shrink-0 mt-0.5" />
+                    <div className="text-xs text-rose-950">
+                      <p className="font-bold">Overhead Audit Notice</p>
+                      <p className="text-rose-900 mt-0.5">
+                        Updating this voucher's payment amount or beneficiary will be preserved in the audit log with previous vs revised values.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Section: Expense Classification & Details */}
+                  <div className="p-5 bg-white rounded-2xl border border-slate-200/90 shadow-xs space-y-4">
+                    <h4 className="font-serif font-bold text-xs uppercase tracking-wider text-forest-950 flex items-center space-x-2">
+                      <Receipt className="w-4 h-4 text-forest-900" />
+                      <span>Expense Classification & Title</span>
+                    </h4>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                          Expense Category <span className="text-rose-500">*</span>
+                        </label>
+                        <AdminSelect
+                          value={editingOperating.category}
+                          onChange={(val) => setEditingOperating({ ...editingOperating, category: val })}
+                          options={OPERATING_CATEGORY_OPTIONS}
+                          size="md"
+                          searchable={true}
+                          className="w-full"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                          Expense Title / Description <span className="text-slate-400 font-normal">(Optional)</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={editingOperating.title}
+                          onChange={(e) => setEditingOperating({ ...editingOperating, title: e.target.value })}
+                          className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-forest-900/15 focus:border-forest-900"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                          Expense Amount (₹) <span className="text-rose-500">*</span>
+                        </label>
+                        <div className="relative">
+                          <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-rose-600 font-bold">₹</span>
+                          <input
+                            type="number"
+                            min="1"
+                            required
+                            value={editingOperating.amount}
+                            onChange={(e) => setEditingOperating({ ...editingOperating, amount: Number(e.target.value) })}
+                            className="w-full pl-8 pr-4 py-2.5 bg-white border border-slate-300 rounded-xl text-sm font-mono font-bold text-rose-700 focus:outline-none focus:ring-2 focus:ring-rose-700/15 focus:border-rose-700"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 mb-1">Payment Mode</label>
+                        <AdminSelect
+                          value={editingOperating.paymentMode}
+                          onChange={(val) => setEditingOperating({ ...editingOperating, paymentMode: val })}
+                          options={PAYMENT_MODE_OPTIONS}
+                          size="md"
+                          className="w-full"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 mb-1">Paid To (Vendor/Person)</label>
+                        <input
+                          type="text"
+                          value={editingOperating.paidTo}
+                          onChange={(e) => setEditingOperating({ ...editingOperating, paidTo: e.target.value })}
+                          className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-forest-900/15 focus:border-forest-900"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 mb-1">Bill / Voucher #</label>
+                        <input
+                          type="text"
+                          value={editingOperating.billNumber}
+                          onChange={(e) => setEditingOperating({ ...editingOperating, billNumber: e.target.value })}
+                          className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-mono text-slate-900 focus:outline-none focus:ring-2 focus:ring-forest-900/15 focus:border-forest-900"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 mb-1">Expense Date</label>
+                        <input
+                          type="date"
+                          value={editingOperating.expenseDate}
+                          onChange={(e) => setEditingOperating({ ...editingOperating, expenseDate: e.target.value })}
+                          className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-mono text-slate-900 focus:outline-none focus:ring-2 focus:ring-forest-900/15 focus:border-forest-900"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                          Reason for Revision / Notes (Logged in Audit Trail)
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Corrected voucher from ₹100 to ₹200 as per counter receipt"
+                          value={editingOperating.notes}
+                          onChange={(e) => setEditingOperating({ ...editingOperating, notes: e.target.value })}
+                          className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-forest-900/15 focus:border-forest-900"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                </form>
+
+                {/* STICKY LUXURY FOOTER */}
+                <div className="px-6 py-4 bg-white border-t border-slate-200/80 flex items-center justify-between shrink-0">
+                  <span className="text-[11px] text-slate-400 font-sans hidden sm:inline">
+                    Every overhead expense revision is strictly auditable by store administrators.
+                  </span>
+                  <div className="flex items-center space-x-3 ml-auto">
+                    <button
+                      type="button"
+                      onClick={() => setEditingOperating(null)}
+                      className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl cursor-pointer transition text-xs"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      form="editOperatingForm"
+                      disabled={isUpdatingOperating}
+                      className="px-6 py-2.5 bg-gradient-to-r from-forest-900 to-forest-950 hover:from-forest-950 hover:to-black text-gold-400 font-bold rounded-xl shadow-md transition transform hover:scale-[1.01] cursor-pointer disabled:opacity-50 text-xs"
+                    >
+                      {isUpdatingOperating ? 'Updating...' : 'Save Changes & Log Audit'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )
+        }
+
+        {/* Global Confirmation Modal for Deletion of Offline Sales, Mfg, and Overhead */}
+        <AdminConfirmModal
+          isOpen={Boolean(deleteConfirmation)}
+          title={deleteConfirmation?.title}
+          message={deleteConfirmation?.message || 'Are you sure you want to delete this record?'}
+          itemName={deleteConfirmation?.itemName}
+          itemBadge={deleteConfirmation?.itemBadge}
+          isLoading={isDeletingFinanceItem}
+          onConfirm={handleConfirmDeleteFinanceItem}
+          onClose={() => !isDeletingFinanceItem && setDeleteConfirmation(null)}
+        />
+      </div>
     </div>
   );
 };

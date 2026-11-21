@@ -65,11 +65,16 @@ export class FinanceService {
     const mfgQuery = hasDate ? { expenseDate: dateQuery } : {};
     const opQuery = hasDate ? { expenseDate: dateQuery } : {};
 
-    // 1. Sales Data from Online Orders & Offline Retail
-    const [orders, offlineSales] = await Promise.all([
-      Order.find(orderQuery).sort({ createdAt: -1 }),
-      OfflineSale.find(offlineQuery).sort({ saleDate: -1 })
-    ]);
+    // 1. Parallelize all 4 collections using lean() and selective projections for maximum speed
+    const [orders, offlineSales, mfgExpenses, operatingExpenses] = await Promise.all([
+        Order.find(orderQuery)
+          .select('orderId createdAt pricing.totalAmount pricing.shippingFee customerDetails.fullName shippingAddress.city shippingAddress.state paymentInfo.method paymentInfo.status orderStatus')
+          .sort({ createdAt: -1 })
+          .lean(),
+        OfflineSale.find(offlineQuery).sort({ saleDate: -1 }).lean(),
+        ManufacturingExpense.find(mfgQuery).sort({ expenseDate: -1 }).lean(),
+        OperatingExpense.find(opQuery).sort({ expenseDate: -1 }).lean()
+      ]);
 
     const grossSalesValue = orders.reduce((sum, o) => sum + (Number(o.pricing?.totalAmount) || 0), 0);
     const offlineGrossValue = offlineSales.reduce((sum, s) => sum + (Number(s.totalAmount) || 0), 0);
@@ -102,7 +107,6 @@ export class FinanceService {
     const netSalesInflow = realizedRevenue + offlineRealizedRevenue;
 
     // Manufacturing / Sourcing Expenses (COGS)
-    const mfgExpenses = await ManufacturingExpense.find(mfgQuery).sort({ expenseDate: -1 });
     const totalManufacturingCost = mfgExpenses.reduce((sum, m) => sum + (Number(m.totalCost) || 0), 0);
     const totalManufacturingPaid = mfgExpenses.reduce((sum, m) => sum + (Number(m.amountPaid) || 0), 0);
     const totalManufacturingDue = mfgExpenses.reduce((sum, m) => sum + (Number(m.amountDue) || 0), 0);
@@ -110,7 +114,6 @@ export class FinanceService {
     const netManufacturingExpense = Math.max(0, totalManufacturingCost - totalSupplierReturnsRefunded);
 
     // Operating Overhead Expenses
-    const operatingExpenses = await OperatingExpense.find(opQuery).sort({ expenseDate: -1 });
     const totalOperatingExpense = operatingExpenses.reduce((sum, o) => sum + (Number(o.amount) || 0), 0);
 
     // Operating Expenses by Category
@@ -185,8 +188,11 @@ export class FinanceService {
     const offlineQuery = hasDate ? { saleDate: dateQuery } : {};
 
     const [orders, offlineSales] = await Promise.all([
-      Order.find(orderQuery).sort({ createdAt: -1 }),
-      OfflineSale.find(offlineQuery).sort({ saleDate: -1 })
+      Order.find(orderQuery)
+        .select('orderId createdAt customerDetails.fullName shippingAddress.city shippingAddress.state pricing.totalAmount pricing.shippingFee paymentInfo.method paymentInfo.status orderStatus')
+        .sort({ createdAt: -1 })
+        .lean(),
+      OfflineSale.find(offlineQuery).sort({ saleDate: -1 }).lean()
     ]);
 
     // 1. Online Sales Metrics
@@ -319,7 +325,7 @@ export class FinanceService {
     const hasDate = Boolean(dateQuery.$gte || dateQuery.$lte);
     const mfgQuery = hasDate ? { expenseDate: dateQuery } : {};
 
-    const entries = await ManufacturingExpense.find(mfgQuery).sort({ expenseDate: -1 });
+    const entries = await ManufacturingExpense.find(mfgQuery).sort({ expenseDate: -1 }).lean();
 
     const totalCost = entries.reduce((sum, e) => sum + (Number(e.totalCost) || 0), 0);
     const totalPaid = entries.reduce((sum, e) => sum + (Number(e.amountPaid) || 0), 0);
@@ -605,7 +611,7 @@ export class FinanceService {
     const hasDate = Boolean(dateQuery.$gte || dateQuery.$lte);
     const opQuery = hasDate ? { expenseDate: dateQuery } : {};
 
-    const entries = await OperatingExpense.find(opQuery).sort({ expenseDate: -1 });
+    const entries = await OperatingExpense.find(opQuery).sort({ expenseDate: -1 }).lean();
     const totalOperatingExpense = entries.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
 
     const categoryBreakdown = {};

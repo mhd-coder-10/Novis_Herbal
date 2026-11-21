@@ -5,47 +5,74 @@ import Review from '../models/Review.js';
 
 export class DashboardService {
   static async getStats() {
-    const totalOrders = await Order.countDocuments();
-    const pendingOrders = await Order.countDocuments({
-      orderStatus: { $in: ['PLACED', 'CONFIRMED', 'PROCESSING', 'PACKED'] }
-    });
-    const deliveredOrders = await Order.countDocuments({ orderStatus: 'DELIVERED' });
-    const cancelledOrders = await Order.countDocuments({ orderStatus: 'CANCELLED' });
-
-    const paidOrders = await Order.find({
-      $or: [
-        { 'paymentInfo.method': 'ONLINE', 'paymentInfo.status': 'PAID' },
-        { 'paymentInfo.method': 'COD', orderStatus: 'DELIVERED' }
-      ],
-      orderStatus: { $ne: 'CANCELLED' }
-    });
-    const totalRevenue = paidOrders.reduce((sum, o) => sum + (o.pricing?.totalAmount || 0), 0);
-
-    const totalCustomers = await User.countDocuments({ role: 'customer' });
-    const lowStockCount = await Product.countDocuments({
-      $expr: { $lte: ['$stock', '$lowStockThreshold'] }
-    });
-
-    // Real Customer Reviews calculation from MongoDB
-    const totalReviews = await Review.countDocuments();
-    const ratingAggregate = await Review.aggregate([
-      { $match: { rating: { $exists: true, $ne: null } } },
-      {
-        $group: {
-          _id: null,
-          avgRating: { $avg: '$rating' },
-          totalCount: { $sum: 1 }
+    const [
+      totalOrders,
+      pendingOrders,
+      deliveredOrders,
+      cancelledOrders,
+      revenueAggregate,
+      totalCustomers,
+      lowStockCount,
+      totalReviews,
+      ratingAggregate,
+      recentOrders,
+      onlineOrdersCount,
+      codOrdersCount
+    ] = await Promise.all([
+      Order.countDocuments(),
+      Order.countDocuments({
+        orderStatus: { $in: ['PLACED', 'CONFIRMED', 'PROCESSING', 'PACKED'] }
+      }),
+      Order.countDocuments({ orderStatus: 'DELIVERED' }),
+      Order.countDocuments({ orderStatus: 'CANCELLED' }),
+      Order.aggregate([
+        {
+          $match: {
+            $or: [
+              { 'paymentInfo.method': 'ONLINE', 'paymentInfo.status': 'PAID' },
+              { 'paymentInfo.method': 'COD', orderStatus: 'DELIVERED' }
+            ],
+            orderStatus: { $ne: 'CANCELLED' }
+          }
+        },
+        {
+          $group: {
+            _id: null,
+            totalRevenue: { $sum: '$pricing.totalAmount' }
+          }
         }
-      }
+      ]),
+      User.countDocuments({ role: 'customer' }),
+      Product.countDocuments({
+        $expr: { $lte: ['$stock', '$lowStockThreshold'] }
+      }),
+      Review.countDocuments(),
+      Review.aggregate([
+        { $match: { rating: { $exists: true, $ne: null } } },
+        {
+          $group: {
+            _id: null,
+            avgRating: { $avg: '$rating' },
+            totalCount: { $sum: 1 }
+          }
+        }
+      ]),
+      Order.find()
+        .select('orderId createdAt customerDetails.fullName pricing.totalAmount orderStatus paymentInfo.status paymentInfo.method')
+        .sort({ createdAt: -1 })
+        .limit(5)
+        .lean(),
+      Order.countDocuments({ 'paymentInfo.method': 'ONLINE' }),
+      Order.countDocuments({ 'paymentInfo.method': 'COD' })
     ]);
+
+    const totalRevenue = revenueAggregate.length > 0 && revenueAggregate[0].totalRevenue
+      ? revenueAggregate[0].totalRevenue
+      : 0;
+
     const averageRating = ratingAggregate.length > 0 && ratingAggregate[0].avgRating
       ? Number(ratingAggregate[0].avgRating.toFixed(1))
       : 0;
-
-    const recentOrders = await Order.find().sort({ createdAt: -1 }).limit(5);
-
-    const onlineOrdersCount = await Order.countDocuments({ 'paymentInfo.method': 'ONLINE' });
-    const codOrdersCount = await Order.countDocuments({ 'paymentInfo.method': 'COD' });
 
     return {
       stats: {

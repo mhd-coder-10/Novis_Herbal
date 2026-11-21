@@ -62,4 +62,8 @@ productSchema.pre('save', function(next) {
   next();
 });
 
+productSchema.index({ isActive: 1, createdAt: -1 });
+productSchema.index({ category: 1 });
+productSchema.index({ stock: 1 });
+
 export default mongoose.model('Product', productSchema);
